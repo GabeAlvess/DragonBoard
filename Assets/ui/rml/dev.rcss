@@ -1,0 +1,464 @@
+.dev-mark {
+    color: #5a321b;
+    border-color: #9f6b28;
+}
+
+.warning-dot {
+    background-color: #c88b35;
+}
+
+.dev-page {
+    width: 1394px;
+}
+
+.dev-lead {
+    margin-bottom: 22px;
+}
+
+.command-workspace {
+    width: 1394px;
+    height: 620px;
+    display: flex;
+}
+
+.command-list-panel {
+    width: 430px;
+    height: 620px;
+    padding: 22px;
+    background-color: #f1e4cf;
+    border: 1px #c7ad80;
+    border-radius: 6px;
+}
+
+.command-list {
+    display: flex;
+    flex-direction: column;
+    height: 535px;
+    overflow-y: auto;
+}
+
+.command-item {
+    display: block;
+    width: 384px;
+    min-height: 66px;
+    margin-bottom: 8px;
+    padding: 10px 16px;
+    color: #725d47;
+    font-size: 30px;
+    text-align: left;
+    border-radius: 5px;
+}
+
+.command-item.active {
+    color: #3d2717;
+    background-color: #ead3a7;
+    border-color: #b77e2b;
+}
+
+.command-details {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 944px;
+    height: 620px;
+    margin-left: 20px;
+    padding: 25px 30px;
+    background-color: #f8f0e3;
+    border: 1px #c7ad80;
+    border-radius: 6px;
+}
+
+.subheading {
+    display: block;
+    padding-bottom: 11px;
+    margin-bottom: 16px;
+    color: #9b6e2d;
+    font-size: 23px;
+    letter-spacing: 3px;
+    border-bottom: 1px #cfb993;
+}
+
+.command-title {
+    display: block;
+    color: #422a18;
+    font-size: 43px;
+}
+
+.command-description {
+    display: block;
+    min-height: 115px;
+    margin-top: 14px;
+    color: #735f49;
+    font-size: 29px;
+    line-height: 1.2;
+}
+
+.console-label {
+    display: block;
+    margin-top: 14px;
+    color: #9b6e2d;
+    font-size: 23px;
+    letter-spacing: 2px;
+}
+
+.console-input {
+    display: block;
+    min-height: 60px;
+    margin-top: 7px;
+    padding: 12px 17px;
+    color: #4b311d;
+    font-size: 30px;
+    background-color: #eee0c9;
+    border: 1px #c3a77c;
+    border-radius: 5px;
+}
+
+.warning {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 15px;
+    color: #81451f;
+    font-size: 26px;
+    background-color: #f1cfad;
+    border-left: 4px #b85f2b;
+}
+
+.execute-button {
+    position: absolute;
+    right: 30px;
+    bottom: 25px;
+    width: 330px;
+    height: 62px;
+    color: #3b2515;
+    font-size: 30px;
+    background-color: #e1bf80;
+    border-color: #a96f20;
+    border-radius: 6px;
+}
+
+.execute-button:hover {
+    color: #2c1a0d;
+    background-color: #d7aa5b;
+}
+
+.execute-button:disabled {
+    opacity: 0.4;
+}
+
+.empty-state {
+    display: block;
+    padding: 18px;
+    color: #8c7961;
+    font-size: 29px;
+}
+
+.info-grid {
+    width: 1394px;
+    display: flex;
+}
+
+.info-card {
+    width: 687px;
+    min-height: 305px;
+    margin-right: 20px;
+    padding: 22px 25px;
+    background-color: #f5e9d7;
+    border: 1px #c8ae80;
+    border-radius: 6px;
+}
+
+.last-info-card {
+    margin-right: 0;
+}
+
+.location-card {
+    width: 1394px;
+    margin-top: 18px;
+    padding: 20px 25px;
+    background-color: #f5e9d7;
+    border: 1px #c8ae80;
+    border-radius: 6px;
+}
+
+.info-row {
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    color: #735f49;
+    font-size: 27px;
+    border-bottom: 1px #d2c1a5;
+}
+
+.info-value {
+    color: #402818;
+    text-align: right;
+}
+
+.info-note {
+    display: block;
+    margin-top: 11px;
+    color: #927d63;
+    font-size: 23px;
+}
+
+.dev-footer-note {
+    margin-left: auto;
+    color: #927d63;
+    font-size: 24px;
+}
+
+/* VR-safe developer surfaces. */
+.dev-mark {
+    color: #f1d9b5;
+    border-color: #b9843d;
+}
+
+.command-list-panel,
+.info-card,
+.location-card {
+    background-color: #33291f;
+    border-color: #765938;
+}
+
+.command-details {
+    background-color: #30271f;
+    border-color: #765938;
+}
+
+.subheading,
+.console-label {
+    color: #d09a4b;
+    border-color: #725638;
+}
+
+.command-item {
+    color: #c7b092;
+}
+
+.command-item.active {
+    color: #f6e3c5;
+    background-color: #533b24;
+    border-color: #c68b39;
+}
+
+.command-title,
+.info-value {
+    color: #f1ddbf;
+}
+
+.command-description,
+.info-row {
+    color: #cdb798;
+}
+
+.console-input {
+    color: #f2dcb9;
+    background-color: #211a14;
+    border-color: #8d683c;
+}
+
+.warning {
+    color: #ffd0a6;
+    background-color: #4c2c20;
+    border-left-color: #d8793d;
+}
+
+.execute-button {
+    color: #21160e;
+    background-color: #bd8437;
+    border-color: #dfa550;
+}
+
+.execute-button:hover {
+    color: #1a110b;
+    background-color: #d09a4a;
+}
+
+.empty-state,
+.info-note,
+.dev-footer-note {
+    color: #a99070;
+}
+
+.info-row {
+    border-color: #604a32;
+}
+
+/* Extreme VR exposure compensation. */
+.command-list-panel,
+.info-card,
+.location-card {
+    background-color: #0f0c09;
+    border-color: #4d391f;
+}
+
+.command-details {
+    background-color: #0c0a08;
+    border-color: #4d391f;
+}
+
+.command-item.active {
+    background-color: #25180e;
+    border-color: #936022;
+}
+
+.console-input {
+    background-color: #070605;
+    border-color: #60431f;
+}
+
+.warning {
+    background-color: #24120d;
+}
+
+.execute-button {
+    background-color: #9d6726;
+    border-color: #c58a39;
+}
+
+.execute-button:hover {
+    background-color: #b77d31;
+}
+
+/* Final neutral-grey developer palette. */
+.dev-mark {
+    color: #dddddd;
+    border-color: #777777;
+}
+
+.warning-dot {
+    background-color: #999999;
+}
+
+.command-list-panel,
+.info-card,
+.location-card {
+    background-color: #242424;
+    border-color: #505050;
+}
+
+.command-details {
+    background-color: #202020;
+    border-color: #505050;
+}
+
+.subheading,
+.console-label {
+    color: #a8a8a8;
+    border-color: #505050;
+}
+
+.command-item {
+    color: #aaaaaa;
+}
+
+.command-item.active {
+    color: #e2e2e2;
+    background-color: #393939;
+    border-color: #737373;
+}
+
+.command-title,
+.info-value {
+    color: #dddddd;
+}
+
+.command-description,
+.info-row {
+    color: #b8b8b8;
+}
+
+.console-input {
+    color: #d8d8d8;
+    background-color: #171717;
+    border-color: #555555;
+}
+
+.warning {
+    color: #bbbbbb;
+    background-color: #292929;
+    border-left-color: #707070;
+}
+
+/* Execute is not an apply action, so it remains grey. */
+.execute-button {
+    color: #eeeeee;
+    background-color: #4a4a4a;
+    border-color: #777777;
+}
+
+.execute-button:hover {
+    color: #ffffff;
+    background-color: #5e5e5e;
+    border-color: #929292;
+}
+
+.empty-state,
+.info-note,
+.dev-footer-note {
+    color: #929292;
+}
+
+.info-row {
+    border-color: #484848;
+}
+
+/* Large-format developer typography. */
+.nav-item {
+    height: 126px;
+    line-height: 1.12;
+}
+
+.subheading,
+.console-label {
+    font-size: 35px;
+    line-height: 1.2;
+}
+
+.command-item {
+    min-height: 94px;
+    padding-top: 17px;
+    padding-bottom: 17px;
+    font-size: 46px;
+    line-height: 1.15;
+}
+
+.command-title {
+    font-size: 64px;
+    line-height: 1.1;
+}
+
+.command-description {
+    min-height: 164px;
+    font-size: 44px;
+    line-height: 1.25;
+}
+
+.console-input {
+    min-height: 84px;
+    font-size: 45px;
+    line-height: 1.2;
+}
+
+.warning {
+    font-size: 38px;
+    line-height: 1.2;
+}
+
+.execute-button {
+    height: 84px;
+    font-size: 44px;
+}
+
+.info-row {
+    min-height: 76px;
+    font-size: 41px;
+    line-height: 1.15;
+}
+
+.info-note {
+    font-size: 35px;
+    line-height: 1.2;
+}

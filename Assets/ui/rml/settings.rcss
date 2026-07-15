@@ -1,0 +1,1257 @@
+/* DragonBoard ivory / bronze visual system. RmlUi RCSS, not browser CSS. */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    display: block;
+    width: 1920px;
+    height: 1080px;
+    margin: 0;
+    color: #3d2a1b;
+    font-family: DragonBoard;
+    font-size: 36px;
+}
+
+#app {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    display: flex;
+    background-color: #f7efe2;
+    border: 2px #c9ad7a;
+}
+
+aside {
+    position: relative;
+    width: 410px;
+    height: 1076px;
+    padding: 34px 32px;
+    background-color: #f1e5d2;
+    border-right: 1px #c9b899;
+}
+
+.brand {
+    height: 118px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+}
+
+.brand-mark {
+    width: 72px;
+    height: 86px;
+    padding-top: 18px;
+    color: #4b321e;
+    font-size: 42px;
+    text-align: center;
+    background-color: #f8f0e3;
+    border: 3px #5b3c24;
+    border-radius: 8px;
+}
+
+.brand-copy {
+    width: 240px;
+    margin-left: 18px;
+}
+
+.brand-name {
+    color: #3a2719;
+    font-size: 42px;
+    letter-spacing: 1px;
+}
+
+.brand-edition {
+    margin-top: 5px;
+    color: #79634c;
+    font-size: 22px;
+    letter-spacing: 2px;
+}
+
+.section-label,
+.page-eyebrow,
+.group-label {
+    color: #a8762f;
+    font-size: 23px;
+    letter-spacing: 4px;
+}
+
+.section-label {
+    display: block;
+    margin: 28px 14px 22px;
+    padding: 0 0 14px;
+    text-align: center;
+    border-bottom: 1px #c9ad7a;
+}
+
+button {
+    color: #4e3928;
+    font-family: DragonBoard;
+    background-color: transparent;
+    border: 1px transparent;
+    tab-index: auto;
+}
+
+button:hover {
+    color: #2f1d10;
+    background-color: #f4dfb8;
+    border-color: #bd8b3e;
+}
+
+button:active {
+    background-color: #e9cf9e;
+}
+
+.nav-item {
+    width: 346px;
+    height: 76px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 7px;
+    padding: 0 22px;
+    font-size: 34px;
+    text-align: left;
+    border-radius: 6px;
+}
+
+.nav-key {
+    width: 48px;
+    margin-right: 16px;
+    color: #8b7359;
+    font-size: 23px;
+    letter-spacing: 1px;
+}
+
+.nav-item.active {
+    color: #3a2617;
+    background-color: #ecd5a9;
+    border-color: #bd8b3e;
+}
+
+.nav-item.active .nav-key {
+    color: #8b5b1c;
+}
+
+.sidebar-status {
+    position: absolute;
+    left: 38px;
+    right: 38px;
+    bottom: 30px;
+    padding: 22px 10px 0;
+    color: #4f3b2b;
+    font-size: 26px;
+    border-top: 1px #c7ad80;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    margin-right: 12px;
+    background-color: #59a76b;
+    border-radius: 7px;
+}
+
+.version {
+    margin: 8px 0 0 25px;
+    color: #8b7862;
+    font-size: 23px;
+}
+
+.content-shell {
+    width: 1506px;
+    height: 1076px;
+}
+
+header {
+    width: 1506px;
+    height: 104px;
+    display: flex;
+    align-items: center;
+    padding: 0 48px;
+    border-bottom: 1px #cdbb9e;
+}
+
+.breadcrumb {
+    color: #45301f;
+    font-size: 27px;
+}
+
+.breadcrumb-muted {
+    color: #6d5843;
+}
+
+.breadcrumb-slash {
+    margin: 0 16px;
+    color: #a78454;
+}
+
+.close-button {
+    width: 182px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    color: #402a1a;
+    font-size: 30px;
+    border: 1px #bc9156;
+    border-radius: 6px;
+}
+
+.keycap {
+    min-width: 36px;
+    height: 36px;
+    margin-left: 18px;
+    padding-top: 5px;
+    color: #57391f;
+    font-size: 23px;
+    text-align: center;
+    background-color: #fbf5ea;
+    border: 1px #b98a4d;
+    border-radius: 5px;
+}
+
+main {
+    width: 1506px;
+    height: 882px;
+    padding: 34px 56px 24px;
+    overflow-y: auto;
+}
+
+.page {
+    display: none;
+    width: 1394px;
+}
+
+.page-eyebrow {
+    display: block;
+    width: 1394px;
+    margin-top: 0;
+    text-align: center;
+}
+
+h1 {
+    display: block;
+    width: 1394px;
+    margin: 6px 0 3px;
+    color: #442b18;
+    font-size: 64px;
+    font-weight: normal;
+    letter-spacing: 3px;
+    text-align: center;
+}
+
+.lead {
+    display: block;
+    width: 1394px;
+    margin: 0 0 26px;
+    color: #766553;
+    font-size: 29px;
+    text-align: center;
+}
+
+.settings-card {
+    width: 1394px;
+    background-color: transparent;
+    border-top: 1px #cdb995;
+    border-bottom: 1px #cdb995;
+}
+
+.setting-row {
+    width: 1394px;
+    height: 136px;
+    display: flex;
+    align-items: center;
+    padding: 0 30px;
+    border-bottom: 1px #d2c2a8;
+}
+
+.setting-row:last-child {
+    border-bottom-width: 0;
+}
+
+.setting-row:hover,
+.setting-row.featured:hover {
+    background-color: #f1e2c9;
+}
+
+.setting-row.featured {
+    background-color: #f8f0e3;
+}
+
+.setting-copy {
+    width: 430px;
+}
+
+.setting-label,
+.setting-help {
+    display: block;
+}
+
+.setting-label {
+    color: #422d1d;
+    font-size: 34px;
+}
+
+.setting-help {
+    margin-top: 6px;
+    color: #776653;
+    font-size: 26px;
+}
+
+.setting-row input.range {
+    width: 650px;
+    height: 72px;
+    margin: 0 28px;
+    tab-index: auto;
+}
+
+input.range slidertrack {
+    height: 11px;
+    margin-top: 30px;
+    background-color: #ded4c3;
+    border-width: 0;
+    border-radius: 6px;
+}
+
+input.range sliderprogress {
+    height: 11px;
+    background-color: #c79645;
+    border-radius: 6px;
+}
+
+input.range sliderbar {
+    width: 38px;
+    height: 38px;
+    margin-top: 16px;
+    background-color: #fbf7ef;
+    border: 4px #a87323;
+    border-radius: 20px;
+}
+
+input.range:hover sliderbar {
+    background-color: #ffffff;
+    border-color: #c28b35;
+}
+
+input.range sliderbar:active {
+    background-color: #ead0a0;
+}
+
+input.range sliderarrowdec,
+input.range sliderarrowinc {
+    width: 0;
+    height: 0;
+    display: none;
+}
+
+.value {
+    width: 145px;
+    padding: 10px 12px;
+    color: #4a311e;
+    font-size: 31px;
+    text-align: center;
+    background-color: #fbf5e9;
+    border: 1px #c49a62;
+    border-radius: 5px;
+}
+
+.toggle-space {
+    width: 640px;
+}
+
+.toggle-button {
+    width: 238px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 10px;
+    color: #6d5945;
+    font-size: 27px;
+    border: 0px transparent;
+}
+
+.toggle-button:hover {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+.toggle-track {
+    position: relative;
+    display: inline-block;
+    width: 72px;
+    height: 34px;
+    margin-right: 15px;
+    background-color: #9a8c78;
+    border: 1px #6c5540;
+    border-radius: 18px;
+}
+
+.toggle-knob {
+    position: absolute;
+    display: block;
+    left: 3px;
+    top: 3px;
+    width: 26px;
+    height: 26px;
+    background-color: #fdf8ef;
+    border-radius: 14px;
+}
+
+.toggle-button.enabled .toggle-track {
+    background-color: #c89b4c;
+    border-color: #8b5a17;
+}
+
+.toggle-button.enabled .toggle-knob {
+    left: 41px;
+}
+
+.toggle-button.enabled .toggle-state {
+    color: #4c3019;
+}
+
+.toggle-state {
+    display: inline-block;
+    width: 120px;
+    text-align: left;
+}
+
+.hint {
+    margin-top: 16px;
+    padding: 13px 18px;
+    color: #7d6951;
+    font-size: 24px;
+    background-color: #f0e1c8;
+    border-left: 4px #b98433;
+}
+
+.hint-icon {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    margin-right: 13px;
+    padding-top: 2px;
+    color: #fffaf0;
+    text-align: center;
+    background-color: #b98433;
+    border-radius: 16px;
+}
+
+.group-label {
+    margin: 18px 0 10px;
+}
+
+.rotation-label {
+    margin-top: 20px;
+}
+
+.rotation-row {
+    width: 1394px;
+    display: flex;
+}
+
+.axis-card {
+    width: 451px;
+    height: 116px;
+    margin-right: 20px;
+    padding: 15px 19px;
+    background-color: #f5ead8;
+    border: 1px #cdb995;
+    border-radius: 6px;
+}
+
+.axis-card.last {
+    margin-right: 0;
+}
+
+.axis-head {
+    display: flex;
+    align-items: center;
+}
+
+.axis-key {
+    width: 32px;
+    height: 32px;
+    padding-top: 3px;
+    color: #8b5d1e;
+    font-size: 22px;
+    text-align: center;
+    background-color: #ead4aa;
+    border-radius: 4px;
+}
+
+.axis-value {
+    margin-left: auto;
+    color: #4a311e;
+    font-size: 27px;
+}
+
+.axis-range {
+    width: 410px;
+    height: 56px;
+    margin-top: 1px;
+}
+
+footer {
+    width: 1506px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    padding: 0 48px;
+    border-top: 1px #cdbb9e;
+}
+
+.classic-button {
+    height: 58px;
+    padding: 0 18px;
+    color: #9a6e2f;
+    font-size: 28px;
+}
+
+.classic-mark {
+    margin-right: 12px;
+    color: #b47d2d;
+}
+
+.footer-spacer {
+    flex: 1;
+}
+
+.save-status {
+    margin-right: 28px;
+    color: #9c8a74;
+    font-size: 25px;
+}
+
+.save-button {
+    height: 62px;
+    padding: 0 18px 0 28px;
+    color: #3f2918;
+    font-size: 30px;
+    background-color: #ead1a2;
+    border: 1px #af7626;
+    border-radius: 6px;
+}
+
+.save-button:hover {
+    color: #2e1c0e;
+    background-color: #dfbc7b;
+    border-color: #8f5d18;
+}
+
+.keycap.light {
+    color: #4a3019;
+    background-color: #f9edda;
+    border-color: #a96f20;
+}
+
+#vr-cursor {
+    position: absolute;
+    left: 960px;
+    top: 540px;
+    width: 24px;
+    height: 24px;
+    margin-left: -12px;
+    margin-top: -12px;
+    pointer-events: none;
+    background-color: #fffaf0;
+    border: 4px #a96f20;
+    border-radius: 13px;
+}
+
+/*
+ * VR-safe low-luminance palette.
+ * The in-game quad reads bright UI colors like an emissive surface, so the
+ * parchment language is retained with deep umber surfaces and cream text.
+ */
+body {
+    color: #ead8bd;
+}
+
+#app {
+    background-color: #2d261f;
+    border-color: #8c6839;
+}
+
+aside {
+    background-color: #211b16;
+    border-right-color: #6f5637;
+}
+
+.brand-mark {
+    color: #f1d9b5;
+    background-color: #33281e;
+    border-color: #b9843d;
+}
+
+.brand-name,
+h1,
+.setting-label {
+    color: #f2dfc3;
+}
+
+.brand-edition,
+.version,
+.setting-help,
+.lead,
+.save-status {
+    color: #bda78b;
+}
+
+.section-label,
+.page-eyebrow,
+.group-label,
+.classic-button,
+.classic-mark {
+    color: #d09a4b;
+}
+
+.section-label,
+.sidebar-status,
+header,
+footer,
+.settings-card,
+.setting-row {
+    border-color: #6f5637;
+}
+
+button {
+    color: #ddc8aa;
+}
+
+button:hover {
+    color: #fff0d7;
+    background-color: #443526;
+    border-color: #b57c31;
+}
+
+button:active {
+    background-color: #513b26;
+}
+
+.nav-key {
+    color: #a99070;
+}
+
+.nav-item.active {
+    color: #f8e8cd;
+    background-color: #4b3825;
+    border-color: #bd8538;
+}
+
+.nav-item.active .nav-key {
+    color: #e1aa58;
+}
+
+.sidebar-status,
+.breadcrumb {
+    color: #dbc5a6;
+}
+
+.breadcrumb-muted {
+    color: #af987a;
+}
+
+.breadcrumb-slash {
+    color: #c18c43;
+}
+
+.close-button {
+    color: #f0dcc0;
+    border-color: #9d7038;
+}
+
+.keycap {
+    color: #f0d7b2;
+    background-color: #33281e;
+    border-color: #a9793d;
+}
+
+.setting-row:hover,
+.setting-row.featured:hover {
+    background-color: #403126;
+}
+
+.setting-row.featured {
+    background-color: #342a21;
+}
+
+input.range slidertrack {
+    background-color: #5e5448;
+}
+
+input.range sliderprogress {
+    background-color: #ce9643;
+}
+
+input.range sliderbar {
+    background-color: #f0d7ad;
+    border-color: #b97d28;
+}
+
+input.range:hover sliderbar {
+    background-color: #ffe9c4;
+    border-color: #d69b42;
+}
+
+input.range sliderbar:active {
+    background-color: #d4a75f;
+}
+
+.value {
+    color: #f4dfbd;
+    background-color: #211a14;
+    border-color: #a7773b;
+}
+
+.toggle-button {
+    color: #c8b294;
+}
+
+.toggle-track {
+    background-color: #625648;
+    border-color: #8d765c;
+}
+
+.toggle-knob {
+    background-color: #f1dfc5;
+}
+
+.toggle-button.enabled .toggle-track {
+    background-color: #b47e31;
+    border-color: #d29b4b;
+}
+
+.toggle-button.enabled .toggle-state {
+    color: #f0d8b5;
+}
+
+.hint {
+    color: #dbc4a4;
+    background-color: #3b2d22;
+    border-left-color: #c68c3c;
+}
+
+.hint-icon {
+    color: #2a1f16;
+    background-color: #d19a4b;
+}
+
+.axis-card {
+    background-color: #352a21;
+    border-color: #725638;
+}
+
+.axis-key {
+    color: #f0c985;
+    background-color: #493621;
+}
+
+.axis-value {
+    color: #f1ddbf;
+}
+
+.save-button {
+    color: #20160f;
+    background-color: #bd8437;
+    border-color: #dfa550;
+}
+
+.save-button:hover {
+    color: #1b120c;
+    background-color: #d09a4a;
+    border-color: #efbd70;
+}
+
+.keycap.light {
+    color: #2e1d10;
+    background-color: #f0d4a7;
+    border-color: #754a1e;
+}
+
+#vr-cursor {
+    background-color: #f6dfb8;
+    border-color: #b97924;
+}
+
+/* Extreme VR exposure compensation requested after the in-game test. */
+#app {
+    opacity: 0.95;
+    background-color: #080706;
+    border-color: #59401f;
+}
+
+aside {
+    background-color: #050403;
+    border-right-color: #49371f;
+}
+
+.brand-mark,
+.keycap,
+.value {
+    background-color: #090705;
+}
+
+.brand-name,
+h1,
+.setting-label {
+    color: #dec8aa;
+}
+
+.brand-edition,
+.version,
+.setting-help,
+.lead,
+.save-status {
+    color: #a99478;
+}
+
+.section-label,
+.page-eyebrow,
+.group-label,
+.classic-button,
+.classic-mark {
+    color: #b77a2b;
+}
+
+.section-label,
+.sidebar-status,
+header,
+footer,
+.settings-card,
+.setting-row {
+    border-color: #49371f;
+}
+
+button:hover {
+    background-color: #17110c;
+    border-color: #8f5d22;
+}
+
+button:active {
+    background-color: #21170f;
+}
+
+.nav-item.active {
+    color: #ead5b7;
+    background-color: #21170f;
+    border-color: #9c6726;
+}
+
+.setting-row:hover,
+.setting-row.featured:hover {
+    background-color: #17110d;
+}
+
+.setting-row.featured {
+    background-color: #100d0a;
+}
+
+input.range slidertrack {
+    background-color: #302a23;
+}
+
+input.range sliderprogress {
+    background-color: #a86e25;
+}
+
+input.range sliderbar {
+    background-color: #d3ae74;
+    border-color: #8d591c;
+}
+
+.value {
+    color: #dec6a4;
+    border-color: #765027;
+}
+
+.toggle-track {
+    background-color: #332d26;
+    border-color: #655441;
+}
+
+.toggle-button.enabled .toggle-track {
+    background-color: #8f5d21;
+    border-color: #b77c30;
+}
+
+.hint {
+    color: #bba487;
+    background-color: #120e0a;
+    border-left-color: #9f6725;
+}
+
+.axis-card {
+    background-color: #0f0c09;
+    border-color: #4d391f;
+}
+
+.axis-key {
+    background-color: #21170e;
+}
+
+.save-button {
+    color: #130d08;
+    background-color: #9d6726;
+    border-color: #c58a39;
+}
+
+.save-button:hover {
+    background-color: #b77d31;
+    border-color: #dba651;
+}
+
+/* Final VR palette: lighter graphite, neutral grey UI, 95% opacity. */
+body {
+    color: #d4d4d4;
+}
+
+#app {
+    opacity: 0.95;
+    background-color: #181818;
+    border-color: #505050;
+}
+
+aside {
+    background-color: #111111;
+    border-right-color: #444444;
+}
+
+.brand-mark {
+    color: #dddddd;
+    background-color: #1c1c1c;
+    border-color: #777777;
+}
+
+.brand-name,
+h1,
+.setting-label {
+    color: #dedede;
+}
+
+.brand-edition,
+.version,
+.setting-help,
+.lead,
+.save-status {
+    color: #999999;
+}
+
+.section-label,
+.page-eyebrow,
+.group-label,
+.classic-button,
+.classic-mark {
+    color: #aaaaaa;
+}
+
+.section-label,
+.sidebar-status,
+header,
+footer,
+.settings-card,
+.setting-row {
+    border-color: #484848;
+}
+
+button {
+    color: #c2c2c2;
+}
+
+button:hover {
+    color: #eeeeee;
+    background-color: #303030;
+    border-color: #696969;
+}
+
+button:active {
+    background-color: #3b3b3b;
+}
+
+.nav-key {
+    color: #858585;
+}
+
+.nav-item.active {
+    color: #e4e4e4;
+    background-color: #343434;
+    border-color: #777777;
+}
+
+.nav-item.active .nav-key {
+    color: #bbbbbb;
+}
+
+.sidebar-status,
+.breadcrumb {
+    color: #c3c3c3;
+}
+
+.breadcrumb-muted,
+.breadcrumb-slash {
+    color: #888888;
+}
+
+.status-dot {
+    background-color: #a5a5a5;
+}
+
+.close-button {
+    color: #d0d0d0;
+    border-color: #686868;
+}
+
+.keycap {
+    color: #c8c8c8;
+    background-color: #202020;
+    border-color: #666666;
+}
+
+.setting-row:hover,
+.setting-row.featured:hover {
+    background-color: #303030;
+}
+
+.setting-row.featured {
+    background-color: #242424;
+}
+
+input.range slidertrack {
+    background-color: #505050;
+}
+
+input.range sliderprogress {
+    background-color: #a0a0a0;
+}
+
+input.range sliderbar {
+    background-color: #d0d0d0;
+    border-color: #777777;
+}
+
+input.range:hover sliderbar {
+    background-color: #eeeeee;
+    border-color: #a0a0a0;
+}
+
+input.range sliderbar:active {
+    background-color: #b5b5b5;
+}
+
+.value {
+    color: #d5d5d5;
+    background-color: #202020;
+    border-color: #606060;
+}
+
+.toggle-button {
+    color: #aaaaaa;
+}
+
+.toggle-track,
+.toggle-button.enabled .toggle-track {
+    background-color: #626262;
+    border-color: #858585;
+}
+
+.toggle-knob {
+    background-color: #dedede;
+}
+
+.toggle-button.enabled .toggle-state {
+    color: #d2d2d2;
+}
+
+.hint {
+    color: #b5b5b5;
+    background-color: #252525;
+    border-left-color: #777777;
+}
+
+.hint-icon {
+    color: #202020;
+    background-color: #b0b0b0;
+}
+
+.axis-card {
+    background-color: #242424;
+    border-color: #4f4f4f;
+}
+
+.axis-key {
+    color: #d0d0d0;
+    background-color: #383838;
+}
+
+.axis-value {
+    color: #d4d4d4;
+}
+
+/* Save/apply is the only red action family. */
+.save-button {
+    color: #f0dddd;
+    background-color: #5c1717;
+    border-color: #944343;
+}
+
+.save-button:hover {
+    color: #fff0f0;
+    background-color: #762020;
+    border-color: #b45b5b;
+}
+
+.keycap.light {
+    color: #ead6d6;
+    background-color: #431313;
+    border-color: #9a5050;
+}
+
+#vr-cursor {
+    background-color: #d8d8d8;
+    border-color: #777777;
+}
+
+/* Large-format VR typography and simplified branding. */
+body {
+    font-size: 52px;
+}
+
+.brand {
+    height: 104px;
+    padding: 0;
+}
+
+.brand-copy {
+    width: 330px;
+    margin-left: 0;
+}
+
+.brand-name {
+    font-size: 58px;
+}
+
+.brand-edition {
+    margin-top: 7px;
+    font-size: 34px;
+    letter-spacing: 3px;
+}
+
+.section-label,
+.page-eyebrow,
+.group-label {
+    font-size: 34px;
+    line-height: 1.2;
+}
+
+.section-label {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.nav-item {
+    height: 104px;
+    padding: 0 24px;
+    font-size: 50px;
+    line-height: 1.15;
+}
+
+.breadcrumb {
+    font-size: 40px;
+}
+
+.close-button {
+    width: 228px;
+    height: 76px;
+    font-size: 42px;
+}
+
+.keycap {
+    min-width: 48px;
+    height: 48px;
+    padding-top: 5px;
+    font-size: 33px;
+}
+
+main {
+    padding-top: 28px;
+}
+
+h1 {
+    font-size: 88px;
+    line-height: 1.05;
+}
+
+.lead {
+    margin-bottom: 24px;
+    font-size: 42px;
+    line-height: 1.2;
+}
+
+.setting-row {
+    height: 196px;
+    padding: 0 30px;
+}
+
+.setting-copy {
+    width: 510px;
+}
+
+.setting-label {
+    font-size: 51px;
+    line-height: 1.1;
+}
+
+.setting-help {
+    margin-top: 11px;
+    font-size: 38px;
+    line-height: 1.2;
+}
+
+.setting-row input.range {
+    width: 555px;
+    margin-left: 24px;
+    margin-right: 24px;
+}
+
+.value {
+    width: 168px;
+    font-size: 42px;
+}
+
+.toggle-space {
+    width: 530px;
+}
+
+.toggle-button {
+    width: 294px;
+    font-size: 39px;
+}
+
+.toggle-state {
+    width: 164px;
+}
+
+.hint {
+    font-size: 36px;
+    line-height: 1.25;
+}
+
+.axis-key {
+    font-size: 34px;
+}
+
+.axis-value {
+    font-size: 39px;
+}
+
+.classic-button,
+.save-button {
+    font-size: 40px;
+}
+
+.save-status {
+    font-size: 35px;
+}

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DragonBoard VR — Menu concept</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="scene">
+    <div class="grain"></div>
+    <div class="menu-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48"><path d="M24 4 40 13v22l-16 9-16-9V13l16-9Z"/><path d="m16 17 8-5 8 5-4 3 4 3-8 13-8-13 4-3-4-3Z"/></svg>
+          </div>
+          <div>
+            <div class="brand-name">DragonBoard</div>
+            <div class="brand-edition">VR configuration</div>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Settings sections">
+          <div class="nav-eyebrow">Settings</div>
+          <button class="nav-item active" data-page="general">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"/></svg></span>
+            <span>General</span>
+          </button>
+          <button class="nav-item" data-page="position">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M21 12l-3-3M21 12l-3 3"/></svg></span>
+            <span>Position</span>
+          </button>
+          <button class="nav-item" data-page="visuals">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg></span>
+            <span>Visuals</span>
+          </button>
+          <button class="nav-item" data-page="items">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="m6 4 12 0 2 4-8 12L4 8l2-4ZM4 8h16M9 4l3 16 3-16"/></svg></span>
+            <span>Item scale</span>
+          </button>
+          <button class="nav-item" data-page="labels">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg></span>
+            <span>Labels</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="runtime"><span class="status-dot"></span><span>Runtime connected</span></div>
+          <div class="version">DragonBoardVR 0.8</div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div class="breadcrumb"><span>Configuration</span><span class="slash">/</span><strong id="breadcrumb-current">General</strong></div>
+          <div class="top-actions">
+            <button class="icon-button" title="Reset current page">
+              <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6M4 4v4.6h4.6"/></svg>
+            </button>
+            <button class="close-button">Close <span class="keycap">B</span></button>
+          </div>
+        </header>
+
+        <div class="page-wrap">
+          <section class="page active" id="page-general" data-title="General">
+            <div class="page-heading">
+              <div><div class="eyebrow">Board behavior</div><h1>General</h1><p>Adjust the overall size and spacing of your board.</p></div>
+              <button class="reset-text">Reset section</button>
+            </div>
+            <div class="settings-card">
+              <div class="setting featured">
+                <div class="setting-copy"><label for="menuScale">Menu scale</label><span>Overall board size in your field of view</span></div>
+                <div class="control"><input id="menuScale" type="range" min="0.25" max="3" step="0.01" value="1"><output for="menuScale">1.00×</output></div>
+              </div>
+              <div class="setting">
+                <div class="setting-copy"><label for="buttonSpacingX">Horizontal spacing</label><span>Distance between columns</span></div>
+                <div class="control"><input id="buttonSpacingX" type="range" min="0.2" max="8" step="0.05" value="2.4"><output for="buttonSpacingX">2.40</output></div>
+              </div>
+              <div class="setting">
+                <div class="setting-copy"><label for="buttonSpacingY">Vertical spacing</label><span>Distance between rows</span></div>
+                <div class="control"><input id="buttonSpacingY" type="range" min="0.2" max="8" step="0.05" value="1.2"><output for="buttonSpacingY">1.20</output></div>
+              </div>
+            </div>
+            <div class="hint"><span class="hint-icon">i</span><span>Changes are previewed instantly. Save when the board feels comfortable at arm’s length.</span></div>
+          </section>
+
+          <section class="page" id="page-position" data-title="Position">
+            <div class="page-heading"><div><div class="eyebrow">Hand anchor</div><h1>Position</h1><p>Place and orient the board relative to your hand.</p></div><button class="reset-text">Reset section</button></div>
+            <div class="section-caption">Position</div>
+            <div class="settings-card compact" data-unit="">
+              <div class="setting"><div class="setting-copy"><label for="menuOffsetX">X axis</label><span>Left / right</span></div><div class="control"><input id="menuOffsetX" type="range" min="-40" max="40" step=".05" value=".5"><output>0.50</output></div></div>
+              <div class="setting"><div class="setting-copy"><label for="menuOffsetY">Y axis</label><span>Near / far</span></div><div class="control"><input id="menuOffsetY" type="range" min="-40" max="40" step=".05" value="-18.5"><output>-18.50</output></div></div>
+              <div class="setting"><div class="setting-copy"><label for="menuOffsetZ">Z axis</label><span>Down / up</span></div><div class="control"><input id="menuOffsetZ" type="range" min="-40" max="40" step=".05" value="0"><output>0.00</output></div></div>
+            </div>
+            <div class="section-caption">Rotation</div>
+            <div class="axis-grid">
+              <div class="axis-card"><span>X</span><strong>-10.0°</strong><input type="range" min="-180" max="180" value="-10"></div>
+              <div class="axis-card"><span>Y</span><strong>36.0°</strong><input type="range" min="-180" max="180" value="36"></div>
+              <div class="axis-card"><span>Z</span><strong>0.0°</strong><input type="range" min="-180" max="180" value="0"></div>
+            </div>
+          </section>
+
+          <section class="page" id="page-visuals" data-title="Visuals">
+            <div class="page-heading"><div><div class="eyebrow">Appearance</div><h1>Visuals</h1><p>Fine-tune the scale of the board’s 3D elements.</p></div><button class="reset-text">Reset section</button></div>
+            <div class="settings-card">
+              <div class="setting"><div class="setting-copy"><label>Button mesh</label><span>Interactive button geometry</span></div><div class="control"><input type="range" min=".1" max="5" value="1.5" step=".01"><output>1.50×</output></div></div>
+              <div class="setting"><div class="setting-copy"><label>Item mesh</label><span>Inventory object geometry</span></div><div class="control"><input type="range" min=".1" max="5" value="1.27" step=".01"><output>1.27×</output></div></div>
+              <div class="setting"><div class="setting-copy"><label>Container depth</label><span>Grid offset from the panel</span></div><div class="control"><input type="range" min="-20" max="20" value="1" step=".05"><output>1.00</output></div></div>
+              <div class="setting"><div class="setting-copy"><label>Reticle scale</label><span>Laser pointer impact marker</span></div><div class="control"><input type="range" min=".1" max="10" value="2.5" step=".05"><output>2.50×</output></div></div>
+            </div>
+          </section>
+
+          <section class="page" id="page-items" data-title="Item scale">
+            <div class="page-heading"><div><div class="eyebrow">Inventory</div><h1>Item scale</h1><p>Set a comfortable display size for each item category.</p></div><button class="reset-text">Reset section</button></div>
+            <div class="item-grid">
+              <button class="item-card"><span class="item-symbol">⚔</span><span><strong>Weapons</strong><small>1.00×</small></span></button>
+              <button class="item-card"><span class="item-symbol">◇</span><span><strong>Armor</strong><small>1.00×</small></span></button>
+              <button class="item-card"><span class="item-symbol">◒</span><span><strong>Potions</strong><small>1.00×</small></span></button>
+              <button class="item-card"><span class="item-symbol">♨</span><span><strong>Food</strong><small>1.00×</small></span></button>
+              <button class="item-card"><span class="item-symbol">✦</span><span><strong>Miscellaneous</strong><small>1.00×</small></span></button>
+            </div>
+          </section>
+
+          <section class="page" id="page-labels" data-title="Labels">
+            <div class="page-heading"><div><div class="eyebrow">Readability</div><h1>Labels</h1><p>Control label size, spacing and local offsets.</p></div><button class="reset-text">Reset section</button></div>
+            <div class="settings-card">
+              <div class="setting featured"><div class="setting-copy"><label>Label scale</label><span>Text size above interactive objects</span></div><div class="control"><input type="range" min=".1" max="5" value="1" step=".01"><output>1.00×</output></div></div>
+              <div class="setting"><div class="setting-copy"><label>Spacing</label><span>Distance between label and object</span></div><div class="control"><input type="range" min="-5" max="5" value=".2" step=".05"><output>0.20</output></div></div>
+            </div>
+            <div class="section-caption">Local offset</div>
+            <div class="axis-grid">
+              <div class="axis-card"><span>X</span><strong>0.00</strong><input type="range" min="-10" max="10" value="0"></div>
+              <div class="axis-card"><span>Y</span><strong>0.30</strong><input type="range" min="-10" max="10" value=".3" step=".05"></div>
+              <div class="axis-card"><span>Z</span><strong>0.00</strong><input type="range" min="-10" max="10" value="0"></div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="footer">
+          <button class="classic-button"><span class="classic-icon">⌘</span> Classic settings</button>
+          <div class="save-state" id="save-state">All changes saved</div>
+          <button class="save-button" id="save-button">Save changes <span class="keycap light">A</span></button>
+        </footer>
+      </main>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

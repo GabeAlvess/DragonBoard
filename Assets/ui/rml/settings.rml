@@ -1,0 +1,141 @@
+<rml>
+<head>
+    <title>DragonBoard Settings</title>
+    <link type="text/rcss" href="settings.rcss" />
+</head>
+<body>
+    <div id="app">
+        <aside>
+            <div class="brand">
+                <div class="brand-copy">
+                    <div class="brand-name">DragonBoard</div><br />
+                    <div class="brand-edition">VR CONFIGURATION</div>
+                </div>
+            </div>
+
+            <div class="section-label">SETTINGS</div>
+            <button id="tab-general" class="nav-item"><span>General</span></button>
+            <button id="tab-position" class="nav-item"><span>Position</span></button>
+            <button id="tab-visuals" class="nav-item"><span>Visuals</span></button>
+            <button id="tab-items" class="nav-item"><span>Item scale</span></button>
+            <button id="tab-labels" class="nav-item"><span>Labels</span></button>
+        </aside>
+
+        <div class="content-shell">
+            <header>
+                <div class="breadcrumb"><span class="breadcrumb-muted">Configuration</span><span class="breadcrumb-slash">/</span><span>DragonBoard</span></div>
+                <button id="close" class="close-button"><span>Close</span><span class="keycap">B</span></button>
+            </header>
+
+            <main id="page-scroll">
+                <section id="page-general" class="page">
+                    <div class="page-eyebrow">BOARD BEHAVIOR</div>
+                    <h1>General</h1>
+                    <p class="lead">Adjust the overall size and spacing of your board.</p>
+                    <div class="settings-card">
+                        <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Item edit mode</span><span class="setting-help">Allow secondary-button editing in inventory, magic and other containers</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-edit-mode" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-edit-state" class="toggle-state">Enabled</span>
+                            </button>
+                        </div>
+                        <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Developer panel</span><span class="setting-help">Show the Dev button on DragonBoard</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-dev-panel" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-dev-state" class="toggle-state">Disabled</span>
+                            </button>
+                        </div>
+                        <div class="setting-row featured">
+                            <div class="setting-copy"><span class="setting-label">Menu scale</span><span class="setting-help">Overall board size in your field of view</span></div>
+                            <input id="menuScale" type="range" class="range" min="0.25" max="3" step="0.01" value="1" />
+                            <span id="value-menuScale" class="value">1.00</span>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-copy"><span class="setting-label">Horizontal spacing</span><span class="setting-help">Distance between columns</span></div>
+                            <input id="buttonSpacingX" type="range" class="range" min="0.2" max="8" step="0.05" value="2.4" />
+                            <span id="value-buttonSpacingX" class="value">2.40</span>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-copy"><span class="setting-label">Vertical spacing</span><span class="setting-help">Distance between rows</span></div>
+                            <input id="buttonSpacingY" type="range" class="range" min="0.2" max="8" step="0.05" value="1.2" />
+                            <span id="value-buttonSpacingY" class="value">1.20</span>
+                        </div>
+                    </div>
+                    <div class="hint"><span class="hint-icon">i</span><span>Changes are previewed instantly. Save when the board feels comfortable at arm's length.</span></div>
+                </section>
+
+                <section id="page-position" class="page">
+                    <div class="page-eyebrow">HAND ANCHOR</div>
+                    <h1>Position</h1>
+                    <p class="lead">Place and orient the board relative to your hand.</p>
+                    <div class="group-label">POSITION</div>
+                    <div class="settings-card compact">
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">X axis</span><span class="setting-help">Left / right</span></div><input id="menuOffsetX" type="range" class="range" min="-40" max="40" step="0.05" value="0.5" /><span id="value-menuOffsetX" class="value">0.50</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Y axis</span><span class="setting-help">Near / far</span></div><input id="menuOffsetY" type="range" class="range" min="-40" max="40" step="0.05" value="-18.5" /><span id="value-menuOffsetY" class="value">-18.50</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Z axis</span><span class="setting-help">Down / up</span></div><input id="menuOffsetZ" type="range" class="range" min="-40" max="40" step="0.05" value="0" /><span id="value-menuOffsetZ" class="value">0.00</span></div>
+                    </div>
+                    <div class="group-label rotation-label">ROTATION</div>
+                    <div class="rotation-row">
+                        <div class="axis-card"><div class="axis-head"><span class="axis-key">X</span><span id="value-menuRotX" class="axis-value">-10.0 deg</span></div><input id="menuRotX" type="range" class="range axis-range" min="-180" max="180" step="0.5" value="-10" /></div>
+                        <div class="axis-card"><div class="axis-head"><span class="axis-key">Y</span><span id="value-menuRotY" class="axis-value">36.0 deg</span></div><input id="menuRotY" type="range" class="range axis-range" min="-180" max="180" step="0.5" value="36" /></div>
+                        <div class="axis-card last"><div class="axis-head"><span class="axis-key">Z</span><span id="value-menuRotZ" class="axis-value">0.0 deg</span></div><input id="menuRotZ" type="range" class="range axis-range" min="-180" max="180" step="0.5" value="0" /></div>
+                    </div>
+                </section>
+
+                <section id="page-visuals" class="page">
+                    <div class="page-eyebrow">APPEARANCE</div>
+                    <h1>Visuals</h1>
+                    <p class="lead">Fine-tune the scale of the board's 3D elements.</p>
+                    <div class="settings-card">
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Button mesh</span><span class="setting-help">Interactive button geometry</span></div><input id="buttonMeshScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1.5" /><span id="value-buttonMeshScale" class="value">1.50</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Item mesh</span><span class="setting-help">Inventory object geometry</span></div><input id="itemMeshScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1.27" /><span id="value-itemMeshScale" class="value">1.27</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Container depth</span><span class="setting-help">Grid offset from the panel</span></div><input id="containerGridOffsetZ" type="range" class="range" min="-20" max="20" step="0.05" value="1" /><span id="value-containerGridOffsetZ" class="value">1.00</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Reticle scale</span><span class="setting-help">Laser pointer impact marker</span></div><input id="reticleScale" type="range" class="range" min="0.1" max="10" step="0.05" value="2.5" /><span id="value-reticleScale" class="value">2.50</span></div>
+                    </div>
+                </section>
+
+                <section id="page-items" class="page">
+                    <div class="page-eyebrow">INVENTORY</div>
+                    <h1>Item scale</h1>
+                    <p class="lead">Set a comfortable display size for each item category.</p>
+                    <div class="settings-card">
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Weapons</span><span class="setting-help">Swords, bows and staves</span></div><input id="itemWeaponScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemWeaponScale" class="value">1.00</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Armor</span><span class="setting-help">Apparel, shields and jewelry</span></div><input id="itemArmorScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemArmorScale" class="value">1.00</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Potions</span><span class="setting-help">Potions and poisons</span></div><input id="itemPotionScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemPotionScale" class="value">1.00</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Food</span><span class="setting-help">Food and ingredients</span></div><input id="itemFoodScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemFoodScale" class="value">1.00</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Miscellaneous</span><span class="setting-help">Books, keys and other objects</span></div><input id="itemMiscScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemMiscScale" class="value">1.00</span></div>
+                    </div>
+                </section>
+
+                <section id="page-labels" class="page">
+                    <div class="page-eyebrow">READABILITY</div>
+                    <h1>Labels</h1>
+                    <p class="lead">Control label size, spacing and local offsets.</p>
+                    <div class="settings-card compact">
+                        <div class="setting-row featured"><div class="setting-copy"><span class="setting-label">Label scale</span><span class="setting-help">Text size above interactive objects</span></div><input id="labelScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-labelScale" class="value">1.00</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Spacing</span><span class="setting-help">Distance between label and object</span></div><input id="labelSpacing" type="range" class="range" min="-5" max="5" step="0.05" value="0.2" /><span id="value-labelSpacing" class="value">0.20</span></div>
+                    </div>
+                    <div class="group-label rotation-label">LOCAL OFFSET</div>
+                    <div class="rotation-row">
+                        <div class="axis-card"><div class="axis-head"><span class="axis-key">X</span><span id="value-labelXOffset" class="axis-value">0.00</span></div><input id="labelXOffset" type="range" class="range axis-range" min="-10" max="10" step="0.05" value="0" /></div>
+                        <div class="axis-card"><div class="axis-head"><span class="axis-key">Y</span><span id="value-labelYOffset" class="axis-value">0.30</span></div><input id="labelYOffset" type="range" class="range axis-range" min="-10" max="10" step="0.05" value="0.3" /></div>
+                        <div class="axis-card last"><div class="axis-head"><span class="axis-key">Z</span><span id="value-labelZOffset" class="axis-value">0.00</span></div><input id="labelZOffset" type="range" class="range axis-range" min="-10" max="10" step="0.05" value="0" /></div>
+                    </div>
+                </section>
+            </main>
+
+            <footer>
+                <button id="use-imgui" class="classic-button"><span class="classic-mark">+</span><span>Classic settings</span></button>
+                <div class="footer-spacer"></div>
+                <div class="save-status">Ready to save</div>
+                <button id="save" class="save-button"><span>Save changes</span><span class="keycap light">A</span></button>
+            </footer>
+        </div>
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

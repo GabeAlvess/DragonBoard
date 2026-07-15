@@ -1,0 +1,340 @@
+.edit-mark {
+    color: #5a321b;
+    border-color: #9f6b28;
+}
+
+.item-summary {
+    display: flex;
+    flex-direction: column;
+    width: 330px;
+    height: 170px;
+    margin: 10px 8px 20px;
+    padding: 20px 18px;
+    background-color: #f7eddd;
+    border: 1px #c5aa7c;
+    border-radius: 6px;
+}
+
+.summary-label {
+    display: block;
+    color: #9b6d2a;
+    font-size: 21px;
+    letter-spacing: 3px;
+}
+
+.summary-name {
+    display: block;
+    max-height: 82px;
+    margin-top: 6px;
+    color: #3e2818;
+    font-size: 34px;
+    overflow: hidden;
+}
+
+.summary-meta {
+    display: block;
+    width: 294px;
+    margin-top: 8px;
+    color: #936625;
+    font-size: 23px;
+}
+
+.meta-separator {
+    margin: 0 9px;
+    color: #b4a187;
+}
+
+.edit-section-label {
+    margin-top: 12px;
+}
+
+.model-path {
+    width: 290px;
+    max-height: 58px;
+    overflow: hidden;
+}
+
+.edit-dot {
+    background-color: #c08a3b;
+}
+
+.edit-main {
+    padding-top: 34px;
+}
+
+.edit-page {
+    width: 1394px;
+}
+
+.edit-card .setting-row {
+    height: 172px;
+}
+
+.single-card {
+    margin-top: 30px;
+}
+
+.pin-grid {
+    width: 1394px;
+    height: 170px;
+    display: flex;
+}
+
+.pin-card {
+    width: 677px;
+    height: 170px;
+    display: block;
+    margin-right: 40px;
+    padding: 30px 34px;
+    color: #432c1b;
+    text-align: left;
+    background-color: #f5e9d7;
+    border: 1px #c5aa7c;
+    border-radius: 6px;
+    tab-index: auto;
+}
+
+.pin-card:last-child {
+    margin-right: 0;
+}
+
+.pin-card:hover {
+    background-color: #eed8b1;
+    border-color: #a96f20;
+}
+
+.pin-card.disabled {
+    color: #9c8c77;
+    background-color: #eee4d4;
+    border-color: #d2c5b1;
+}
+
+.pin-title {
+    display: block;
+    font-size: 38px;
+    pointer-events: none;
+}
+
+.pin-description {
+    display: block;
+    margin-top: 14px;
+    color: #796650;
+    font-size: 27px;
+    pointer-events: none;
+}
+
+.pin-group-label {
+    margin: 34px 0 16px;
+}
+
+.magic-pin-actions {
+    display: none;
+}
+
+.edit-footer {
+    padding-left: 48px;
+}
+
+.reset-button,
+.category-button {
+    height: 62px;
+    margin-left: 14px;
+    padding: 0 26px;
+    font-size: 29px;
+    border: 1px #bc9e73;
+    border-radius: 6px;
+}
+
+.reset-button {
+    color: #984f3d;
+    border-color: #c59384;
+}
+
+.reset-button:hover {
+    background-color: #edc9bf;
+    border-color: #a95d4b;
+}
+
+.category-button {
+    color: #80591f;
+    border-color: #bc9156;
+}
+
+/* VR-safe item editor surfaces. */
+.edit-mark {
+    color: #f1d9b5;
+    border-color: #b9843d;
+}
+
+.item-summary,
+.pin-card {
+    background-color: #33291f;
+    border-color: #765938;
+}
+
+.summary-label,
+.summary-meta {
+    color: #d09a4b;
+}
+
+.summary-name,
+.pin-title {
+    color: #f1ddbf;
+}
+
+.meta-separator {
+    color: #806d55;
+}
+
+.pin-description {
+    color: #c0aa8d;
+}
+
+.pin-card:hover {
+    background-color: #493624;
+    border-color: #c38a3a;
+}
+
+.pin-card.disabled {
+    color: #817363;
+    background-color: #27211c;
+    border-color: #4a4035;
+}
+
+.reset-button {
+    color: #e8aa98;
+    border-color: #a96959;
+}
+
+.reset-button:hover {
+    background-color: #4a2922;
+    border-color: #d18570;
+}
+
+.category-button {
+    color: #e0b46f;
+    border-color: #a87839;
+}
+
+/* Extreme VR exposure compensation. */
+.item-summary,
+.pin-card {
+    background-color: #0f0c09;
+    border-color: #4d391f;
+}
+
+.pin-card:hover {
+    background-color: #21170f;
+    border-color: #936022;
+}
+
+.pin-card.disabled {
+    background-color: #080706;
+    border-color: #2b251e;
+}
+
+.reset-button:hover {
+    background-color: #21100c;
+}
+
+/* Final neutral-grey editor palette. */
+.edit-mark {
+    color: #dddddd;
+    border-color: #777777;
+}
+
+.item-summary,
+.pin-card {
+    background-color: #242424;
+    border-color: #505050;
+}
+
+.summary-label,
+.summary-meta {
+    color: #aaaaaa;
+}
+
+.summary-name,
+.pin-title {
+    color: #dddddd;
+}
+
+.meta-separator {
+    color: #777777;
+}
+
+.pin-description {
+    color: #a5a5a5;
+}
+
+.pin-card:hover {
+    background-color: #343434;
+    border-color: #737373;
+}
+
+.pin-card.disabled {
+    color: #727272;
+    background-color: #1a1a1a;
+    border-color: #393939;
+}
+
+.reset-button {
+    color: #b7b7b7;
+    border-color: #666666;
+}
+
+.reset-button:hover {
+    color: #dedede;
+    background-color: #303030;
+    border-color: #838383;
+}
+
+/* Apply category joins Apply item in the dark-red action family. */
+.category-button {
+    color: #f0dddd;
+    background-color: #5c1717;
+    border-color: #944343;
+}
+
+.category-button:hover {
+    color: #fff0f0;
+    background-color: #762020;
+    border-color: #b45b5b;
+}
+
+/* Large-format item editor typography. */
+.item-summary {
+    height: 208px;
+}
+
+.summary-label {
+    font-size: 34px;
+}
+
+.summary-name {
+    max-height: 104px;
+    font-size: 52px;
+    line-height: 1.1;
+}
+
+.summary-meta {
+    font-size: 37px;
+    line-height: 1.2;
+}
+
+.pin-title {
+    font-size: 56px;
+    line-height: 1.1;
+}
+
+.pin-description {
+    margin-top: 18px;
+    font-size: 41px;
+    line-height: 1.2;
+}
+
+.reset-button,
+.category-button {
+    height: 82px;
+    font-size: 41px;
+}

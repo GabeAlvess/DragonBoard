@@ -1,0 +1,99 @@
+<rml>
+<head>
+    <title>DragonBoard Developer</title>
+    <link type="text/rcss" href="settings.rcss" />
+    <link type="text/rcss" href="dev.rcss" />
+</head>
+<body>
+    <div id="app">
+        <aside>
+            <div class="brand">
+                <div class="brand-copy">
+                    <div class="brand-name">DragonBoard</div><br />
+                    <div class="brand-edition">DEVELOPER</div>
+                </div>
+            </div>
+
+            <div class="section-label">DEVELOPER TOOLS</div>
+            <button id="dev-tab-commands" class="nav-item"><span>Console commands</span></button>
+            <button id="dev-tab-info" class="nav-item"><span>Game information</span></button>
+
+            <div class="sidebar-status developer-status">
+                <div><span class="status-dot warning-dot"></span><span>Developer mode</span></div>
+                <div class="version">Use commands with care</div>
+            </div>
+        </aside>
+
+        <div class="content-shell">
+            <header>
+                <div class="breadcrumb"><span class="breadcrumb-muted">DragonBoard</span><span class="breadcrumb-slash">/</span><span>Developer</span></div>
+                <button id="dev-close" class="close-button"><span>Close</span><span class="keycap">B</span></button>
+            </header>
+
+            <main id="page-scroll">
+                <section id="dev-page-commands" class="page dev-page">
+                    <div class="page-eyebrow">TOOLS</div>
+                    <h1>Console commands</h1>
+                    <p class="lead dev-lead">Inspect and execute configured Skyrim console actions.</p>
+                    <div class="command-workspace">
+                        <div class="command-list-panel">
+                            <div class="subheading">AVAILABLE COMMANDS</div>
+                            <div id="dev-command-list" class="command-list"></div>
+                        </div>
+
+                        <div class="command-details">
+                            <div class="subheading">COMMAND DETAILS</div><br />
+                            <div id="dev-command-title" class="command-title">No command selected</div><br />
+                            <div id="dev-command-description" class="command-description"></div><br />
+                            <div class="console-label">CONSOLE INPUT</div><br />
+                            <div id="dev-command-input" class="console-input"></div><br />
+                            <div id="dev-command-warning" class="warning">
+                                This command closes DragonBoard and runs after a safe delay.
+                            </div>
+                            <button id="dev-execute" class="execute-button">Execute command</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="dev-page-info" class="page dev-page">
+                    <div class="page-eyebrow">DIAGNOSTICS</div>
+                    <h1>Game information</h1>
+                    <p class="lead dev-lead">Live runtime and location information.</p>
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <div class="subheading">PERFORMANCE</div>
+                            <div class="info-row"><span>FPS (Present)</span><span id="dev-fps" class="info-value">0.0</span></div>
+                            <div class="info-row"><span>Frame time</span><span id="dev-frame-time" class="info-value">0.00 ms</span></div>
+                            <div class="info-row"><span>Panel draw calls</span><span id="dev-draw-calls" class="info-value">0</span></div>
+                            <div class="info-note">Panel-only count; this does not instrument every Skyrim draw call.</div>
+                        </div>
+
+                        <div class="info-card last-info-card">
+                            <div class="subheading">RUNTIME</div>
+                            <div class="info-row"><span>Panel texture</span><span id="dev-texture-size" class="info-value">1920 x 1080</span></div>
+                            <div class="info-row"><span>ImGui VR Helper</span><span id="dev-helper" class="info-value">Standalone mode</span></div>
+                            <div class="info-row"><span>DragonBoardVR</span><span id="dev-version" class="info-value">-</span></div>
+                            <div class="info-row"><span>D3D feature level</span><span id="dev-feature-level" class="info-value">-</span></div>
+                        </div>
+                    </div>
+
+                    <div class="location-card">
+                        <div class="subheading">PLAYER AND LOCATION</div>
+                        <div class="info-row"><span>Player position</span><span id="dev-player-position" class="info-value">X 0.0   Y 0.0   Z 0.0</span></div>
+                        <div class="info-row"><span>Cell</span><span id="dev-cell" class="info-value">&lt;none&gt;</span></div>
+                        <div class="info-row"><span>Cell FormID</span><span id="dev-cell-form" class="info-value">00000000</span></div>
+                        <div class="info-row"><span>Worldspace</span><span id="dev-worldspace" class="info-value">&lt;interior or none&gt;</span></div>
+                        <div class="info-row"><span>Worldspace FormID</span><span id="dev-worldspace-form" class="info-value">--------</span></div>
+                    </div>
+                </section>
+            </main>
+
+            <footer>
+                <button id="dev-use-imgui" class="classic-button"><span class="classic-mark">+</span><span>Classic panel</span></button>
+                <div class="footer-spacer"></div>
+            </footer>
+        </div>
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

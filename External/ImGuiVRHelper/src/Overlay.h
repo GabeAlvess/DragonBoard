@@ -1,0 +1,370 @@
+// SPDX-License-Identifier: GPL-3.0-or-later WITH LicenseRef-Modding-Exception
+// Copyright (c) 2025 ImGuiVRHelper contributors. See COPYING and EXCEPTIONS.md.
+//
+// Overlay subsystem state: positioning settings, attach modes, wand-laser
+// intersection state, and the fixed-world transform fallback.
+//
+// This is the helper-side replacement for the overlay-related portions of
+// Community Shaders' VR class (settings.VRMenu*, wandState,
+// fixedWorldOverlayPosition, Config::*). Overlay submission, drag, and the
+// in-scene fallback all consume State::GetSingleton().
+
+#pragma once
+
+#include <atomic>
+
+#include <SimpleMath.h>
+#include <imgui.h>
+#include <openvr.h>
+
+#include "ImGuiVRHelperInput.h"  // InputDeviceType
+
+namespace ImGuiVRHelper::Overlay
+{
+	using DirectX::SimpleMath::Matrix;
+	using DirectX::SimpleMath::Vector3;
+	using ImGuiVRHelperPluginAPI::InputDeviceType;
+
+	// ---- Constants ------------------------------------------------------
+
+	namespace Config
+	{
+		inline constexpr int kOverlayWidth = 1920;
+		inline constexpr int kOverlayHeight = 1080;
+		inline constexpr float kOverlayAspect = static_cast<float>(kOverlayHeight) / static_cast<float>(kOverlayWidth);
+
+		// Default supersample for view-filling panels (see Settings::hudSupersample).
+		// A HUD layer fills most of the FOV (see hudCoverage), so a 1x texture
+		// stretched that wide reads as pixelated; 2x keeps text sharp. Clients learn
+		// the real panel size from GetPanel and scale their framebuffer to match.
+		inline constexpr int kHUDSupersample = 2;
+		inline constexpr int kMaxHUDSupersample = 3;  // VRAM ceiling; clamps the setting
+
+		inline constexpr float kDefaultMenuScale = 1.0f;
+		inline constexpr float kMinMenuScale = 0.1f;
+		inline constexpr float kMaxMenuScale = 5.0f;
+
+		// Fraction of each eye's view the HUD quad covers (see hudCoverage). Min/max
+		// are shared by the settings slider and the render-time clamp so the two
+		// can't disagree.
+		inline constexpr float kDefaultHUDCoverage = 0.5f;
+		inline constexpr float kMinHUDCoverage = 0.2f;
+		inline constexpr float kMaxHUDCoverage = 1.0f;
+
+		// HMD-relative defaults (meters).
+		inline constexpr float kDefaultHMDOffsetX = 0.195f;
+		inline constexpr float kDefaultHMDOffsetY = -0.375f;
+		inline constexpr float kDefaultHMDOffsetZ = -1.355f;
+
+		// Controller-relative defaults (meters).
+		inline constexpr float kDefaultControllerOffsetX = 0.295f;
+		inline constexpr float kDefaultControllerOffsetY = 0.211f;
+		inline constexpr float kDefaultControllerOffsetZ = 0.063f;
+
+		/// Scale matrix matching the overlay's aspect ratio. Y is scaled
+		/// proportionally so the overlay stays visually square.
+		inline Matrix CreateScaleMatrix(float scale)
+		{
+			return Matrix::CreateScale(scale, scale * kOverlayAspect, scale);
+		}
+	}
+
+	// ---- Enums ----------------------------------------------------------
+
+	enum class AttachMode
+	{
+		HMDOnly = 0,
+		ControllerOnly = 1,
+		Both = 2,
+		None = 3,
+	};
+
+	enum class PositioningMethod
+	{
+		HMDRelative = 0,
+		FixedWorld = 1,
+	};
+
+	enum class OverlayType
+	{
+		HMD,
+		Controller,
+	};
+
+	/// Style of the helper-composited wand pointer (drawn for every focused
+	/// client that doesn't set kClientFlag_OwnCursor). Both anchor their hotspot
+	/// at the exact wand hit; this is a presentation choice.
+	enum class CursorStyle
+	{
+		Dot = 0,    ///< Filled disc with a dark outline (legible at distance).
+		Arrow = 1,  ///< Classic desktop arrow, tip at the hit point.
+	};
+
+	// ---- Settings -------------------------------------------------------
+
+	struct Settings
+	{
+		float menuScale = Config::kDefaultMenuScale;
+		PositioningMethod positioningMethod = PositioningMethod::FixedWorld;
+		AttachMode attachMode = AttachMode::HMDOnly;
+		InputDeviceType attachController = InputDeviceType::Secondary;
+
+		// HMD-relative offsets.
+		float hmdOffsetX = Config::kDefaultHMDOffsetX;
+		float hmdOffsetY = Config::kDefaultHMDOffsetY;
+		float hmdOffsetZ = Config::kDefaultHMDOffsetZ;
+
+		// Controller-relative offsets.
+		float controllerOffsetX = Config::kDefaultControllerOffsetX;
+		float controllerOffsetY = Config::kDefaultControllerOffsetY;
+		float controllerOffsetZ = Config::kDefaultControllerOffsetZ;
+
+		bool enableWandPointing = true;
+
+		/// Style of the helper-composited wand pointer. Applies to every focused
+		/// client that takes the default (helper-drawn) pointer.
+		CursorStyle cursorStyle = CursorStyle::Dot;
+
+		/// Scale multiplier on the helper-drawn pointer's on-panel size (1.0 =
+		/// the built-in default). Accessibility knob: larger/smaller for
+		/// visibility or precision-aiming preference.
+		float cursorSize = 1.0f;
+
+		/// RGBA tint applied to the helper-drawn pointer's fill color (its dark
+		/// outline stays dark for contrast against any panel content). Alpha
+		/// scales the baked per-pixel coverage, not a flat overlay.
+		float cursorColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+		/// Route-on-press input leases (see internal/InputLeases.h). Kill-switch
+		/// only — false reverts to the legacy settle-latch + suppression-flag
+		/// routing in case a regression surfaces in the field. Not in the UI.
+		bool useInputLeases = true;
+
+		// Drag-to-reposition. On by default so the documented grip-to-move gesture
+		// works out of the box; gated to off-panel grip so it can't hijack on-panel
+		// menu input.
+		bool enableDragToReposition = true;
+		float autoResetDistance = 1000.0f;  ///< game units; 0 disables auto-reset
+
+		/// When true, an overlay may only be OPENED while the game is paused
+		/// (RE::UI::GameIsPaused()), so menus never affect live gameplay —
+		/// matching Community Shaders' original pause-only menu. Switching
+		/// between already-open overlays and closing are always allowed.
+		bool onlyOpenWhilePaused = true;
+
+		/// Show a one-time welcome banner on the HUD at startup (how to open
+		/// overlays). Auto-dismisses after ~30s or when you enter the game.
+		bool showWelcome = true;
+
+		/// Controller combos the helper owns for opening / closing the active
+		/// overlay. Open focuses the last-opened overlay (or the first mod
+		/// overlay on a cold start); close releases focus. Defaults match
+		/// Community Shaders' original VR menu binds so muscle memory carries
+		/// over. Rebindable from the controller map; persisted as packed values.
+		/// OpenVR key codes: X/A = 7, B/Y = 1, grip = 2.
+		std::vector<ImGuiVRHelperPluginAPI::InputCombo> openMenuKeys = {
+			ImGuiVRHelperPluginAPI::InputCombo::Secondary(7),
+			ImGuiVRHelperPluginAPI::InputCombo::Secondary(1),
+		};
+		std::vector<ImGuiVRHelperPluginAPI::InputCombo> closeMenuKeys = {
+			ImGuiVRHelperPluginAPI::InputCombo::Both(2),
+		};
+
+		/// Preferred order of mod overlays (by client name) for the overlay cycle
+		/// and the open combo's "first mod" pick (top = opened first). Clients not
+		/// listed fall to the end in registration order. Empty = registration
+		/// order. Set from the helper's "Overlay order" UI.
+		std::vector<std::string> overlayOrder;
+
+		// Thumbstick deadzone (also used for drag-depth control). Bumped
+		// from 0.1 to 0.2 — most VR controllers have hardware drift in
+		// the 0.05-0.15 range, and 0.1 left the cursor noticeably
+		// drifting after stick release. SteamVR's own input deadzone
+		// defaults are also in the 0.2 ballpark.
+		float mouseDeadzone = 0.2f;
+
+		/// RGBA color blended into the overlay while it's being dragged.
+		/// Default: yellow at 30% alpha, matching SCS's visual feedback.
+		float dragHighlightColor[4] = { 1.0f, 1.0f, 0.0f, 0.3f };
+
+		/// Spdlog level name: "trace", "debug", "info", "warn", "err",
+		/// "critical", "off". Applied at plugin load. Default "info".
+		std::string logLevel = "info";
+
+		/// Smoke test for kClientFlag_HUDMode. When on, the helper
+		/// registers a synthetic HUD-mode client and renders a
+		/// calibration grid into its panel RTV every frame. Toggle
+		/// off to clear. Lives in the Diagnostics section of the
+		/// settings UI; default off.
+		bool showHUDDemo = false;
+
+		/// Distance (meters) from the HMD to the HUD-mode plane. All
+		/// kClientFlag_HUDMode clients render onto a flat quad at this
+		/// depth in front of the user. Closer values feel like a
+		/// "thin glass layer" / monitor stuck to the headset; farther
+		/// values feel like a billboard floating in space. 0.5 is
+		/// roughly the minimum comfortable focal distance on most VR
+		/// lenses; pushing closer than that strains the eyes.
+		float hudDepth = 1.0f;
+
+		/// Fraction of each eye's view frustum the HUD plane fills, at
+		/// hudDepth. The helper derives the quad's extents (and off-center
+		/// position, since HMD frustums are asymmetric) directly from the
+		/// per-eye projection tangents, so the HUD covers the actual view
+		/// like a screen rather than a small fixed-FOV window. 1.0 = edge
+		/// to edge (may clip at the lens mask on some HMDs); smaller values
+		/// shrink it toward a comfortable window. Clamped to
+		/// [kMinHUDCoverage, kMaxHUDCoverage].
+		float hudCoverage = Config::kDefaultHUDCoverage;
+
+		/// Base resolution of every overlay panel texture, before HUD
+		/// supersampling. Higher = sharper but more VRAM; pick to suit the
+		/// headset/monitor. Common presets are offered in the settings UI.
+		int baseWidth = Config::kOverlayWidth;
+		int baseHeight = Config::kOverlayHeight;
+
+		/// Supersample multiplier for panels that fill the view: HUD layers, the
+		/// settings panel and the toasts/welcome. 1 = off; clamped to [1, 3].
+		int hudSupersample = Config::kHUDSupersample;
+
+		/// Vertical placement of the toasts/welcome banner, as a fraction of the
+		/// panel height (0 = top edge, 1 = bottom). The banner is pivoted by its
+		/// top-center. Clamped to [0, 1]. Default 0.18 (near the top).
+		float toastTopFraction = 0.18f;
+
+		/// Composite the focused menu through the runtime's IVROverlay layer
+		/// (SteamVR overlay / OpenComposite OpenXR quad) instead of drawing it
+		/// into the eye buffers, keeping it sharp under temporal upscalers and
+		/// frame generation. Falls back to the in-scene path when the runtime
+		/// has no usable overlay support. Experimental; default off.
+		bool useRuntimeOverlay = false;
+	};
+
+	// ---- Runtime state --------------------------------------------------
+
+	struct WandState
+	{
+		// Written on the render thread by WandPointing::ComputeIntersection;
+		// also read from devbench's listener thread (DiagnosticsJson).
+		std::atomic<bool> isIntersecting = false;
+		std::atomic<float> uvCoordinatesX = 0.0f;
+		std::atomic<float> uvCoordinatesY = 0.0f;
+		std::atomic<bool> externalSurfaceActive = false;
+		vr::TrackedDeviceIndex_t controllerIndex = vr::k_unTrackedDeviceIndexInvalid;
+		Vector3 rayOrigin = Vector3::Zero;
+		Vector3 rayDirection = Vector3::Zero;
+		// Which overlay anchor (HMD- or controller-attached) the hit above belongs to, for
+		// AttachMode::Both where the panel is drawn at both locations at once. Set alongside
+		// isIntersecting/uvCoordinates by WandPointing::ComputeIntersection. Consumed by
+		// InSceneOverlay's cursor-marker pass to draw the marker at the same anchor the panel
+		// quad it's landing on uses.
+		OverlayType matchedOverlayType = OverlayType::HMD;
+	};
+
+	struct FixedWorldPosition
+	{
+		Matrix m = Matrix::Identity;
+		bool initialized = false;
+	};
+
+	struct DragState
+	{
+		std::atomic<bool> dragging = false;
+		vr::TrackedDeviceIndex_t controllerIndex = vr::k_unTrackedDeviceIndexInvalid;
+		bool isPrimary = false;
+		bool isSecondary = false;
+		Matrix initialControllerMatrix = Matrix::Identity;
+		Matrix initialOverlayMatrix = Matrix::Identity;
+		Matrix startControllerMatrix = Matrix::Identity;
+		/// Invert(initialControllerMatrix), cached at grip-press (FixedWorld mode's
+		/// rigid-attach recompute needs it every frame; it's constant for the drag).
+		Matrix initialControllerMatrixInverse = Matrix::Identity;
+
+		enum class Mode
+		{
+			None,
+			FixedWorld,
+			HMD,
+			Controller,
+		} mode = Mode::None;
+
+		Vector3 initialHMDOffset = Vector3::Zero;
+		Vector3 initialControllerOffset = Vector3::Zero;
+		float initialHMDScale = 1.0f;
+
+		/// True for a drag started via HelperImpl::RequestReposition (a client's own on-panel
+		/// "Move" affordance, held with trigger) rather than the off-panel grip gesture. Changes
+		/// how UpdateActiveDrag decides to end the drag: State::repositionRequested each frame
+		/// instead of the grip button, since the client — not raw grip state — owns the "still
+		/// held" signal here (grip itself may be bound to something else by the underlying game
+		/// while that client's menu is up, e.g. Skyrim's dialogue menu closes on grip).
+		std::atomic<bool> clientRequested = false;
+	};
+
+	// ---- Singleton ------------------------------------------------------
+
+	/// Persist Settings to Data/SKSE/Plugins/ImGuiVRHelper.toml. Safe to
+	/// call any time after Globals::IsReady().
+	void SaveSettings();
+
+	/// Load Settings from Data/SKSE/Plugins/ImGuiVRHelper.toml if it
+	/// exists. Missing fields fall back to defaults; corrupt files log a
+	/// warning and leave defaults intact. If a legacy .json from a prior
+	/// helper version is present, its values are migrated and the .json
+	/// is removed on the way through.
+	void LoadSettings();
+
+	/// If the TOML config file doesn't exist on disk, write the current
+	/// (default) Settings to it so the user has a discoverable file to
+	/// edit. Idempotent — silent if the file is already present.
+	void WriteDefaultsIfMissing();
+
+	/// Apply Settings::logLevel to spdlog's default logger. Safe to call
+	/// after SKSE::Init has set up logging.
+	void ApplyLogLevel();
+
+	class State
+	{
+	public:
+		static State& GetSingleton();
+
+		Settings settings;
+		WandState wandState;
+		FixedWorldPosition fixedWorld;
+		DragState dragState;
+
+		bool lastKnownLeftHandedMode = false;
+		bool overlayVisible = false;  ///< populated by HelperImpl::IsOverlayVisible
+
+		/// Set by HelperImpl::RequestReposition when the focused client calls it this frame (its
+		/// own on-panel "Move" affordance, held with trigger); consumed (and reset false) by
+		/// OverlayDrag::Update each DispatchFrame. The client must call it again every frame it
+		/// wants the drag to continue -- a heartbeat, not a toggle -- so simply not calling it
+		/// (trigger released) ends the drag on the next Update.
+		bool repositionRequested = false;
+
+		/// World position the player was at when fixed-world overlay last
+		/// snapped. Used by auto-reset distance check.
+		RE::NiPoint3 savedPlayerWorldPos{};
+
+		/// Per-controller polled state, populated by Input.cpp once that
+		/// port lands. Until then, all isPressed/thumbsticks read 0.
+		RE::VRControllerState primaryControllerState{};
+		RE::VRControllerState secondaryControllerState{};
+
+		/// Synthetic wand-pointer override (devbench bridge): while active, the
+		/// input-thread wand updates force the hit to (u,v) on the panel, so an
+		/// agent can drive deterministic clicks without a headset. Atomics:
+		/// written from devbench's listener thread, read on the input thread.
+		struct DebugPointerOverride
+		{
+			std::atomic<bool> active{ false };
+			std::atomic<float> u{ 0.5f };
+			std::atomic<float> v{ 0.5f };
+		};
+		DebugPointerOverride debugPointer;
+
+	private:
+		State() = default;
+	};
+}
