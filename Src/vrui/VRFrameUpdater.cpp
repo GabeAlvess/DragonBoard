@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "VRFrameUpdater.h"
+#include "JournalMenuProbe.h"
 #include "VRMenuManager.h"
 #include "VRUISettings.h"
 #include "ModActionManager.h"
@@ -93,6 +94,7 @@ namespace vrui
                     }
 
                     VRMenuManager::get().onFrameUpdate(deltaTime);
+                    JournalMenuProbe::GetSingleton().Update();
                     dragonboard::ui::rml::RmlPanelHost::GetSingleton().UpdateGameThread(deltaTime);
                     ModActionManager::get().update(deltaTime);
                 });

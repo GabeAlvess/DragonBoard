@@ -6,6 +6,7 @@
 #include "plugin.h"
 #include "papyrus/PapyrusPanelBridge.h"
 #include "ui/rml/RmlPanelHost.h"
+#include "vrui/JournalMenuProbe.h"
 #include "vrui/ModActionManager.h"
 #include "vrui/ModEventHandler.h"
 #include "vrui/VRFrameUpdater.h"
@@ -95,6 +96,7 @@ namespace dragonboard::bootstrap
         }
 
         case SKSE::MessagingInterface::kPreLoadGame:
+            JournalMenuProbe::GetSingleton().Reset();
             dragonboard::papyrus::ResetPapyrusPanels();
             break;
 
@@ -106,6 +108,7 @@ namespace dragonboard::bootstrap
 
         case SKSE::MessagingInterface::kNewGame:
             logger::trace("DragonBoardVR: ===== kNewGame =====");
+            JournalMenuProbe::GetSingleton().Reset();
             dragonboard::papyrus::ResetPapyrusPanels();
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             VRFrameUpdater::Register();

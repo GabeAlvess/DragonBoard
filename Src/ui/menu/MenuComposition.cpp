@@ -32,6 +32,8 @@
 #include "vrui/VRUIModsContainer.h"
 #include "vrui/ModActionManager.h"
 #include "vrui/VRUIMapMarker.h"
+#include "vrui/JournalMenuProbe.h"
+#include "vrui/VRUILayoutManager.h"
 
 using namespace vrui;
 
@@ -53,8 +55,6 @@ static VRUIButton::PressCallback openGameMenu(const char* menuName)
         if (queue) queue->AddMessage(menuName, RE::UI_MESSAGE_TYPE::kShow, nullptr);
     };
 }
-
-#include "vrui/VRUILayoutManager.h"
 
 static void applyJSONTransform(std::shared_ptr<vrui::VRUIWidget> widget, const std::string& containerId, const std::string& elementId) {
     if (!widget) return;
@@ -765,7 +765,13 @@ void dragonboard::ui::menu::Create()
         } else if (lowerAction == "wait" || lowerAction == "sleep") {
             btn->setOnPressHandler(openGameMenu("Sleep/Wait Menu"));
         } else if (lowerAction == "journal") {
-            btn->setOnPressHandler(openGameMenu("Journal Menu"));
+            btn->setOnPressHandler([](VRUIButton*, EquipHand) {
+                vrui::JournalMenuProbe::GetSingleton().ArmFromDragonBoard();
+                VRMenuManager::get().toggleMenu();
+                if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
+                    queue->AddMessage("Journal Menu", RE::UI_MESSAGE_TYPE::kShow, nullptr);
+                }
+            });
         } else if (lowerAction == "map") {
             btn->setOnPressHandler(openGameMenu("MapMenu"));
         } else if (lowerAction == "inventory") {
