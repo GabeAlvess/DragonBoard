@@ -76,8 +76,6 @@ namespace vrui
         _overwriteLogged = false;
         _framesWaitingForJournal = 0;
         _targetAvailable = false;
-        _rotationOffsetCaptured = false;
-        _targetAnchor = nullptr;
 
         auto& manager = VRMenuManager::get();
         auto panel = manager.findPanelByName("Background_Panel");
@@ -92,16 +90,9 @@ namespace vrui
         if (targetNode) {
             _targetWorld = targetNode->world;
             _targetAvailable = true;
-
-            if (targetNode->parent) {
-                _targetAnchor = RE::NiPointer<RE::NiNode>(targetNode->parent);
-                _targetLocal = targetNode->parent->world.Invert() * targetNode->world;
-            }
-
             logger::info(
-                "DragonBoardVR SkyUI probe: armed from board node '{}' with anchor '{}' at worldPos=({:.3f}, {:.3f}, {:.3f}).",
+                "DragonBoardVR SkyUI probe: armed from board node '{}' at worldPos=({:.3f}, {:.3f}, {:.3f}).",
                 NodeName(targetNode),
-                NodeName(_targetAnchor.get()),
                 _targetWorld.translate.x,
                 _targetWorld.translate.y,
                 _targetWorld.translate.z);
@@ -153,17 +144,15 @@ namespace vrui
         }
 
         auto* uiNode = nodes->uiNode.get();
-        if (!uiNode || !uiNode->parent || !RefreshTargetWorld()) {
+        if (!uiNode || !uiNode->parent || !_targetAvailable) {
             return;
         }
 
         if (!_activeUiNode) {
             _activeUiNode = RE::NiPointer<RE::NiNode>(uiNode);
             _originalLocal = uiNode->local;
-            _uiRotationFromTarget = _targetWorld.rotate.Transpose() * uiNode->world.rotate;
-            _rotationOffsetCaptured = true;
             logger::info(
-                "DragonBoardVR SkyUI probe: captured original uiNode transform; applying board-following pose while preserving the initial Journal orientation and scale.");
+                "DragonBoardVR SkyUI probe: captured original uiNode local transform; applying translation-only test.");
         } else if (_activeUiNode.get() != uiNode) {
             logger::warn(
                 "DragonBoardVR SkyUI probe: uiNode changed while Journal was open; restoring and stopping this probe.");
@@ -176,7 +165,7 @@ namespace vrui
             _overwriteLogged = true;
         }
 
-        ApplyAnchoredPose(*uiNode);
+        ApplyTranslationOnly(*uiNode);
     }
 
     void JournalMenuProbe::Reset()
@@ -186,10 +175,8 @@ namespace vrui
         _journalWasOpen = false;
         _nodesLogged = false;
         _targetAvailable = false;
-        _rotationOffsetCaptured = false;
         _overwriteLogged = false;
         _framesWaitingForJournal = 0;
-        _targetAnchor = nullptr;
     }
 
     void JournalMenuProbe::LogVrNodes(RE::VR_NODE_DATA& nodes) const
@@ -201,23 +188,10 @@ namespace vrui
         LogNode("DialogueUINode", nodes.DialogueUINode.get());
     }
 
-    bool JournalMenuProbe::RefreshTargetWorld()
-    {
-        if (_targetAnchor) {
-            _targetWorld = _targetAnchor->world * _targetLocal;
-            _targetAvailable = true;
-        }
-        return _targetAvailable;
-    }
-
-    void JournalMenuProbe::ApplyAnchoredPose(RE::NiNode& uiNode)
+    void JournalMenuProbe::ApplyTranslationOnly(RE::NiNode& uiNode)
     {
         RE::NiTransform desiredWorld = uiNode.world;
         desiredWorld.translate = _targetWorld.translate;
-        if (_rotationOffsetCaptured) {
-            desiredWorld.rotate = _targetWorld.rotate * _uiRotationFromTarget;
-        }
-        desiredWorld.scale = _originalLocal.scale * uiNode.parent->world.scale;
 
         const RE::NiTransform parentInverse = uiNode.parent->world.Invert();
         uiNode.local = parentInverse * desiredWorld;
