@@ -4,7 +4,8 @@
 #include "higgsinterface001.h"
 #include "keyhandler/keyhandler.h"
 #include "plugin.h"
-#include "ui/imgui/DragonBoardSettingsMenu.h"
+#include "papyrus/PapyrusPanelBridge.h"
+#include "ui/rml/RmlPanelHost.h"
 #include "vrui/ModActionManager.h"
 #include "vrui/ModEventHandler.h"
 #include "vrui/VRFrameUpdater.h"
@@ -39,7 +40,6 @@ namespace dragonboard::bootstrap
         switch (message->type) {
         case SKSE::MessagingInterface::kPostPostLoad:
             logger::trace("DragonBoardVR: ===== kPostPostLoad =====");
-            dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton().Connect();
             g_higgsInterface = HiggsPluginAPI::GetHiggsInterface001(
                 SKSE::GetPluginHandle(), SKSE::GetMessagingInterface());
             if (g_higgsInterface) {
@@ -90,19 +90,24 @@ namespace dragonboard::bootstrap
             // main menu, but before the player skeleton and DragonBoard 3D
             // items are initialized. Only arm a Present-thread RmlUi warm-up;
             // no scene graph nodes are created here.
-            dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton().RequestRmlWarmup();
+            dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             break;
         }
 
+        case SKSE::MessagingInterface::kPreLoadGame:
+            dragonboard::papyrus::ResetPapyrusPanels();
+            break;
+
         case SKSE::MessagingInterface::kPostLoadGame:
             logger::trace("DragonBoardVR: ===== kPostLoadGame =====");
-            dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton().RequestRmlWarmup();
+            dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             VRFrameUpdater::Register();
             break;
 
         case SKSE::MessagingInterface::kNewGame:
             logger::trace("DragonBoardVR: ===== kNewGame =====");
-            dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton().RequestRmlWarmup();
+            dragonboard::papyrus::ResetPapyrusPanels();
+            dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             VRFrameUpdater::Register();
             break;
         }

@@ -129,7 +129,6 @@
             </main>
 
             <footer>
-                <button id="use-imgui" class="classic-button"><span class="classic-mark">+</span><span>Classic settings</span></button>
                 <div class="footer-spacer"></div>
                 <div class="save-status">Ready to save</div>
                 <button id="save" class="save-button"><span>Save changes</span><span class="keycap light">A</span></button>

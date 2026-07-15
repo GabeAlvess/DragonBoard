@@ -1,9 +1,6 @@
-#include "ui/imgui/DragonBoardSettingsMenu.h"
-#include "ui/imgui/StandaloneImGuiStyle.h"
+#include "ui/rml/RmlPanelHost.h"
 #include "ui/rml/DragonBoardRmlUi.h"
 
-#include "ImGuiVRHelperAPI.h"
-#include "ImGuiVRHelperTypes.h"
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUIPanel.h"
 #include "vrui/VRUIItemEditPanel.h"
@@ -16,22 +13,22 @@
 #include <Windows.h>
 
 #include <d3d11.h>
-#include <imgui.h>
-#include <backends/imgui_impl_dx11.h>
 #include <RE/R/Renderer.h>
 
-namespace dragonboard::ui::imgui
+namespace dragonboard::ui::rml
 {
     namespace
     {
-        constexpr uint32_t kLocalSettingsContentId = 0xFFFFFFFFu;
+        constexpr std::uint32_t kPanelWidth = 1920;
+        constexpr std::uint32_t kPanelHeight = 1080;
+        constexpr float kSceneScreenSizeScale = 0.85f;
 
         using PresentFn = HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT);
         PresentFn g_originalPresent = nullptr;
         std::chrono::steady_clock::time_point g_lastPresent;
         bool g_lastPresentValid = false;
 
-        HRESULT WINAPI StandaloneSettingsPresent(
+        HRESULT WINAPI RmlPresent(
             IDXGISwapChain* swapChain, UINT syncInterval, UINT flags)
         {
             const auto now = std::chrono::steady_clock::now();
@@ -46,183 +43,253 @@ namespace dragonboard::ui::imgui
             g_lastPresentValid = true;
 
             try {
-                DragonBoardSettingsMenu::GetSingleton().RenderPresentThread(dt);
+                RmlPanelHost::GetSingleton().RenderPresentThread(dt);
             } catch (const std::exception& e) {
-                logger::error("DragonBoardVR: standalone Settings render exception: {}", e.what());
+                logger::error("DragonBoardVR: RmlUi Present exception: {}", e.what());
             }
             return g_originalPresent(swapChain, syncInterval, flags);
         }
 
     }
 
-    DragonBoardSettingsMenu& DragonBoardSettingsMenu::GetSingleton()
+    RmlPanelHost& RmlPanelHost::GetSingleton()
     {
-        static DragonBoardSettingsMenu singleton;
+        static RmlPanelHost singleton;
         return singleton;
     }
 
-    DragonBoardSettingsMenu::~DragonBoardSettingsMenu()
+    DragonBoardVR_API::PanelHandle RmlPanelHost::RegisterExternalPanel(
+        const DragonBoardVR_API::PanelDescriptor& descriptor) noexcept
     {
-        // The NiSourceTexture must never outlive the tiny renderer bridge while
-        // still pointing at it. Restore the engine-owned placeholder first,
-        // then release the COM references acquired from API007 directly; the
-        // helper DLL may already be shutting down at this point.
+        try {
+            if (!descriptor.id || !*descriptor.id ||
+                !descriptor.documentPath || !*descriptor.documentPath) {
+                return DragonBoardVR_API::InvalidPanel;
+            }
+
+            std::scoped_lock lock(_externalMutex);
+            for (const auto& [handle, client] : _externalPanels) {
+                (void)handle;
+                if (client.id == descriptor.id) {
+                    logger::warn(
+                        "DragonBoardVR API: RmlUi panel id '{}' is already registered.",
+                        descriptor.id);
+                    return DragonBoardVR_API::InvalidPanel;
+                }
+            }
+
+            auto handle = _nextExternalPanel.fetch_add(1, std::memory_order_relaxed);
+            if (handle == DragonBoardVR_API::InvalidPanel) {
+                handle = _nextExternalPanel.fetch_add(1, std::memory_order_relaxed);
+            }
+            _externalPanels.emplace(handle, ExternalPanelClient{
+                descriptor.id,
+                descriptor.documentPath,
+                descriptor.onEvent,
+                descriptor.userData });
+            _renderCommands.push_back(RenderCommand{
+                RenderCommandType::kRegister,
+                handle,
+                descriptor.id,
+                descriptor.documentPath });
+            RequestRmlWarmup();
+            return handle;
+        } catch (const std::exception& e) {
+            logger::error("DragonBoardVR API: failed to register RmlUi panel: {}", e.what());
+            return DragonBoardVR_API::InvalidPanel;
+        }
+    }
+
+    void RmlPanelHost::UnregisterExternalPanel(
+        DragonBoardVR_API::PanelHandle panel) noexcept
+    {
+        try {
+            {
+                std::scoped_lock lock(_externalMutex);
+                if (_externalPanels.erase(panel) == 0) return;
+                _renderCommands.push_back(RenderCommand{
+                    RenderCommandType::kUnregister, panel });
+            }
+            if (_activeExternalPanel.load() == panel) HideExternalPanel(panel);
+        } catch (...) {
+            logger::error("DragonBoardVR API: failed to unregister RmlUi panel {}.", panel);
+        }
+    }
+
+    bool RmlPanelHost::ShowExternalPanel(
+        DragonBoardVR_API::PanelHandle panel) noexcept
+    {
+        try {
+            {
+                std::scoped_lock lock(_externalMutex);
+                if (!_externalPanels.contains(panel)) return false;
+                _renderCommands.push_back(RenderCommand{ RenderCommandType::kShow, panel });
+            }
+            if (!EnsurePresentHookInstalled()) return false;
+            auto& manager = vrui::VRMenuManager::get();
+            if (!manager.isMenuOpen()) manager.toggleMenu();
+            ResetPanelInput();
+            _activeExternalPanel.store(panel);
+            _localPanelMode.store(LocalPanelMode::kExternal);
+            _visible.store(true);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    void RmlPanelHost::HideExternalPanel(
+        DragonBoardVR_API::PanelHandle panel) noexcept
+    {
+        if (_activeExternalPanel.load() == panel) {
+            _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
+            Close();
+        }
+    }
+
+    bool RmlPanelHost::IsExternalPanelVisible(
+        DragonBoardVR_API::PanelHandle panel) const noexcept
+    {
+        return panel != DragonBoardVR_API::InvalidPanel && _visible.load() &&
+            _localPanelMode.load() == LocalPanelMode::kExternal &&
+            _activeExternalPanel.load() == panel;
+    }
+
+    bool RmlPanelHost::SetExternalElementText(
+        DragonBoardVR_API::PanelHandle panel,
+        const char* elementId,
+        const char* text) noexcept
+    {
+        return QueueElementCommand(
+            RenderCommandType::kSetText, panel, elementId, text ? text : "");
+    }
+
+    bool RmlPanelHost::SetExternalElementAttribute(
+        DragonBoardVR_API::PanelHandle panel,
+        const char* elementId,
+        const char* name,
+        const char* value) noexcept
+    {
+        return QueueElementCommand(
+            RenderCommandType::kSetAttribute,
+            panel,
+            elementId,
+            name,
+            value,
+            value != nullptr);
+    }
+
+    bool RmlPanelHost::SetExternalElementClass(
+        DragonBoardVR_API::PanelHandle panel,
+        const char* elementId,
+        const char* className,
+        bool enabled) noexcept
+    {
+        return QueueElementCommand(
+            RenderCommandType::kSetClass, panel, elementId, className, nullptr, enabled);
+    }
+
+    bool RmlPanelHost::QueueElementCommand(
+        RenderCommandType type,
+        DragonBoardVR_API::PanelHandle panel,
+        const char* first,
+        const char* second,
+        const char* third,
+        bool enabled) noexcept
+    {
+        try {
+            if (!first || !*first || !second) return false;
+            if (type != RenderCommandType::kSetText && !*second) return false;
+            std::scoped_lock lock(_externalMutex);
+            if (!_externalPanels.contains(panel)) return false;
+            _renderCommands.push_back(RenderCommand{
+                type,
+                panel,
+                first,
+                second,
+                third ? third : "",
+                enabled });
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    RmlPanelHost::~RmlPanelHost()
+    {
+        // Restore the engine-owned placeholder before releasing the bridge.
         if (_screenSourceTexture && _sceneTextureBridge) {
             _screenSourceTexture->rendererTexture = _originalRendererTexture;
         }
         _sceneTextureBridge.reset();
-        if (_panelTexture.srv) {
-            _panelTexture.srv->Release();
-        }
-        if (_panelTexture.texture) {
-            _panelTexture.texture->Release();
-        }
-        _panelTexture = {};
-        _boundTexture = nullptr;
-        _boundSrv = nullptr;
-
         _rmlUi.reset();
-
-        if (_imguiContext) {
-            ImGui::SetCurrentContext(_imguiContext);
-            ImGui_ImplDX11_Shutdown();
-            ImGui::DestroyContext(_imguiContext);
-            _imguiContext = nullptr;
-        }
-        if (_settingsSrv) _settingsSrv->Release();
-        if (_settingsRtv) _settingsRtv->Release();
-        if (_settingsTexture) _settingsTexture->Release();
+        if (_panelShaderResource) _panelShaderResource->Release();
+        if (_panelRenderTarget) _panelRenderTarget->Release();
+        if (_panelRenderTexture) _panelRenderTexture->Release();
         if (_context) _context->Release();
         if (_device) _device->Release();
     }
 
-    bool DragonBoardSettingsMenu::Connect()
+    bool RmlPanelHost::OpenSettings()
     {
-        if (_connected.load()) {
-            return true;
-        }
-        if (_helperConnectionAttempted.exchange(true)) {
-            return false;
-        }
-
-		_helper010 = ImGuiVRHelperPluginAPI::GetImGuiVRHelperInterface010();
-		_helper008 = _helper010 ? static_cast<ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface008*>(_helper010) :
-		                         ImGuiVRHelperPluginAPI::GetImGuiVRHelperInterface008();
-        _helper007 = _helper008 ? static_cast<ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface007*>(_helper008) :
-                                 ImGuiVRHelperPluginAPI::GetImGuiVRHelperInterface007();
-        _helper006 = _helper007 ? static_cast<ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface006*>(_helper007) :
-                                 ImGuiVRHelperPluginAPI::GetImGuiVRHelperInterface006();
-        _helper = _helper006 ? static_cast<ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface001*>(_helper006) :
-                              ImGuiVRHelperPluginAPI::GetImGuiVRHelperInterface001();
-        if (!_helper) {
-            logger::info("DragonBoardVR: ImGui VR Helper not found; standalone Settings remains available.");
-            return false;
-        }
-
-        constexpr uint32_t flags =
-            ImGuiVRHelperPluginAPI::kClientFlag_LiveTool |
-            ImGuiVRHelperPluginAPI::kClientFlag_PointerFocus;
-
-        _clientId = _helper->RegisterClient(
-            "DragonBoardVR Physical Host",
-            Plugin::VERSION.string().c_str(),
-            &DragonBoardSettingsMenu::OnHelperFrame,
-            this,
-            flags);
-
-        if (_clientId == 0) {
-            _helper = nullptr;
-            logger::warn("DragonBoardVR: ImGui VR Helper rejected the settings client.");
-            return false;
-        }
-
-        CaptureSettingsGameThread();
-        _connected.store(true);
-        logger::info(
-            "DragonBoardVR: ImGui VR Helper connected (build {}, client {}).",
-            _helper->GetBuildNumber(),
-            _clientId);
-        if (_helper006) {
-            logger::info("DragonBoardVR: ImGui VR Helper physical-surface API 006 available.");
-        } else {
-            logger::warn(
-                "DragonBoardVR: ImGui VR Helper API 006 unavailable; using the helper's own pose and raycast.");
-        }
-        if (_helper007) {
-            logger::info("DragonBoardVR: ImGui VR Helper scene-host API 007 available.");
-        }
-        if (_helper008) {
-            logger::info("DragonBoardVR: ImGui VR Helper universal physical-host API 008 available.");
-        }
-		if (_helper010) {
-			logger::info("DragonBoardVR: external hosted panels will request 1920x1080 through API 010.");
-		} else if (_helper008) {
-			logger::warn("DragonBoardVR: ImGui VR Helper API 010 unavailable; hosted panels keep helper sizing.");
-		}
-        return true;
-    }
-
-    bool DragonBoardSettingsMenu::Open()
-    {
-        // The local Settings panel owns its ImGui context and texture.  The
-        // helper connection is optional and is used only for external panels.
-        Connect();
         if (!EnsurePresentHookInstalled()) {
-            logger::error("DragonBoardVR: Standalone Settings render hook unavailable; using the 3D fallback.");
+            logger::error("DragonBoardVR: RmlUi Settings render hook unavailable.");
+            return false;
+        }
+        if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
+            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsSettingsReady()))) {
+            logger::error("DragonBoardVR: RmlUi Settings document is unavailable.");
             return false;
         }
 
         CaptureSettingsGameThread();
-        ResetStandaloneInput();
+        ResetPanelInput();
+        _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
         _localPanelMode.store(LocalPanelMode::kSettings);
-        _useRmlSettings.store(true);
         _rmlSettingsSyncPending.store(true);
-        _closePending.store(false);
         _visible.store(true);
-        if (_helper008 && _clientId != 0) {
-            _helper008->ReleaseHostedPanel(_clientId);
-        } else if (_helper && _clientId != 0) {
-            _helper->ReleaseFocus(_clientId);
-        }
         return true;
     }
 
-    bool DragonBoardSettingsMenu::OpenDev()
+    bool RmlPanelHost::OpenDeveloper()
     {
-        Connect();
         if (!EnsurePresentHookInstalled()) {
-            logger::error("DragonBoardVR: Standalone Dev render hook unavailable.");
+            logger::error("DragonBoardVR: RmlUi Developer render hook unavailable.");
+            return false;
+        }
+        if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
+            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsDeveloperReady()))) {
+            logger::error("DragonBoardVR: RmlUi Developer document is unavailable.");
             return false;
         }
 
         LoadDevCommandsGameThread();
         CaptureDevGameInfoGameThread();
-        ResetStandaloneInput();
+        ResetPanelInput();
+        _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
         _devInfoRefreshAccumulator = 0.0f;
         _localPanelMode.store(LocalPanelMode::kDeveloper);
-        _useRmlDeveloper.store(true);
         _rmlDeveloperSyncPending.store(true);
-        _closePending.store(false);
         _visible.store(true);
-        if (_helper008 && _clientId != 0) {
-            _helper008->ReleaseHostedPanel(_clientId);
-        } else if (_helper && _clientId != 0) {
-            _helper->ReleaseFocus(_clientId);
-        }
         return true;
     }
 
-    bool DragonBoardSettingsMenu::OpenItemEdit(vrui::VRUIItemEditPanel* editor)
+    bool RmlPanelHost::OpenItemEdit(vrui::VRUIItemEditPanel* editor)
     {
         if (!editor) return false;
-        Connect();
         if (!EnsurePresentHookInstalled()) {
-            logger::error("DragonBoardVR: standalone item editor render hook unavailable.");
+            logger::error("DragonBoardVR: RmlUi Item Editor render hook unavailable.");
+            return false;
+        }
+        if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
+            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsItemEditReady()))) {
+            logger::error("DragonBoardVR: RmlUi Item Editor document is unavailable.");
             return false;
         }
 
         const auto state = editor->getEditState();
-        ResetStandaloneInput();
+        ResetPanelInput();
+        _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
         {
             std::scoped_lock lock(_itemEditMutex);
             _itemEditBackend = editor;
@@ -244,22 +311,15 @@ namespace dragonboard::ui::imgui
             _itemEditDraft.canPinToWorld = state.canPinToWorld;
         }
         _localPanelMode.store(LocalPanelMode::kItemEdit);
-        _useRmlItemEdit.store(true);
         _rmlItemEditSyncPending.store(true);
         _itemEditApplyPending.store(false);
         _itemEditActionPending.store(ItemEditAction::kNone);
-        _closePending.store(false);
         _visible.store(true);
-        if (_helper008 && _clientId != 0) {
-            _helper008->ReleaseHostedPanel(_clientId);
-        } else if (_helper && _clientId != 0) {
-            _helper->ReleaseFocus(_clientId);
-        }
         logger::info("DragonBoardVR: opened RmlUi item editor for {:08X} '{}'.", state.formID, state.itemName);
         return true;
     }
 
-    void DragonBoardSettingsMenu::RequestRmlWarmup()
+    void RmlPanelHost::RequestRmlWarmup()
     {
         if (_rendererReady.load(std::memory_order_acquire) ||
             _rmlWarmupAttempted.load(std::memory_order_acquire)) {
@@ -276,42 +336,29 @@ namespace dragonboard::ui::imgui
         }
     }
 
-    bool DragonBoardSettingsMenu::IsDevOpen() const
+    bool RmlPanelHost::IsDeveloperOpen() const
     {
         return _visible.load() && _localPanelMode.load() == LocalPanelMode::kDeveloper;
     }
 
-    void DragonBoardSettingsMenu::Close()
+    void RmlPanelHost::Close()
     {
-        ResetStandaloneInput();
+        ResetPanelInput();
         _visible.store(false);
-        _closePending.store(true);
     }
 
-    void DragonBoardSettingsMenu::CloseHostedPanel()
-    {
-        ResetStandaloneInput();
-        _visible.store(false);
-        _closePending.store(true);
-        if (_helper008 && _clientId != 0) {
-            _helper008->ReleaseHostedPanel(_clientId);
-        } else if (_helper && _clientId != 0) {
-            _helper->ReleaseFocus(_clientId);
-        }
-    }
-
-    void DragonBoardSettingsMenu::OnDominantVrButtonEvent(
+    void RmlPanelHost::OnDominantVrButtonEvent(
         bool triggerButton,
         bool gripButton,
         bool pressed)
     {
         if (!_visible.load(std::memory_order_acquire)) return;
 
-        // This state belongs only to the flat RmlUi/ImGui panel. The global
+        // This state belongs only to the flat RmlUi panel. The global
         // DragonBoard input state is deliberately left untouched so activation
         // chords such as Grip + Y continue to receive the original VR events.
         if (triggerButton) {
-            const bool previous = _standaloneTriggerDown.exchange(
+            const bool previous = _triggerDown.exchange(
                 pressed, std::memory_order_acq_rel);
             if (previous != pressed) {
                 logger::info(
@@ -320,7 +367,7 @@ namespace dragonboard::ui::imgui
                     gripButton);
             }
         } else if (gripButton) {
-            const bool previous = _standaloneGripDown.exchange(
+            const bool previous = _gripDown.exchange(
                 pressed, std::memory_order_acq_rel);
             if (previous != pressed) {
                 logger::info(
@@ -330,26 +377,131 @@ namespace dragonboard::ui::imgui
         }
     }
 
-    void DragonBoardSettingsMenu::ResetStandaloneInput()
+    void RmlPanelHost::ResetPanelInput()
     {
-        _standaloneTriggerDown.store(false, std::memory_order_release);
-        _standaloneGripDown.store(false, std::memory_order_release);
-        _standaloneStickX.store(0.0f, std::memory_order_release);
-        _standaloneStickY.store(0.0f, std::memory_order_release);
+        _triggerDown.store(false, std::memory_order_release);
+        _gripDown.store(false, std::memory_order_release);
+        _stickX.store(0.0f, std::memory_order_release);
+        _stickY.store(0.0f, std::memory_order_release);
     }
 
-    void DragonBoardSettingsMenu::UpdateGameThread(float deltaTime)
+    void RmlPanelHost::ApplyRenderCommandsPresentThread()
+    {
+        if (!_rmlUi) return;
+        std::deque<RenderCommand> commands;
+        {
+            std::scoped_lock lock(_externalMutex);
+            commands.swap(_renderCommands);
+        }
+
+        for (auto& command : commands) {
+            bool succeeded = false;
+            switch (command.type) {
+            case RenderCommandType::kRegister:
+                succeeded = _rmlUi->RegisterPanel(
+                    command.panel, std::move(command.first), std::move(command.second));
+                break;
+            case RenderCommandType::kUnregister:
+                succeeded = _rmlUi->UnregisterPanel(command.panel);
+                break;
+            case RenderCommandType::kShow:
+                succeeded = _rmlUi->ShowPanel(command.panel);
+                break;
+            case RenderCommandType::kSetText:
+                succeeded = _rmlUi->SetElementText(
+                    command.panel, command.first.c_str(), command.second.c_str());
+                break;
+            case RenderCommandType::kSetAttribute:
+                succeeded = _rmlUi->SetElementAttribute(
+                    command.panel,
+                    command.first.c_str(),
+                    command.second.c_str(),
+                    command.enabled ? command.third.c_str() : nullptr);
+                break;
+            case RenderCommandType::kSetClass:
+                succeeded = _rmlUi->SetElementClass(
+                    command.panel,
+                    command.first.c_str(),
+                    command.second.c_str(),
+                    command.enabled);
+                break;
+            }
+            if (!succeeded) {
+                logger::warn(
+                    "DragonBoardVR: RmlUi render command {} failed for external panel {}.",
+                    static_cast<unsigned>(command.type),
+                    command.panel);
+            }
+        }
+    }
+
+    void RmlPanelHost::CollectExternalEventsPresentThread()
+    {
+        if (!_rmlUi) return;
+        std::deque<ExternalEvent> events;
+        while (auto event = _rmlUi->ConsumePanelEvent()) {
+            events.push_back(ExternalEvent{
+                event->panel,
+                event->type == DragonBoardRmlUi::PanelEventType::kChange ?
+                    DragonBoardVR_API::PanelEventType::Change :
+                    DragonBoardVR_API::PanelEventType::Click,
+                std::move(event->elementId),
+                std::move(event->value),
+                event->numericValue });
+        }
+        if (events.empty()) return;
+        std::scoped_lock lock(_externalMutex);
+        while (!events.empty()) {
+            _externalEvents.push_back(std::move(events.front()));
+            events.pop_front();
+        }
+    }
+
+    void RmlPanelHost::DispatchExternalEventsGameThread()
+    {
+        std::deque<ExternalEvent> events;
+        {
+            std::scoped_lock lock(_externalMutex);
+            events.swap(_externalEvents);
+        }
+
+        while (!events.empty()) {
+            auto event = std::move(events.front());
+            events.pop_front();
+            DragonBoardVR_API::PanelEventCallback callback = nullptr;
+            void* userData = nullptr;
+            {
+                std::scoped_lock lock(_externalMutex);
+                const auto it = _externalPanels.find(event.panel);
+                if (it != _externalPanels.end()) {
+                    callback = it->second.callback;
+                    userData = it->second.userData;
+                }
+            }
+            if (!callback) continue;
+
+            const DragonBoardVR_API::PanelEvent apiEvent{
+                event.panel,
+                event.type,
+                event.elementId.c_str(),
+                event.value.c_str(),
+                event.numericValue };
+            try {
+                callback(&apiEvent, userData);
+            } catch (...) {
+                logger::error(
+                    "DragonBoardVR API: external RmlUi callback threw for panel {}.",
+                    event.panel);
+            }
+        }
+    }
+
+    void RmlPanelHost::UpdateGameThread(float deltaTime)
     {
         auto& manager = vrui::VRMenuManager::get();
 
-        // API008 turns DragonBoard into a host even before its own Settings
-        // client is opened, so another helper client can take focus and appear
-        // on the board through its normal hotkey.
-        if (manager.isMenuOpen() && !_connected.load()) {
-            Connect();
-        }
-
-        UpdateClientSurfaceGameThread();
+        UpdateSurfaceGameThread();
+        DispatchExternalEventsGameThread();
         const auto hapticCue = static_cast<dragonboard::ui::rml::DragonBoardRmlUi::HapticCue>(
             _pendingRmlHapticCue.exchange(0, std::memory_order_acq_rel));
         if (hapticCue != dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kNone) {
@@ -387,8 +539,8 @@ namespace dragonboard::ui::imgui
             float stickX = 0.0f;
             float stickY = 0.0f;
             manager.getDominantThumbstick(stickX, stickY);
-            _standaloneStickX.store(stickX);
-            _standaloneStickY.store(stickY);
+            _stickX.store(stickX);
+            _stickY.store(stickY);
 
             if (_localPanelMode.load() == LocalPanelMode::kDeveloper) {
                 _devInfoRefreshAccumulator += std::clamp(deltaTime, 0.0f, 0.5f);
@@ -443,52 +595,23 @@ namespace dragonboard::ui::imgui
             }
         }
 
-        _closePending.store(false);
     }
 
-    void DragonBoardSettingsMenu::UpdateClientSurfaceGameThread()
+    void RmlPanelHost::UpdateSurfaceGameThread()
     {
         auto& manager = vrui::VRMenuManager::get();
-        const bool localSettingsActive = _visible.load();
-        const bool universalHost = _helper008 != nullptr;
-        const bool hostActive = manager.isMenuOpen() && (universalHost || localSettingsActive);
+        const bool hostActive = manager.isMenuOpen() && _visible.load();
         if (!hostActive) {
-			if (_helper010 && _hostSizeSubmitted) {
-				_helper010->SetPhysicalHostPanelSize(_clientId, 0, 0);
-				_hostSizeSubmitted = false;
-			}
-            if (!universalHost) {
-                SetExternalHostGameThread(false);
-            }
             if (_screenNode) {
                 _screenNode->SetAppCulled(true);
             }
             _scenePanelVisible = false;
             _pointerInHostedPanel = false;
-            _hostedClientId = 0;
-            if (_surfaceSubmitted && _helper006 && _clientId != 0) {
-                if (_helper008) {
-                    _helper008->SubmitPhysicalHostSurface(_clientId, nullptr);
-                } else {
-                    _helper006->SubmitClientSurface(_clientId, nullptr);
-                }
-                _surfaceSubmitted = false;
-            }
             if (_visible.load() && !manager.isMenuOpen()) {
                 Close();
             }
             return;
         }
-
-		if (localSettingsActive && _helper010 && _hostSizeSubmitted) {
-			_helper010->SetPhysicalHostPanelSize(_clientId, 0, 0);
-			_hostSizeSubmitted = false;
-		} else if (!localSettingsActive && _helper010 && _clientId != 0 && !_hostSizeSubmitted) {
-			_hostSizeSubmitted = _helper010->SetPhysicalHostPanelSize(_clientId, 1920, 1080);
-			if (!_hostSizeSubmitted) {
-				logger::warn("DragonBoardVR: helper rejected the 1920x1080 physical-host request.");
-			}
-		}
 
         // Follow the panel that owns the visible DragonBoard mesh.  The
         // persistent panel is only the fixed-button layer and can have a
@@ -541,7 +664,7 @@ namespace dragonboard::ui::imgui
             worldScale = anchor.scale * local.scale;
         }
 
-        const float effectiveScreenScale = standalone::kSceneScreenSizeScale;
+        const float effectiveScreenScale = kSceneScreenSizeScale;
         const float width = std::max(
             1.0f,
             layoutPanel->getWidth() * worldScale * effectiveScreenScale);
@@ -549,28 +672,19 @@ namespace dragonboard::ui::imgui
             1.0f,
             layoutPanel->getHeight() * worldScale * effectiveScreenScale);
 
-        ImGuiVRHelperPluginAPI::ClientSurfaceState state{};
-        state.flags = ImGuiVRHelperPluginAPI::kClientSurfaceFlag_Visible;
-        state.center[0] = worldPosition.x;
-        state.center[1] = worldPosition.y;
-        state.center[2] = worldPosition.z;
-
         // The board mesh's front-face correction is a local 180-degree turn.
-        // Publish the opposite X basis so the Helper samples the texture from
-        // that front face instead of showing it mirrored from the back.
-        state.right[0] = -worldRotation.entry[0][0];
-        state.right[1] = -worldRotation.entry[1][0];
-        state.right[2] = -worldRotation.entry[2][0];
-        state.up[0] = worldRotation.entry[0][2];
-        state.up[1] = worldRotation.entry[1][2];
-        state.up[2] = worldRotation.entry[2][2];
-        state.width_units = width;
-        state.height_units = height;
+        const RE::NiPoint3 right(
+            -worldRotation.entry[0][0],
+            -worldRotation.entry[1][0],
+            -worldRotation.entry[2][0]);
+        const RE::NiPoint3 up(
+            worldRotation.entry[0][2],
+            worldRotation.entry[1][2],
+            worldRotation.entry[2][2]);
 
         const RE::NiPoint3 rayOrigin = manager.getLaserOrigin();
         const RE::NiPoint3 rayDirection = manager.getLaserDirection();
-        const RE::NiPoint3 right(state.right[0], state.right[1], state.right[2]);
-        const RE::NiPoint3 up(state.up[0], state.up[1], state.up[2]);
+        bool pointerInPanel = false;
         const RE::NiPoint3 normal(
             right.y * up.z - right.z * up.y,
             right.z * up.x - right.x * up.z,
@@ -595,118 +709,39 @@ namespace dragonboard::ui::imgui
                 const float u = localX + 0.5f;
                 const float v = 0.5f - localY;
                 if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
-                    state.flags |= ImGuiVRHelperPluginAPI::kClientSurfaceFlag_PointerInPanel;
-                    state.pointer_u = u;
-                    state.pointer_v = v;
+                    pointerInPanel = true;
                     _pointerU = u;
                     _pointerV = v;
                 }
             }
         }
-        _pointerInHostedPanel =
-            (state.flags & ImGuiVRHelperPluginAPI::kClientSurfaceFlag_PointerInPanel) != 0;
-
-        const bool firstSurfaceSubmission = !_surfaceSubmitted;
-        if (!localSettingsActive && _helper006 && _clientId != 0 && !_helper008) {
-            _helper006->SubmitClientSurface(_clientId, &state);
-            _surfaceSubmitted = true;
-        }
-
-        // Only suppress the helper's post-composited quad after the same panel
-        // texture is successfully hosted by a dedicated child of Tablet.nif.
-        // Until then API006 remains the visible fallback.
-        const bool sceneHosted = UpdateScenePanelGameThread(surfacePanel->getBackgroundNode());
-        _scenePanelVisible = sceneHosted;
-        if (localSettingsActive) {
-            if (_surfaceSubmitted && _helper006 && _clientId != 0) {
-                if (_helper008) {
-                    _helper008->SubmitPhysicalHostSurface(_clientId, nullptr);
-                } else {
-                    _helper006->SubmitClientSurface(_clientId, nullptr);
-                }
-                _surfaceSubmitted = false;
-            }
-            SetExternalHostGameThread(false);
-        } else if (_helper008 && _clientId != 0) {
-            if (sceneHosted) {
-                _helper008->SubmitPhysicalHostSurface(_clientId, &state);
-                _surfaceSubmitted = true;
-            } else if (_surfaceSubmitted) {
-                _helper008->SubmitPhysicalHostSurface(_clientId, nullptr);
-                _surfaceSubmitted = false;
-            }
-        } else if (_helper007 && _clientId != 0) {
-            SetExternalHostGameThread(sceneHosted);
-        }
-
-        if (firstSurfaceSubmission && _surfaceSubmitted) {
-            logger::info(
-                "DragonBoardVR: Publishing ImGui surface '{}' size {:.2f} x {:.2f} at ({:.2f}, {:.2f}, {:.2f}); source={} anchor='{}'.",
-                surfacePanel->getName(),
-                width,
-                height,
-                state.center[0],
-                state.center[1],
-                state.center[2],
-                magicNodeAnchored ? "MagicNode.world x panel.local" : "panel.world",
-                menuHandNode ? menuHandNode->name.c_str() : "<none>");
-        }
+        _pointerInHostedPanel = pointerInPanel;
+        _scenePanelVisible = UpdateScenePanelGameThread(surfacePanel->getBackgroundNode());
     }
 
-    bool DragonBoardSettingsMenu::UpdateScenePanelGameThread(RE::NiNode* backgroundNode)
+    bool RmlPanelHost::UpdateScenePanelGameThread(RE::NiNode* backgroundNode)
     {
         if (!backgroundNode) {
             return false;
         }
 
-        ImGuiVRHelperPluginAPI::PanelTextureHandle acquired{};
-        uint32_t contentClientId = 0;
-        ID3D11Texture2D* selectedTexture = nullptr;
-        ID3D11ShaderResourceView* selectedSrv = nullptr;
-        uint32_t selectedWidth = 0;
-        uint32_t selectedHeight = 0;
-        bool externalAcquired = false;
-
-        if (_visible.load()) {
-            // Texture creation and ImGui rendering happen from Present. Never
-            // touch the immediate context from the game-update task.
-            if (!_rendererReady.load()) {
-                return false;
-            }
-            contentClientId = kLocalSettingsContentId;
-            selectedTexture = _settingsTexture;
-            selectedSrv = _settingsSrv;
-            selectedWidth = standalone::kPanelWidth;
-            selectedHeight = standalone::kPanelHeight;
-        } else if (_helper007 && _clientId != 0) {
-            contentClientId = _clientId;
-            externalAcquired = _helper008 ?
-                _helper008->AcquireFocusedPanelTexture(_clientId, &acquired, &contentClientId) :
-                _helper007->AcquirePanelTexture(_clientId, &acquired);
-            if (externalAcquired) {
-                selectedTexture = acquired.texture;
-                selectedSrv = acquired.srv;
-                selectedWidth = acquired.width;
-                selectedHeight = acquired.height;
-            }
-        }
-
-        if (!selectedTexture || !selectedSrv) {
+        // Texture creation and rendering happen on Present. The game thread
+        // only publishes the already-created texture to the scene material.
+        if (!_visible.load() || !_rendererReady.load() ||
+            !_panelRenderTexture || !_panelShaderResource) {
             if (_screenNode) {
                 _screenNode->SetAppCulled(true);
             }
-            _hostedClientId = 0;
             return false;
         }
 
         if (!_screenNode) {
             _screenNode = vrui::VRUIWidget::loadModelFromNif("DragonBoardVR\\ImGuiScreen.nif", false);
             if (!_screenNode) {
-                if (externalAcquired) _helper007->ReleasePanelTexture(&acquired);
                 return false;
             }
 
-            _screenNode->name = "DragonBoardVR_ImGuiScreen";
+            _screenNode->name = "DragonBoardVR_RmlScreen";
             // IconPlane2's geometry is a 170.666-unit XY square. Fit a 16:9
             // screen inside the Tablet.nif face and lift it just above the
             // parchment to avoid z-fighting.
@@ -730,7 +765,7 @@ namespace dragonboard::ui::imgui
                     _screenSourceTexture = material->diffuseTexture;
                     _originalRendererTexture = _screenSourceTexture->rendererTexture;
 
-                    // ImGuiScreen.nif is a dedicated SSE quad with a complete
+                    // The legacy-named screen NIF is a dedicated SSE quad with a complete
                     // 0..1 UV range. Keep the runtime material transform at
                     // identity so both triangles sample the same panel texture.
                     material->texCoordScale[0] = { 1.0f, 1.0f };
@@ -744,50 +779,33 @@ namespace dragonboard::ui::imgui
                 logger::warn("DragonBoardVR: ImGuiScreen.nif has no usable dedicated diffuse texture.");
                 _screenNode = nullptr;
                 _screenSourceTexture = nullptr;
-                if (externalAcquired) _helper007->ReleasePanelTexture(&acquired);
                 return false;
             }
         }
 
         constexpr float kPlaneExtent = 170.666656f;
-        const float screenWidth = 18.0f * standalone::kSceneScreenSizeScale;
+        const float screenWidth = 18.0f * kSceneScreenSizeScale;
         const float screenHeight = screenWidth * 9.0f / 16.0f;
         _screenNode->local.rotate.entry[0][0] = screenWidth / kPlaneExtent;
         _screenNode->local.rotate.entry[1][1] = screenHeight / kPlaneExtent;
 
-        if (_hostedClientId != contentClientId ||
-            _boundTexture != selectedTexture || _boundSrv != selectedSrv) {
+        if (!_sceneTextureBridge) {
             if (_screenSourceTexture && _sceneTextureBridge) {
                 _screenSourceTexture->rendererTexture = _originalRendererTexture;
             }
             _sceneTextureBridge.reset();
-            if ((_panelTexture.texture || _panelTexture.srv) && _helper007) {
-                _helper007->ReleasePanelTexture(&_panelTexture);
-            }
-            _panelTexture = {};
 
             _sceneTextureBridge = std::make_unique<RE::BSGraphics::Texture>();
-            _sceneTextureBridge->texture = selectedTexture;
+            _sceneTextureBridge->texture = _panelRenderTexture;
             _sceneTextureBridge->unk08 = 0;
-            _sceneTextureBridge->resourceView = selectedSrv;
+            _sceneTextureBridge->resourceView = _panelShaderResource;
             _screenSourceTexture->rendererTexture = _sceneTextureBridge.get();
-            if (externalAcquired) {
-                _panelTexture = acquired;
-                acquired = {};
-            }
-            _boundTexture = selectedTexture;
-            _boundSrv = selectedSrv;
-            _hostedClientId = contentClientId;
 
             logger::info(
-                "DragonBoardVR: ImGui client {} texture bound to scene screen ({}x{}, texture={}, srv={}).",
-                _hostedClientId,
-                selectedWidth,
-                selectedHeight,
-                static_cast<void*>(selectedTexture),
-                static_cast<void*>(selectedSrv));
+                "DragonBoardVR: RmlUi texture bound to scene screen ({}x{}).",
+                kPanelWidth,
+                kPanelHeight);
         }
-        if (externalAcquired) _helper007->ReleasePanelTexture(&acquired);
 
         if (_screenNode->parent != backgroundNode) {
             if (_screenNode->parent) {
@@ -795,7 +813,7 @@ namespace dragonboard::ui::imgui
             }
             backgroundNode->AttachChild(_screenNode.get());
             logger::info(
-                "DragonBoardVR: ImGui scene screen attached to tablet node '{}'.",
+                "DragonBoardVR: RmlUi scene screen attached to tablet node '{}'.",
                 backgroundNode->name.c_str());
         }
 
@@ -806,27 +824,7 @@ namespace dragonboard::ui::imgui
         return _sceneTextureBridge != nullptr;
     }
 
-    void DragonBoardSettingsMenu::SetExternalHostGameThread(bool enabled)
-    {
-        if (!_helper007 || _clientId == 0 || _externalHostEnabled == enabled) {
-            return;
-        }
-        _helper007->SetExternalPanelHost(_clientId, enabled);
-        _externalHostEnabled = enabled;
-        logger::info(
-            "DragonBoardVR: ImGui scene host {}.",
-            enabled ? "enabled" : "disabled (API006 fallback active)");
-    }
-
-    void DragonBoardSettingsMenu::OnHelperFrame(
-        [[maybe_unused]] const ImGuiVRHelperPluginAPI::Frame* frame,
-        [[maybe_unused]] void* user)
-    {
-        // Host-only client. External mods render through their own callbacks;
-        // DragonBoard Settings is rendered independently below.
-    }
-
-    bool DragonBoardSettingsMenu::EnsurePresentHookInstalled()
+    bool RmlPanelHost::EnsurePresentHookInstalled()
     {
         if (g_originalPresent) return true;
 
@@ -844,24 +842,24 @@ namespace dragonboard::ui::imgui
             return false;
         }
         g_originalPresent = reinterpret_cast<PresentFn>(vtable[8]);
-        vtable[8] = reinterpret_cast<void*>(&StandaloneSettingsPresent);
+        vtable[8] = reinterpret_cast<void*>(&RmlPresent);
         DWORD ignored = 0;
         VirtualProtect(&vtable[8], sizeof(void*), oldProtect, &ignored);
         FlushInstructionCache(GetCurrentProcess(), &vtable[8], sizeof(void*));
 
         logger::info(
-            "DragonBoardVR: standalone Settings Present hook installed (next={}).",
+            "DragonBoardVR: RmlUi Present hook installed (next={}).",
             reinterpret_cast<void*>(g_originalPresent));
         return true;
     }
 
-    void DragonBoardSettingsMenu::RenderPresentThread(float deltaTime)
+    void RmlPanelHost::RenderPresentThread(float deltaTime)
     {
         if (_rmlWarmupRequested.exchange(false, std::memory_order_acq_rel) &&
             !_rendererReady.load(std::memory_order_acquire)) {
             _rmlWarmupAttempted.store(true, std::memory_order_release);
             const auto started = std::chrono::steady_clock::now();
-            const bool initialized = InitializeStandaloneRenderer();
+            const bool initialized = InitializeRenderer();
             const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - started).count();
             if (initialized) {
@@ -870,16 +868,19 @@ namespace dragonboard::ui::imgui
                     elapsedMs);
             } else {
                 logger::warn(
-                    "DragonBoardVR: RmlUi warm-up failed after {} ms; normal panel fallback remains available.",
+                    "DragonBoardVR: RmlUi warm-up failed after {} ms.",
                     elapsedMs);
             }
         }
+        if (_rendererReady.load(std::memory_order_acquire) && !_visible.load()) {
+            ApplyRenderCommandsPresentThread();
+        }
         if (_visible.load()) {
-            RenderStandalone(deltaTime);
+            RenderPanel(deltaTime);
         }
     }
 
-    bool DragonBoardSettingsMenu::InitializeStandaloneRenderer()
+    bool RmlPanelHost::InitializeRenderer()
     {
         if (_rendererReady.load()) return true;
 
@@ -894,8 +895,8 @@ namespace dragonboard::ui::imgui
         context->AddRef();
 
         D3D11_TEXTURE2D_DESC desc{};
-        desc.Width = standalone::kPanelWidth;
-        desc.Height = standalone::kPanelHeight;
+        desc.Width = kPanelWidth;
+        desc.Height = kPanelHeight;
         desc.MipLevels = 1;
         desc.ArraySize = 1;
         desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -909,7 +910,7 @@ namespace dragonboard::ui::imgui
         if (FAILED(device->CreateTexture2D(&desc, nullptr, &texture)) ||
             FAILED(device->CreateRenderTargetView(texture, nullptr, &rtv)) ||
             FAILED(device->CreateShaderResourceView(texture, nullptr, &srv))) {
-            logger::error("DragonBoardVR: Failed to create the standalone 1920x1080 Settings texture.");
+            logger::error("DragonBoardVR: failed to create the 1920x1080 RmlUi render texture.");
             if (srv) srv->Release();
             if (rtv) rtv->Release();
             if (texture) texture->Release();
@@ -918,68 +919,44 @@ namespace dragonboard::ui::imgui
             return false;
         }
 
-        IMGUI_CHECKVERSION();
-        auto* imguiContext = ImGui::CreateContext();
-        if (!imguiContext) {
-            srv->Release();
-            rtv->Release();
-            texture->Release();
-            context->Release();
-            device->Release();
-            return false;
-        }
-        ImGui::SetCurrentContext(imguiContext);
-        auto& io = ImGui::GetIO();
-        io.IniFilename = nullptr;
-        io.LogFilename = nullptr;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        // This context is fully standalone; the helper no longer composites a
-        // cursor into its panel texture for us.
-        io.MouseDrawCursor = true;
-        standalone::ConfigureFonts(io);
-
-        standalone::ApplyStyle();
-
-        if (!ImGui_ImplDX11_Init(device, context)) {
-            logger::error("DragonBoardVR: Failed to initialize the standalone ImGui DX11 backend.");
-            ImGui::DestroyContext(imguiContext);
-            srv->Release();
-            rtv->Release();
-            texture->Release();
-            context->Release();
-            device->Release();
-            return false;
-        }
-
-        _imguiContext = imguiContext;
-        _device = device;
-        _context = context;
-        _settingsTexture = texture;
-        _settingsRtv = rtv;
-        _settingsSrv = srv;
-
         _rmlUi = std::make_unique<dragonboard::ui::rml::DragonBoardRmlUi>();
         if (!_rmlUi->Initialize(device, context)) {
-            logger::warn("DragonBoardVR: RmlUi Settings unavailable; the existing ImGui view remains active.");
+            logger::error("DragonBoardVR: RmlUi runtime initialization failed.");
             _rmlUi.reset();
+            srv->Release();
+            rtv->Release();
+            texture->Release();
+            context->Release();
+            device->Release();
+            return false;
         }
+
+        _device = device;
+        _context = context;
+        _panelRenderTexture = texture;
+        _panelRenderTarget = rtv;
+        _panelShaderResource = srv;
         _rendererReady.store(true);
-        logger::info("DragonBoardVR: standalone panel renderer initialized at 1920x1080.");
+        logger::info("DragonBoardVR: RmlUi panel host initialized at 1920x1080.");
         return true;
     }
 
-    void DragonBoardSettingsMenu::RenderStandalone(float deltaTime)
+    void RmlPanelHost::RenderPanel(float deltaTime)
     {
-        if (!_visible.load() || !InitializeStandaloneRenderer()) return;
+        if (!_visible.load() || !InitializeRenderer()) return;
+        ApplyRenderCommandsPresentThread();
 
         const auto panelMode = _localPanelMode.load();
         const bool settingsRmlActive = panelMode == LocalPanelMode::kSettings &&
-            _useRmlSettings.load() && _rmlUi && _rmlUi->IsSettingsReady();
+            _rmlUi && _rmlUi->IsSettingsReady();
         const bool developerRmlActive = panelMode == LocalPanelMode::kDeveloper &&
-            _useRmlDeveloper.load() && _rmlUi && _rmlUi->IsDeveloperReady();
+            _rmlUi && _rmlUi->IsDeveloperReady();
         const bool itemEditRmlActive = panelMode == LocalPanelMode::kItemEdit &&
-            _useRmlItemEdit.load() && _rmlUi && _rmlUi->IsItemEditReady();
-        if (settingsRmlActive || developerRmlActive || itemEditRmlActive) {
+            _rmlUi && _rmlUi->IsItemEditReady();
+        const auto externalPanel = _activeExternalPanel.load();
+        const bool externalRmlActive = panelMode == LocalPanelMode::kExternal &&
+            _rmlUi && _rmlUi->IsPanelReady(externalPanel);
+        if (settingsRmlActive || developerRmlActive || itemEditRmlActive || externalRmlActive) {
             if (settingsRmlActive) {
                 _rmlUi->ShowSettings();
                 if (_rmlSettingsSyncPending.exchange(false)) SyncRmlSettingsFromDraft();
@@ -987,20 +964,22 @@ namespace dragonboard::ui::imgui
                 _rmlUi->ShowDeveloper();
                 if (_rmlDeveloperSyncPending.exchange(false)) SyncRmlDeveloperCommands();
                 SyncRmlDeveloperInfo();
-            } else {
+            } else if (itemEditRmlActive) {
                 _rmlUi->ShowItemEdit();
                 if (_rmlItemEditSyncPending.exchange(false)) SyncRmlItemEdit();
+            } else {
+                _rmlUi->ShowPanel(externalPanel);
             }
             _rmlUi->ProcessInput(
                 _pointerInHostedPanel.load(),
                 _pointerU.load(),
                 _pointerV.load(),
-                _standaloneTriggerDown.load(),
-                _standaloneGripDown.load(),
-                _standaloneStickX.load(),
-                _standaloneStickY.load(),
-                static_cast<int>(standalone::kPanelWidth),
-                static_cast<int>(standalone::kPanelHeight));
+                _triggerDown.load(),
+                _gripDown.load(),
+                _stickX.load(),
+                _stickY.load(),
+                static_cast<int>(kPanelWidth),
+                static_cast<int>(kPanelHeight));
 
             const auto hapticCue = _rmlUi->ConsumeHapticCue();
             const auto requested = static_cast<std::uint8_t>(hapticCue);
@@ -1040,7 +1019,7 @@ namespace dragonboard::ui::imgui
                     _applyPending.store(true);
                 }
 
-                const bool triggerDown = _standaloneTriggerDown.load();
+                const bool triggerDown = _triggerDown.load();
                 if (!triggerDown && _rmlPreviousTriggerDown && _deferredRmlTransformApply) {
                     _deferredRmlTransformApply = false;
                     _applyPending.store(true);
@@ -1057,7 +1036,7 @@ namespace dragonboard::ui::imgui
                 }
                 if (command) QueueDevCommand(*command);
                 }
-            } else {
+            } else if (itemEditRmlActive) {
                 if (auto change = _rmlUi->ConsumeSliderChange()) {
                     ApplyRmlItemEditSliderChange(change->id, change->value);
                 }
@@ -1074,27 +1053,16 @@ namespace dragonboard::ui::imgui
                 case RmlItemAction::kToggleLabel: _itemEditActionPending.store(ItemEditAction::kToggleLabel); break;
                 case RmlItemAction::kNone: break;
                 }
+            } else {
+                CollectExternalEventsPresentThread();
             }
 
             const bool rendered = _rmlUi->Render(
-                _settingsRtv,
-                static_cast<int>(standalone::kPanelWidth),
-                static_cast<int>(standalone::kPanelHeight));
+                _panelRenderTarget,
+                static_cast<int>(kPanelWidth),
+                static_cast<int>(kPanelHeight));
             if (_rmlUi->ConsumeCloseRequested()) {
                 Close();
-            }
-            if (_rmlUi->ConsumeImGuiFallbackRequested()) {
-                if (settingsRmlActive) {
-                    _useRmlSettings.store(false);
-                } else if (developerRmlActive) {
-                    _useRmlDeveloper.store(false);
-                } else {
-                    _useRmlItemEdit.store(false);
-                }
-                _previousTriggerDown = _standaloneTriggerDown.load();
-                logger::info(
-                    "DragonBoardVR: switched {} from RmlUi to the ImGui fallback.",
-                    settingsRmlActive ? "Settings" : (developerRmlActive ? "Developer" : "Item editor"));
             }
             if (settingsRmlActive && _rmlUi->ConsumeSaveRequested()) {
                 _savePending.store(true);
@@ -1106,68 +1074,15 @@ namespace dragonboard::ui::imgui
                 return;
             }
 
-            logger::error("DragonBoardVR: RmlUi frame failed; switching to the ImGui fallback.");
-            if (settingsRmlActive) {
-                _useRmlSettings.store(false);
-            } else if (developerRmlActive) {
-                _useRmlDeveloper.store(false);
-            } else {
-                _useRmlItemEdit.store(false);
-            }
+            logger::error("DragonBoardVR: RmlUi frame failed; closing the active panel.");
+            Close();
+            return;
         }
-
-        ImGui::SetCurrentContext(_imguiContext);
-        auto& io = ImGui::GetIO();
-        io.DisplaySize = ImVec2(
-            static_cast<float>(standalone::kPanelWidth),
-            static_cast<float>(standalone::kPanelHeight));
-        io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
-        io.DeltaTime = std::clamp(deltaTime, 1.0f / 240.0f, 0.1f);
-
-        ImGui_ImplDX11_NewFrame();
-        PumpStandaloneInput(io.DisplaySize.x, io.DisplaySize.y);
-        ImGui::NewFrame();
-        DrawLocalPanel();
-        ImGui::Render();
-
-        _presentFrameMs = io.DeltaTime * 1000.0f;
-        _presentFps = io.DeltaTime > 0.0f ? 1.0f / io.DeltaTime : 0.0f;
-        _panelDrawCalls = 0;
-        if (const auto* drawData = ImGui::GetDrawData()) {
-            for (int i = 0; i < drawData->CmdListsCount; ++i) {
-                _panelDrawCalls += drawData->CmdLists[i]->CmdBuffer.Size;
-            }
-        }
-
-        ID3D11RenderTargetView* oldRtv = nullptr;
-        ID3D11DepthStencilView* oldDsv = nullptr;
-        _context->OMGetRenderTargets(1, &oldRtv, &oldDsv);
-
-        D3D11_VIEWPORT oldViewports[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE]{};
-        UINT viewportCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-        _context->RSGetViewports(&viewportCount, oldViewports);
-
-        const float clear[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        _context->OMSetRenderTargets(1, &_settingsRtv, nullptr);
-        _context->ClearRenderTargetView(_settingsRtv, clear);
-
-        D3D11_VIEWPORT viewport{};
-        viewport.Width = static_cast<float>(standalone::kPanelWidth);
-        viewport.Height = static_cast<float>(standalone::kPanelHeight);
-        viewport.MinDepth = 0.0f;
-        viewport.MaxDepth = 1.0f;
-        _context->RSSetViewports(1, &viewport);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-        _context->OMSetRenderTargets(1, &oldRtv, oldDsv);
-        if (viewportCount > 0) {
-            _context->RSSetViewports(viewportCount, oldViewports);
-        }
-        if (oldRtv) oldRtv->Release();
-        if (oldDsv) oldDsv->Release();
+        logger::error("DragonBoardVR: requested RmlUi document is unavailable.");
+        Close();
     }
 
-    void DragonBoardSettingsMenu::SyncRmlSettingsFromDraft()
+    void RmlPanelHost::SyncRmlSettingsFromDraft()
     {
         if (!_rmlUi || !_rmlUi->IsSettingsReady()) return;
         std::scoped_lock lock(_draftMutex);
@@ -1198,7 +1113,7 @@ namespace dragonboard::ui::imgui
         _rmlUi->SetDeveloperButtonEnabled(_draft.showDevButton);
     }
 
-    void DragonBoardSettingsMenu::ApplyRmlSliderChange(std::string_view id, float value)
+    void RmlPanelHost::ApplyRmlSliderChange(std::string_view id, float value)
     {
         bool changed = true;
         const bool movesHostedPanel =
@@ -1240,7 +1155,7 @@ namespace dragonboard::ui::imgui
         }
     }
 
-    void DragonBoardSettingsMenu::SyncRmlDeveloperCommands()
+    void RmlPanelHost::SyncRmlDeveloperCommands()
     {
         if (!_rmlUi || !_rmlUi->IsDeveloperReady()) return;
         std::vector<dragonboard::ui::rml::DragonBoardRmlUi::DeveloperCommand> commands;
@@ -1255,7 +1170,7 @@ namespace dragonboard::ui::imgui
         _rmlUi->SetDeveloperCommands(std::move(commands));
     }
 
-    void DragonBoardSettingsMenu::SyncRmlDeveloperInfo()
+    void RmlPanelHost::SyncRmlDeveloperInfo()
     {
         if (!_rmlUi || !_rmlUi->IsDeveloperReady()) return;
         DevGameInfoSnapshot snapshot;
@@ -1268,7 +1183,6 @@ namespace dragonboard::ui::imgui
         info.fps = _presentFps;
         info.frameTimeMs = _presentFrameMs;
         info.panelDrawCalls = _panelDrawCalls;
-        info.helperConnected = _connected.load();
         info.pluginVersion = Plugin::VERSION.string();
         info.d3dFeatureLevel = _device ? static_cast<std::uint32_t>(_device->GetFeatureLevel()) : 0;
         info.playerX = snapshot.playerX;
@@ -1281,7 +1195,7 @@ namespace dragonboard::ui::imgui
         _rmlUi->SetDeveloperInfo(info);
     }
 
-    void DragonBoardSettingsMenu::SyncRmlItemEdit()
+    void RmlPanelHost::SyncRmlItemEdit()
     {
         if (!_rmlUi || !_rmlUi->IsItemEditReady()) return;
         ItemEditDraft draft;
@@ -1308,7 +1222,7 @@ namespace dragonboard::ui::imgui
         _rmlUi->SetItemEditInfo(info);
     }
 
-    void DragonBoardSettingsMenu::ApplyRmlItemEditSliderChange(std::string_view id, float value)
+    void RmlPanelHost::ApplyRmlItemEditSliderChange(std::string_view id, float value)
     {
         bool changed = true;
         {
@@ -1325,7 +1239,7 @@ namespace dragonboard::ui::imgui
         if (changed) _itemEditApplyPending.store(true);
     }
 
-    void DragonBoardSettingsMenu::ApplyItemEditDraftGameThread()
+    void RmlPanelHost::ApplyItemEditDraftGameThread()
     {
         ItemEditDraft draft;
         vrui::VRUIItemEditPanel* backend = nullptr;
@@ -1340,7 +1254,7 @@ namespace dragonboard::ui::imgui
             draft.rotX, draft.rotY, draft.rotZ, draft.scale);
     }
 
-    void DragonBoardSettingsMenu::ExecuteItemEditActionGameThread(ItemEditAction action)
+    void RmlPanelHost::ExecuteItemEditActionGameThread(ItemEditAction action)
     {
         vrui::VRUIItemEditPanel* backend = nullptr;
         {
@@ -1433,95 +1347,8 @@ namespace dragonboard::ui::imgui
         _rmlItemEditSyncPending.store(true);
     }
 
-    void DragonBoardSettingsMenu::PumpStandaloneInput(float width, float height)
-    {
-        auto& io = ImGui::GetIO();
-        const bool pointerOnPanel = _pointerInHostedPanel.load();
-        if (pointerOnPanel) {
-            io.AddMousePosEvent(
-                std::clamp(_pointerU.load(), 0.0f, 1.0f) * width,
-                std::clamp(_pointerV.load(), 0.0f, 1.0f) * height);
-            _pointerWasOnPanel = true;
-        } else if (_pointerWasOnPanel && !ImGui::IsAnyItemActive()) {
-            io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-            _pointerWasOnPanel = false;
-        }
-
-        const bool triggerDown = _standaloneTriggerDown.load();
-        if (triggerDown != _previousTriggerDown) {
-            if (!triggerDown || pointerOnPanel) {
-                io.AddMouseButtonEvent(ImGuiMouseButton_Left, triggerDown);
-            }
-            _previousTriggerDown = triggerDown;
-        }
-
-        // Trigger is click-only. Grip explicitly arms scrolling so a stick
-        // movement can never steal a click while the user edits a control.
-        const bool gripDown = _standaloneGripDown.load();
-        const bool scrollArmed = gripDown && !triggerDown;
-        const float stickX = _standaloneStickX.load();
-        const float stickY = _standaloneStickY.load();
-        constexpr float deadzone = 0.15f;
-        if (scrollArmed && (std::abs(stickX) > deadzone || std::abs(stickY) > deadzone)) {
-            _scrollAccumulatorX += stickX * 0.1f;
-            _scrollAccumulatorY += stickY * 0.1f;
-            float wheelX = 0.0f;
-            float wheelY = 0.0f;
-            if (std::abs(_scrollAccumulatorX) > 0.3f) {
-                wheelX = _scrollAccumulatorX > 0.0f ? 1.0f : -1.0f;
-                _scrollAccumulatorX = 0.0f;
-            }
-            if (std::abs(_scrollAccumulatorY) > 0.3f) {
-                wheelY = _scrollAccumulatorY > 0.0f ? 1.0f : -1.0f;
-                _scrollAccumulatorY = 0.0f;
-            }
-            if (wheelX != 0.0f || wheelY != 0.0f) {
-                io.AddMouseWheelEvent(-wheelX, -wheelY);
-            }
-        } else if (!scrollArmed) {
-            _scrollAccumulatorX = 0.0f;
-            _scrollAccumulatorY = 0.0f;
-        }
-    }
-
-    void DragonBoardSettingsMenu::DrawLocalPanel()
-    {
-        if (_localPanelMode.load() == LocalPanelMode::kDeveloper) {
-            DrawDeveloperPanel();
-        } else if (_localPanelMode.load() == LocalPanelMode::kItemEdit) {
-            DrawItemEditPanel();
-        } else {
-            DrawSettings();
-        }
-    }
-
-    void DragonBoardSettingsMenu::DrawItemEditPanel()
-    {
-        std::scoped_lock lock(_itemEditMutex);
-        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-        ImGui::SetNextWindowSize(ImVec2(1920.0f, 1080.0f));
-        ImGui::Begin("DragonBoard item editor fallback", nullptr,
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-        ImGui::Text("Editing: %s", _itemEditDraft.itemName.c_str());
-        ImGui::Text("%s  |  %08X", _itemEditDraft.category.c_str(), _itemEditDraft.formID);
-        ImGui::Separator();
-        ImGui::SliderFloat("Position X", &_itemEditDraft.posX, -20.0f, 20.0f);
-        ImGui::SliderFloat("Position Y", &_itemEditDraft.posY, -20.0f, 20.0f);
-        ImGui::SliderFloat("Position Z", &_itemEditDraft.posZ, -20.0f, 20.0f);
-        ImGui::SliderFloat("Rotation X", &_itemEditDraft.rotX, -180.0f, 180.0f);
-        ImGui::SliderFloat("Rotation Y", &_itemEditDraft.rotY, -180.0f, 180.0f);
-        ImGui::SliderFloat("Rotation Z", &_itemEditDraft.rotZ, -180.0f, 180.0f);
-        ImGui::SliderFloat("Scale", &_itemEditDraft.scale, 0.01f, 5.0f);
-        if (ImGui::IsAnyItemActive()) _itemEditApplyPending.store(true);
-        if (ImGui::Button("Apply Item")) _itemEditActionPending.store(ItemEditAction::kApplyItem);
-        ImGui::SameLine();
-        if (ImGui::Button("Apply Category")) _itemEditActionPending.store(ItemEditAction::kApplyCategory);
-        ImGui::SameLine();
-        if (ImGui::Button("Reset")) _itemEditActionPending.store(ItemEditAction::kReset);
-        ImGui::SameLine();
-        if (ImGui::Button("Back")) _itemEditActionPending.store(ItemEditAction::kBack);
-        ImGui::End();
-    }
+    // RmlUi is the only local panel renderer. All interaction is handled above
+    // by DragonBoardRmlUi and converted into game-thread requests.
 
 
 

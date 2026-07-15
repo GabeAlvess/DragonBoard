@@ -5,7 +5,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct ID3D11Device;
@@ -26,6 +28,21 @@ namespace dragonboard::ui::rml
     class DragonBoardRmlUi
     {
     public:
+        enum class PanelEventType : std::uint8_t
+        {
+            kClick,
+            kChange
+        };
+
+        struct PanelEvent
+        {
+            std::uint32_t panel = 0;
+            PanelEventType type = PanelEventType::kClick;
+            std::string elementId;
+            std::string value;
+            float numericValue = 0.0f;
+        };
+
         enum class HapticCue : std::uint8_t
         {
             kNone = 0,
@@ -55,7 +72,6 @@ namespace dragonboard::ui::rml
             float fps = 0.0f;
             float frameTimeMs = 0.0f;
             int panelDrawCalls = 0;
-            bool helperConnected = false;
             std::string pluginVersion;
             std::uint32_t d3dFeatureLevel = 0;
             float playerX = 0.0f;
@@ -112,6 +128,28 @@ namespace dragonboard::ui::rml
         bool ShowDeveloper();
         bool ShowItemEdit();
 
+        // Generic document API. These methods are called only on the Present
+        // thread; RmlPanelHost owns the cross-thread command queue.
+        bool RegisterPanel(
+            std::uint32_t handle,
+            std::string panelId,
+            std::string documentPath);
+        bool UnregisterPanel(std::uint32_t handle);
+        [[nodiscard]] bool IsPanelReady(std::uint32_t handle) const;
+        bool ShowPanel(std::uint32_t handle);
+        bool SetElementText(std::uint32_t handle, const char* elementId, const char* text);
+        bool SetElementAttribute(
+            std::uint32_t handle,
+            const char* elementId,
+            const char* name,
+            const char* value);
+        bool SetElementClass(
+            std::uint32_t handle,
+            const char* elementId,
+            const char* className,
+            bool enabled);
+        [[nodiscard]] std::optional<PanelEvent> ConsumePanelEvent();
+
         void ProcessInput(
             bool pointerOnPanel,
             float pointerU,
@@ -125,7 +163,6 @@ namespace dragonboard::ui::rml
         bool Render(ID3D11RenderTargetView* renderTarget, int width, int height);
 
         [[nodiscard]] bool ConsumeCloseRequested();
-        [[nodiscard]] bool ConsumeImGuiFallbackRequested();
         [[nodiscard]] bool ConsumeSaveRequested();
         [[nodiscard]] bool ConsumeEditModeToggleRequested();
         [[nodiscard]] bool ConsumeDeveloperPanelToggleRequested();
@@ -159,6 +196,14 @@ namespace dragonboard::ui::rml
             TriggerCaptureMode mode = TriggerCaptureMode::kNone;
         };
 
+        struct RegisteredPanel
+        {
+            std::uint32_t handle = 0;
+            std::string id;
+            std::string documentPath;
+            Rml::ElementDocument* document = nullptr;
+        };
+
         void BindClick(Rml::ElementDocument* document, const char* id);
         void BindSlider(Rml::ElementDocument* document, const char* id);
         void HandleClick(const char* id);
@@ -177,6 +222,11 @@ namespace dragonboard::ui::rml
             int x, int y, TriggerCaptureMode& mode) const;
         void RegisterInteractive(
             Rml::ElementDocument* document, const char* id, TriggerCaptureMode mode);
+        void RegisterDocumentInteractives(Rml::ElementDocument* document);
+        [[nodiscard]] RegisteredPanel* FindPanel(std::uint32_t handle);
+        [[nodiscard]] const RegisteredPanel* FindPanel(std::uint32_t handle) const;
+        [[nodiscard]] std::uint32_t FindPanelHandle(Rml::ElementDocument* document) const;
+        void HideAllDocuments();
         void UpdateCapturedSlider(int pointerX);
         void BeginTriggerScrollLock();
         void RestoreTriggerScrollLock();
@@ -191,6 +241,8 @@ namespace dragonboard::ui::rml
         Rml::ElementDocument* _developerDocument = nullptr;
         Rml::ElementDocument* _itemEditDocument = nullptr;
         Rml::ElementDocument* _activeDocument = nullptr;
+        std::unordered_map<std::uint32_t, RegisteredPanel> _registeredPanels;
+        std::deque<PanelEvent> _panelEvents;
         bool _rmlInitialized = false;
         bool _previousTriggerDown = false;
         bool _pointerWasOnPanel = false;
@@ -218,7 +270,6 @@ namespace dragonboard::ui::rml
         float _gripScrollTargetTop = 0.0f;
         float _gripPointerScrollAccumulator = 0.0f;
         bool _closeRequested = false;
-        bool _imguiFallbackRequested = false;
         bool _saveRequested = false;
         bool _editModeToggleRequested = false;
         bool _developerPanelToggleRequested = false;

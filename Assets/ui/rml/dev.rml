@@ -71,7 +71,7 @@
                         <div class="info-card last-info-card">
                             <div class="subheading">RUNTIME</div>
                             <div class="info-row"><span>Panel texture</span><span id="dev-texture-size" class="info-value">1920 x 1080</span></div>
-                            <div class="info-row"><span>ImGui VR Helper</span><span id="dev-helper" class="info-value">Standalone mode</span></div>
+                            <div class="info-row"><span>Panel renderer</span><span class="info-value">RmlUi 6.2</span></div>
                             <div class="info-row"><span>DragonBoardVR</span><span id="dev-version" class="info-value">-</span></div>
                             <div class="info-row"><span>D3D feature level</span><span id="dev-feature-level" class="info-value">-</span></div>
                         </div>
@@ -89,7 +89,6 @@
             </main>
 
             <footer>
-                <button id="dev-use-imgui" class="classic-button"><span class="classic-mark">+</span><span>Classic panel</span></button>
                 <div class="footer-spacer"></div>
             </footer>
         </div>

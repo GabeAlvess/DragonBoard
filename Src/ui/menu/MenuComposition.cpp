@@ -12,7 +12,7 @@
 #include <atomic>
 
 #include "game/actions/ActionExecutor.h"
-#include "ui/imgui/DragonBoardSettingsMenu.h"
+#include "ui/rml/RmlPanelHost.h"
 #include "ui/menu/MenuComposition.h"
 
 #include "vrui/VRMenuManager.h"
@@ -349,16 +349,16 @@ static VRUIButton::PressCallback resolveFixedButtonAction(const std::string& act
     if (lower == "tweenmenu")                               return openGameMenu("TweenMenu");
     if (lower == "mcm_panel" || lower == "settings") {
         return [](VRUIButton*, EquipHand) {
-            auto& imguiSettings = dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton();
-            if (imguiSettings.IsOpen()) {
-                imguiSettings.Close();
+            auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+            if (rmlHost.IsOpen()) {
+                rmlHost.Close();
                 return;
             }
 
             auto& manager = VRMenuManager::get();
             manager.navigateHome();
             manager.switchToPanel("MainPanel");
-            if (!imguiSettings.Open()) {
+            if (!rmlHost.OpenSettings()) {
                 manager.switchToPanel("MCM_Panel");
             }
         };
@@ -385,15 +385,15 @@ static VRUIButton::PressCallback resolveFixedButtonAction(const std::string& act
     }
     if (lower == "devpanel" || lower == "dev") {
         return [](VRUIButton*, EquipHand) {
-            auto& imguiMenu = dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton();
-            if (imguiMenu.IsDevOpen()) {
-                imguiMenu.Close();
+            auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+            if (rmlHost.IsDeveloperOpen()) {
+                rmlHost.Close();
                 return;
             }
             auto& manager = VRMenuManager::get();
             manager.navigateHome();
             manager.switchToPanel("MainPanel");
-            imguiMenu.OpenDev();
+            rmlHost.OpenDeveloper();
         };
     }
     if (lower == "quicksave" || lower == "save") {
@@ -735,30 +735,30 @@ void dragonboard::ui::menu::Create()
 
         if (lowerAction == "settings") {
             btn->setOnPressHandler([](VRUIButton*, EquipHand) {
-                auto& imguiSettings = dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton();
-                if (imguiSettings.IsOpen()) {
-                    imguiSettings.Close();
+                auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+                if (rmlHost.IsOpen()) {
+                    rmlHost.Close();
                     return;
                 }
 
                 auto& manager = VRMenuManager::get();
                 manager.navigateHome();
                 manager.switchToPanel("MainPanel");
-                if (!imguiSettings.Open()) {
+                if (!rmlHost.OpenSettings()) {
                     manager.switchToPanel("MCM_Panel");
                 }
             });
         } else if (lowerAction == "dev" || lowerAction == "devpanel") {
             btn->setOnPressHandler([](VRUIButton*, EquipHand) {
-                auto& imguiMenu = dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton();
-                if (imguiMenu.IsDevOpen()) {
-                    imguiMenu.Close();
+                auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+                if (rmlHost.IsDeveloperOpen()) {
+                    rmlHost.Close();
                     return;
                 }
                 auto& manager = VRMenuManager::get();
                 manager.navigateHome();
                 manager.switchToPanel("MainPanel");
-                imguiMenu.OpenDev();
+                rmlHost.OpenDeveloper();
             });
         } else if (lowerAction == "close") {
             btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().toggleMenu(); });

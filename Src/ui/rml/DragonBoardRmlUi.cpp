@@ -106,7 +106,8 @@ namespace dragonboard::ui::rml
                 // button. Resolve the actual button so its full visual card,
                 // including title and description, has one reliable action.
                 auto* element = event.GetTargetElement();
-                while (element && element->GetTagName() != "button" && !IsItemEditCard(element)) {
+                while (element && element->GetTagName() != "button" &&
+                       element->GetTagName() != "input" && !IsItemEditCard(element)) {
                     element = element->GetParentNode();
                 }
                 if (element && !element->GetId().empty()) {
@@ -220,7 +221,7 @@ namespace dragonboard::ui::rml
             _fontData.clear();
         }
         if (!fontLoaded) {
-            logger::error("DragonBoardVR: RmlUi could not find a usable font; keeping ImGui fallback.");
+            logger::error("DragonBoardVR: RmlUi could not find a usable font.");
             Shutdown();
             return false;
         }
@@ -275,7 +276,7 @@ namespace dragonboard::ui::rml
             }
         }
         if (!_settingsDocument && !_developerDocument && !_itemEditDocument) {
-            logger::error("DragonBoardVR: no RmlUi document could be loaded; keeping ImGui fallbacks.");
+            logger::error("DragonBoardVR: no RmlUi document could be loaded.");
             Shutdown();
             return false;
         }
@@ -291,7 +292,6 @@ namespace dragonboard::ui::rml
                 BindClick(_settingsDocument, tabId.c_str());
             }
             for (const auto* slider : kSliders) BindSlider(_settingsDocument, slider);
-            BindClick(_settingsDocument, "use-imgui");
             BindClick(_settingsDocument, "save");
             BindClick(_settingsDocument, "close");
             BindClick(_settingsDocument, "toggle-edit-mode");
@@ -305,7 +305,6 @@ namespace dragonboard::ui::rml
                 BindClick(_developerDocument, tabId.c_str());
             }
             BindClick(_developerDocument, "dev-execute");
-            BindClick(_developerDocument, "dev-use-imgui");
             BindClick(_developerDocument, "dev-close");
             SelectDeveloperPage("commands");
             _developerDocument->Hide();
@@ -354,6 +353,8 @@ namespace dragonboard::ui::rml
         _developerDocument = nullptr;
         _itemEditDocument = nullptr;
         _activeDocument = nullptr;
+        _registeredPanels.clear();
+        _panelEvents.clear();
         _eventListener.reset();
         if (_context) {
             Rml::RemoveContext(kContextName);
@@ -395,8 +396,7 @@ namespace dragonboard::ui::rml
     {
         if (!IsSettingsReady()) return false;
         if (_activeDocument == _settingsDocument) return true;
-        if (_developerDocument) _developerDocument->Hide();
-        if (_itemEditDocument) _itemEditDocument->Hide();
+        HideAllDocuments();
         _settingsDocument->Show();
         _activeDocument = _settingsDocument;
         return true;
@@ -406,8 +406,7 @@ namespace dragonboard::ui::rml
     {
         if (!IsDeveloperReady()) return false;
         if (_activeDocument == _developerDocument) return true;
-        if (_settingsDocument) _settingsDocument->Hide();
-        if (_itemEditDocument) _itemEditDocument->Hide();
+        HideAllDocuments();
         _developerDocument->Show();
         _activeDocument = _developerDocument;
         return true;
@@ -417,11 +416,140 @@ namespace dragonboard::ui::rml
     {
         if (!IsItemEditReady()) return false;
         if (_activeDocument == _itemEditDocument) return true;
-        if (_settingsDocument) _settingsDocument->Hide();
-        if (_developerDocument) _developerDocument->Hide();
+        HideAllDocuments();
         _itemEditDocument->Show();
         _activeDocument = _itemEditDocument;
         return true;
+    }
+
+    bool DragonBoardRmlUi::RegisterPanel(
+        std::uint32_t handle,
+        std::string panelId,
+        std::string documentPath)
+    {
+        if (!_context || !_eventListener || handle == 0 || panelId.empty() ||
+            documentPath.empty() || _registeredPanels.contains(handle)) {
+            return false;
+        }
+        for (const auto& [existingHandle, panel] : _registeredPanels) {
+            (void)existingHandle;
+            if (panel.id == panelId) {
+                logger::warn("DragonBoardVR: RmlUi panel id '{}' is already registered.", panelId);
+                return false;
+            }
+        }
+        if (!std::filesystem::exists(documentPath)) {
+            logger::warn(
+                "DragonBoardVR: RmlUi panel '{}' document does not exist: {}",
+                panelId,
+                documentPath);
+            return false;
+        }
+
+        auto* document = _context->LoadDocument(documentPath);
+        if (!document) {
+            logger::error(
+                "DragonBoardVR: failed to load RmlUi panel '{}' from '{}'.",
+                panelId,
+                documentPath);
+            return false;
+        }
+        document->AddEventListener("change", _eventListener.get());
+        document->Hide();
+        _registeredPanels.emplace(handle, RegisteredPanel{
+            handle, std::move(panelId), std::move(documentPath), document });
+        RegisterDocumentInteractives(document);
+        logger::info(
+            "DragonBoardVR: registered external RmlUi panel {} ('{}').",
+            handle,
+            _registeredPanels.at(handle).id);
+        return true;
+    }
+
+    bool DragonBoardRmlUi::UnregisterPanel(std::uint32_t handle)
+    {
+        const auto it = _registeredPanels.find(handle);
+        if (it == _registeredPanels.end()) return false;
+        auto* document = it->second.document;
+        if (_activeDocument == document) {
+            _activeDocument = nullptr;
+        }
+        std::erase_if(_interactiveBindings, [document](const InteractiveBinding& binding) {
+            return binding.document == document;
+        });
+        if (document) document->Close();
+        _registeredPanels.erase(it);
+        return true;
+    }
+
+    bool DragonBoardRmlUi::IsPanelReady(std::uint32_t handle) const
+    {
+        const auto* panel = FindPanel(handle);
+        return _renderer && _renderer->IsReady() && _context && panel && panel->document;
+    }
+
+    bool DragonBoardRmlUi::ShowPanel(std::uint32_t handle)
+    {
+        auto* panel = FindPanel(handle);
+        if (!panel || !panel->document) return false;
+        if (_activeDocument == panel->document) return true;
+        HideAllDocuments();
+        panel->document->Show();
+        _activeDocument = panel->document;
+        return true;
+    }
+
+    bool DragonBoardRmlUi::SetElementText(
+        std::uint32_t handle, const char* elementId, const char* text)
+    {
+        auto* panel = FindPanel(handle);
+        if (!panel || !panel->document || !elementId || !*elementId) return false;
+        auto* element = panel->document->GetElementById(elementId);
+        if (!element) return false;
+        element->SetInnerRML(EscapeRml(text ? text : ""));
+        return true;
+    }
+
+    bool DragonBoardRmlUi::SetElementAttribute(
+        std::uint32_t handle,
+        const char* elementId,
+        const char* name,
+        const char* value)
+    {
+        auto* panel = FindPanel(handle);
+        if (!panel || !panel->document || !elementId || !*elementId || !name || !*name) {
+            return false;
+        }
+        auto* element = panel->document->GetElementById(elementId);
+        if (!element) return false;
+        if (value) element->SetAttribute(name, value);
+        else element->RemoveAttribute(name);
+        return true;
+    }
+
+    bool DragonBoardRmlUi::SetElementClass(
+        std::uint32_t handle,
+        const char* elementId,
+        const char* className,
+        bool enabled)
+    {
+        auto* panel = FindPanel(handle);
+        if (!panel || !panel->document || !elementId || !*elementId ||
+            !className || !*className) {
+            return false;
+        }
+        auto* element = panel->document->GetElementById(elementId);
+        if (!element) return false;
+        element->SetClass(className, enabled);
+        return true;
+    }
+
+    std::optional<DragonBoardRmlUi::PanelEvent> DragonBoardRmlUi::ConsumePanelEvent()
+    {
+        if (_panelEvents.empty()) return std::nullopt;
+        auto event = std::move(_panelEvents.front());
+        _panelEvents.pop_front();
+        return event;
     }
 
     void DragonBoardRmlUi::ProcessInput(
@@ -560,7 +688,10 @@ namespace dragonboard::ui::rml
                         captureElement = captureElement->GetParentNode();
                     }
                     if (captureElement && captureElement->GetTagName() == "input") {
-                        _triggerCaptureMode = TriggerCaptureMode::kSlider;
+                        const auto inputType = captureElement->GetAttribute<Rml::String>(
+                            "type", "text");
+                        _triggerCaptureMode = inputType == "range" ?
+                            TriggerCaptureMode::kSlider : TriggerCaptureMode::kButton;
                     } else if (captureElement && captureElement != _activeDocument) {
                         _triggerCaptureMode = TriggerCaptureMode::kButton;
                     } else {
@@ -655,6 +786,60 @@ namespace dragonboard::ui::rml
         _interactiveBindings.push_back({ document, id, mode });
     }
 
+    void DragonBoardRmlUi::RegisterDocumentInteractives(Rml::ElementDocument* document)
+    {
+        if (!document) return;
+
+        Rml::ElementList buttons;
+        document->GetElementsByTagName(buttons, "button");
+        for (auto* element : buttons) {
+            if (element && !element->GetId().empty()) {
+                BindClick(document, element->GetId().c_str());
+            }
+        }
+
+        Rml::ElementList inputs;
+        document->GetElementsByTagName(inputs, "input");
+        for (auto* element : inputs) {
+            if (!element || element->GetId().empty()) continue;
+            const auto type = element->GetAttribute<Rml::String>("type", "text");
+            if (type == "range") BindSlider(document, element->GetId().c_str());
+            else BindClick(document, element->GetId().c_str());
+        }
+    }
+
+    DragonBoardRmlUi::RegisteredPanel* DragonBoardRmlUi::FindPanel(std::uint32_t handle)
+    {
+        const auto it = _registeredPanels.find(handle);
+        return it != _registeredPanels.end() ? &it->second : nullptr;
+    }
+
+    const DragonBoardRmlUi::RegisteredPanel* DragonBoardRmlUi::FindPanel(
+        std::uint32_t handle) const
+    {
+        const auto it = _registeredPanels.find(handle);
+        return it != _registeredPanels.end() ? &it->second : nullptr;
+    }
+
+    std::uint32_t DragonBoardRmlUi::FindPanelHandle(Rml::ElementDocument* document) const
+    {
+        for (const auto& [handle, panel] : _registeredPanels) {
+            if (panel.document == document) return handle;
+        }
+        return 0;
+    }
+
+    void DragonBoardRmlUi::HideAllDocuments()
+    {
+        if (_settingsDocument) _settingsDocument->Hide();
+        if (_developerDocument) _developerDocument->Hide();
+        if (_itemEditDocument) _itemEditDocument->Hide();
+        for (auto& [handle, panel] : _registeredPanels) {
+            (void)handle;
+            if (panel.document) panel.document->Hide();
+        }
+    }
+
     void DragonBoardRmlUi::UpdateCapturedSlider(int pointerX)
     {
         if (!_activeDocument || _triggerCapturedSliderId.empty()) return;
@@ -676,7 +861,9 @@ namespace dragonboard::ui::rml
 
         const float previous = std::stof(element->GetAttribute<Rml::String>("value", "0"));
         if (std::abs(previous - value) < 0.0001f) return;
-        SetSliderValue(_triggerCapturedSliderId.c_str(), value);
+        _synchronizingSliderValues = true;
+        element->SetAttribute("value", Rml::CreateString("%.6f", value));
+        _synchronizingSliderValues = false;
         HandleSliderChange(_triggerCapturedSliderId.c_str(), value);
     }
 
@@ -786,11 +973,6 @@ namespace dragonboard::ui::rml
         return std::exchange(_closeRequested, false);
     }
 
-    bool DragonBoardRmlUi::ConsumeImGuiFallbackRequested()
-    {
-        return std::exchange(_imguiFallbackRequested, false);
-    }
-
     bool DragonBoardRmlUi::ConsumeSaveRequested()
     {
         return std::exchange(_saveRequested, false);
@@ -834,7 +1016,8 @@ namespace dragonboard::ui::rml
     {
         if (!id) return;
         const std::string_view sliderId(id);
-        auto* document = sliderId.starts_with("edit") ? _itemEditDocument : _settingsDocument;
+        auto* document = FindPanelHandle(_activeDocument) != 0 ? _activeDocument :
+            (sliderId.starts_with("edit") ? _itemEditDocument : _settingsDocument);
         if (!document) return;
         auto* element = document->GetElementById(id);
         if (!element) return;
@@ -941,7 +1124,6 @@ namespace dragonboard::ui::rml
         setText("dev-frame-time", Rml::CreateString("%.2f ms", info.frameTimeMs));
         setText("dev-draw-calls", std::to_string(info.panelDrawCalls));
         setText("dev-texture-size", "1920 x 1080");
-        setText("dev-helper", info.helperConnected ? "Connected" : "Standalone mode");
         setText("dev-version", info.pluginVersion);
         setText("dev-feature-level", Rml::CreateString("0x%X", info.d3dFeatureLevel));
         setText("dev-player-position", Rml::CreateString(
@@ -985,6 +1167,19 @@ namespace dragonboard::ui::rml
         if (!id) return;
         RequestHaptic(ResolveClickHaptic(id));
         logger::info("DragonBoardVR: RmlUi click on '{}'.", id);
+        if (const auto panel = FindPanelHandle(_activeDocument); panel != 0) {
+            std::string value;
+            if (const auto* element = _activeDocument->GetElementById(id)) {
+                value = element->GetAttribute<Rml::String>("value", "");
+                if (element->GetAttribute<Rml::String>(
+                        "data-dragonboard-action", "") == "close") {
+                    _closeRequested = true;
+                }
+            }
+            _panelEvents.push_back(PanelEvent{
+                panel, PanelEventType::kClick, id, std::move(value), 0.0f });
+            return;
+        }
         const std::string_view value(id);
         if (value == "close" || value == "dev-close") {
             _closeRequested = true;
@@ -1004,8 +1199,6 @@ namespace dragonboard::ui::rml
             _itemEditAction = ItemEditAction::kPinWorld;
         } else if (value == "edit-toggle-label") {
             _itemEditAction = ItemEditAction::kToggleLabel;
-        } else if (value == "use-imgui" || value == "dev-use-imgui") {
-            _imguiFallbackRequested = true;
         } else if (value == "save") {
             _saveRequested = true;
         } else if (value == "toggle-edit-mode") {
@@ -1049,6 +1242,15 @@ namespace dragonboard::ui::rml
             RequestHaptic(HapticCue::kSliderTick);
         }
         UpdateSliderValueLabel(id, value);
+        if (const auto panel = FindPanelHandle(_activeDocument); panel != 0) {
+            _panelEvents.push_back(PanelEvent{
+                panel,
+                PanelEventType::kChange,
+                id,
+                Rml::CreateString("%.6f", value),
+                value });
+            return;
+        }
         _sliderChange = SliderChange{ id, value };
     }
 

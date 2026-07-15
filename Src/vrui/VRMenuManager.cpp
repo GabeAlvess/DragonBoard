@@ -6,7 +6,7 @@
 #include "ui/frame/FrameUpdateController.h"
 #include "ui/runtime/DeferredActionController.h"
 #include "ui/equipment/EquipInteractionController.h"
-#include "ui/imgui/DragonBoardSettingsMenu.h"
+#include "ui/rml/RmlPanelHost.h"
 #include "VRUIHandTracking.h"
 #include "VRUIItemEditPanel.h"
 #include "VRUISettings.h"
@@ -53,12 +53,12 @@ namespace vrui
 
     void VRMenuManager::switchToPanel(const std::string& panelName)
     {
-        auto& imguiSettings = dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton();
+        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
         if (panelName == "ItemEditPanel") {
             if (const auto panel = findPanelByName(panelName)) {
                 auto* editor = dynamic_cast<VRUIItemEditPanel*>(
                     panel->findWidgetByName("ItemEditContainer"));
-                if (editor && imguiSettings.OpenItemEdit(editor)) {
+                if (editor && rmlHost.OpenItemEdit(editor)) {
                     // Keep only the selected item's 3D preview active behind
                     // the RmlUi surface. The classic editor controls remain
                     // hidden and the source inventory stays detached.
@@ -70,7 +70,7 @@ namespace vrui
             }
             logger::warn("DragonBoardVR: RmlUi item editor unavailable; using classic ItemEditPanel.");
         }
-        imguiSettings.CloseHostedPanel();
+        rmlHost.Close();
         dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);
     }
 
@@ -106,8 +106,8 @@ namespace vrui
 
     void VRMenuManager::closeMenu()
     {
-        auto& imguiSettings = dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton();
-        imguiSettings.CloseHostedPanel();
+        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+        rmlHost.Close();
         if (!_menuSession.IsOpen()) return; // Already closed, nothing to do
         if (auto* taskInterface = SKSE::GetTaskInterface()) {
             taskInterface->AddTask([]() {
@@ -121,8 +121,8 @@ namespace vrui
         // Debounce: prevent multiple triggers from same gesture/frame
         if (!_menuToggleCooldown.TryConsume(0.5f)) return;
 
-        auto& imguiSettings = dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton();
-        imguiSettings.CloseHostedPanel();
+        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+        rmlHost.Close();
 
         if (auto* taskInterface = SKSE::GetTaskInterface()) {
             taskInterface->AddTask([]() {

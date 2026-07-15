@@ -12,7 +12,6 @@ set_toolset('msvc', 'ninja')
 
 add_rules('mode.debug', 'mode.releasedbg', 'mode.release')
 
-add_requires('imgui', { configs = { dx11 = true } })
 add_requires('rmlui 6.2', { configs = { shared = false, lua = false, svg = false, lottie = false } })
 
 -- CommonLibSSE-NG enables SE, AE, and VR by default. Override those dependency
@@ -35,7 +34,7 @@ option_end()
 
 target('DragonBoardVR')
     add_deps('commonlibsse-ng')
-    add_packages('imgui', 'rmlui')
+    add_packages('rmlui')
     add_syslinks('d3d11', 'd3dcompiler')
 
     on_config(function ()
@@ -52,13 +51,18 @@ target('DragonBoardVR')
     })
 
     add_files('Src/**.cpp')
-    add_files('External/ImGuiVRHelper/api/ImGuiVRHelperAPI.cpp')
     add_headerfiles('Src/**.h')
     add_installfiles('Assets/ui/rml/*.rml', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui'
     })
     add_installfiles('Assets/ui/rml/*.rcss', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui'
+    })
+    add_installfiles('Src/papyrus/*.psc', {
+        prefixdir = 'Scripts/Source'
+    })
+    add_installfiles('Assets/scripts/DragonBoardVR.pex', {
+        prefixdir = 'Scripts'
     })
     add_installfiles('Assets/meshes/DragonBoardVR/ImGuiScreen.nif', {
         prefixdir = 'meshes/DragonBoardVR'
@@ -73,8 +77,7 @@ target('DragonBoardVR')
         '$(projectdir)/ClibUtil/include',
         '$(projectdir)/xbyak',
         '$(projectdir)/simpleini',
-        '$(projectdir)/lib',
-        '$(projectdir)/External/ImGuiVRHelper/api'
+        '$(projectdir)/lib'
     )
 
     set_pcxxheader('Src/pch.h')
@@ -99,6 +102,17 @@ target('DragonBoardVR')
         os.mkdir(installedRmlUiDir)
         os.cp(path.join(rmlUiDir, '*.rml'), installedRmlUiDir)
         os.cp(path.join(rmlUiDir, '*.rcss'), installedRmlUiDir)
+        local papyrusSourceDir = path.join(installRoot, 'Scripts', 'Source')
+        os.mkdir(papyrusSourceDir)
+        os.cp(path.join(os.projectdir(), 'Src', 'papyrus', '*.psc'), papyrusSourceDir)
+        local papyrusPex = path.join(os.projectdir(), 'Assets', 'scripts', 'DragonBoardVR.pex')
+        if os.isfile(papyrusPex) then
+            local papyrusRuntimeDir = path.join(installRoot, 'Scripts')
+            os.mkdir(papyrusRuntimeDir)
+            os.cp(papyrusPex, path.join(papyrusRuntimeDir, 'DragonBoardVR.pex'))
+        else
+            cprint('${yellow}Papyrus runtime stub not found:${clear} %s', papyrusPex)
+        end
         cprint('${green}synced install_output:${clear} %s', installFile)
     end)
 

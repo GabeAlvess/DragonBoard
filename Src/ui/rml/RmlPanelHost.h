@@ -1,14 +1,16 @@
 #pragma once
 
-#include "ImGuiVRHelperTypes.h"
+#include "DragonBoardVR_API.h"
 
 #include <RE/Skyrim.h>
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 struct ID3D11Device;
@@ -16,58 +18,100 @@ struct ID3D11DeviceContext;
 struct ID3D11RenderTargetView;
 struct ID3D11ShaderResourceView;
 struct ID3D11Texture2D;
-struct ImGuiContext;
-
-namespace ImGuiVRHelperPluginAPI
-{
-    struct Frame;
-    struct IImGuiVRHelperInterface001;
-    struct IImGuiVRHelperInterface006;
-    struct IImGuiVRHelperInterface007;
-    struct IImGuiVRHelperInterface008;
-    struct IImGuiVRHelperInterface010;
-}
-
-namespace dragonboard::ui::rml
-{
-    class DragonBoardRmlUi;
-}
 
 namespace vrui
 {
     class VRUIItemEditPanel;
 }
 
-namespace dragonboard::ui::imgui
+namespace dragonboard::ui::rml
 {
-    class DragonBoardSettingsMenu
+    class DragonBoardRmlUi;
+    class RmlPanelHost
     {
     public:
-        static DragonBoardSettingsMenu& GetSingleton();
+        static RmlPanelHost& GetSingleton();
 
-        bool Connect();
-        bool Open();
-        bool OpenDev();
+        bool OpenSettings();
+        bool OpenDeveloper();
         bool OpenItemEdit(vrui::VRUIItemEditPanel* editor);
         void RequestRmlWarmup();
         void Close();
-        void CloseHostedPanel();
         void OnDominantVrButtonEvent(bool triggerButton, bool gripButton, bool pressed);
         void UpdateGameThread(float deltaTime);
         void RenderPresentThread(float deltaTime);
 
-        [[nodiscard]] bool IsConnected() const { return _connected.load(); }
+        DragonBoardVR_API::PanelHandle RegisterExternalPanel(
+            const DragonBoardVR_API::PanelDescriptor& descriptor) noexcept;
+        void UnregisterExternalPanel(DragonBoardVR_API::PanelHandle panel) noexcept;
+        bool ShowExternalPanel(DragonBoardVR_API::PanelHandle panel) noexcept;
+        void HideExternalPanel(DragonBoardVR_API::PanelHandle panel) noexcept;
+        [[nodiscard]] bool IsExternalPanelVisible(
+            DragonBoardVR_API::PanelHandle panel) const noexcept;
+        bool SetExternalElementText(
+            DragonBoardVR_API::PanelHandle panel,
+            const char* elementId,
+            const char* text) noexcept;
+        bool SetExternalElementAttribute(
+            DragonBoardVR_API::PanelHandle panel,
+            const char* elementId,
+            const char* name,
+            const char* value) noexcept;
+        bool SetExternalElementClass(
+            DragonBoardVR_API::PanelHandle panel,
+            const char* elementId,
+            const char* className,
+            bool enabled) noexcept;
+
         [[nodiscard]] bool IsOpen() const { return _visible.load(); }
-        [[nodiscard]] bool IsDevOpen() const;
+        [[nodiscard]] bool IsDeveloperOpen() const;
 
     private:
-        void ResetStandaloneInput();
+        void ResetPanelInput();
 
         enum class LocalPanelMode : std::uint8_t
         {
             kSettings,
             kDeveloper,
-            kItemEdit
+            kItemEdit,
+            kExternal
+        };
+
+        enum class RenderCommandType : std::uint8_t
+        {
+            kRegister,
+            kUnregister,
+            kShow,
+            kSetText,
+            kSetAttribute,
+            kSetClass
+        };
+
+        struct RenderCommand
+        {
+            RenderCommandType type = RenderCommandType::kShow;
+            DragonBoardVR_API::PanelHandle panel = DragonBoardVR_API::InvalidPanel;
+            std::string first;
+            std::string second;
+            std::string third;
+            bool enabled = false;
+        };
+
+        struct ExternalPanelClient
+        {
+            std::string id;
+            std::string documentPath;
+            DragonBoardVR_API::PanelEventCallback callback = nullptr;
+            void* userData = nullptr;
+        };
+
+        struct ExternalEvent
+        {
+            DragonBoardVR_API::PanelHandle panel = DragonBoardVR_API::InvalidPanel;
+            DragonBoardVR_API::PanelEventType type = DragonBoardVR_API::PanelEventType::Click;
+            std::string elementId;
+            std::string value;
+            float numericValue = 0.0f;
         };
 
         enum class ItemEditAction : std::uint8_t
@@ -155,18 +199,13 @@ namespace dragonboard::ui::imgui
             bool canPinToWorld = false;
         };
 
-        DragonBoardSettingsMenu() = default;
-        ~DragonBoardSettingsMenu();
+        RmlPanelHost() = default;
+        ~RmlPanelHost();
 
-        static void OnHelperFrame(const ImGuiVRHelperPluginAPI::Frame* frame, void* user);
-
-        // Standalone renderer and physical DragonBoard host.
+        // Render thread and physical DragonBoard host.
         bool EnsurePresentHookInstalled();
-        bool InitializeStandaloneRenderer();
-        void RenderStandalone(float deltaTime);
-        void PumpStandaloneInput(float width, float height);
-        void DrawLocalPanel();
-        void DrawItemEditPanel();
+        bool InitializeRenderer();
+        void RenderPanel(float deltaTime);
         void SyncRmlSettingsFromDraft();
         void ApplyRmlSliderChange(std::string_view id, float value);
         void SyncRmlDeveloperCommands();
@@ -175,57 +214,56 @@ namespace dragonboard::ui::imgui
         void ApplyRmlItemEditSliderChange(std::string_view id, float value);
         void ApplyItemEditDraftGameThread();
         void ExecuteItemEditActionGameThread(ItemEditAction action);
+        void ApplyRenderCommandsPresentThread();
+        void CollectExternalEventsPresentThread();
+        void DispatchExternalEventsGameThread();
+        bool QueueElementCommand(
+            RenderCommandType type,
+            DragonBoardVR_API::PanelHandle panel,
+            const char* first,
+            const char* second,
+            const char* third = nullptr,
+            bool enabled = false) noexcept;
 
-        // Settings view. Implemented in DragonBoardSettingsView.cpp.
-        void DrawSettings();
+        // Built-in Settings adapter.
         void CaptureSettingsGameThread();
         void ApplyDraftGameThread();
-        void MarkChanged();
 
-        // Developer view. Implemented in DragonBoardDeveloperView.cpp.
-        void DrawDeveloperPanel();
+        // Built-in Developer adapter.
         void CaptureDevGameInfoGameThread();
         void LoadDevCommandsGameThread();
         void QueueDevCommand(const DevCommandEntry& entry);
 
-        // Physical surface integration for local and externally hosted panels.
-        void UpdateClientSurfaceGameThread();
+        // Physical RmlUi surface attached to the DragonBoard scene graph.
+        void UpdateSurfaceGameThread();
         bool UpdateScenePanelGameThread(RE::NiNode* backgroundNode);
-        void SetExternalHostGameThread(bool enabled);
 
-        ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface001* _helper = nullptr;
-        ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface006* _helper006 = nullptr;
-        ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface007* _helper007 = nullptr;
-        ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface008* _helper008 = nullptr;
-        ImGuiVRHelperPluginAPI::IImGuiVRHelperInterface010* _helper010 = nullptr;
-        uint32_t _clientId = 0;
-
-        ImGuiContext* _imguiContext = nullptr;
         ID3D11Device* _device = nullptr;
         ID3D11DeviceContext* _context = nullptr;
-        ID3D11Texture2D* _settingsTexture = nullptr;
-        ID3D11RenderTargetView* _settingsRtv = nullptr;
-        ID3D11ShaderResourceView* _settingsSrv = nullptr;
+        ID3D11Texture2D* _panelRenderTexture = nullptr;
+        ID3D11RenderTargetView* _panelRenderTarget = nullptr;
+        ID3D11ShaderResourceView* _panelShaderResource = nullptr;
         std::atomic<bool> _rendererReady{ false };
         std::atomic<bool> _rmlWarmupRequested{ false };
         std::atomic<bool> _rmlWarmupAttempted{ false };
         std::unique_ptr<dragonboard::ui::rml::DragonBoardRmlUi> _rmlUi;
-        std::atomic<bool> _useRmlSettings{ true };
         std::atomic<bool> _rmlSettingsSyncPending{ true };
-        std::atomic<bool> _useRmlDeveloper{ true };
         std::atomic<bool> _rmlDeveloperSyncPending{ true };
-        std::atomic<bool> _useRmlItemEdit{ true };
         std::atomic<bool> _rmlItemEditSyncPending{ true };
         std::atomic<std::uint8_t> _pendingRmlHapticCue{ 0 };
 
-        std::atomic<bool> _connected{ false };
-        std::atomic<bool> _helperConnectionAttempted{ false };
         std::atomic<bool> _visible{ false };
         std::atomic<bool> _applyPending{ false };
         std::atomic<bool> _savePending{ false };
-        std::atomic<bool> _closePending{ false };
-        std::atomic<bool> _menuOnLeftHand{ true };
         std::atomic<LocalPanelMode> _localPanelMode{ LocalPanelMode::kSettings };
+        std::atomic<DragonBoardVR_API::PanelHandle> _activeExternalPanel{
+            DragonBoardVR_API::InvalidPanel };
+
+        mutable std::mutex _externalMutex;
+        std::unordered_map<DragonBoardVR_API::PanelHandle, ExternalPanelClient> _externalPanels;
+        std::deque<RenderCommand> _renderCommands;
+        std::deque<ExternalEvent> _externalEvents;
+        std::atomic<DragonBoardVR_API::PanelHandle> _nextExternalPanel{ 1 };
 
         std::mutex _draftMutex;
         SettingsDraft _draft;
@@ -246,33 +284,19 @@ namespace dragonboard::ui::imgui
         float _presentFps = 0.0f;
         float _presentFrameMs = 0.0f;
         int _panelDrawCalls = 0;
-        int _settingsPage = 0;
-        int _developerPage = 0;
-
-        bool _previousTriggerDown = false;
         bool _rmlPreviousTriggerDown = false;
         bool _deferredRmlTransformApply = false;
-        float _scrollAccumulatorX = 0.0f;
-        float _scrollAccumulatorY = 0.0f;
         std::atomic<float> _pointerU{ 0.0f };
         std::atomic<float> _pointerV{ 0.0f };
-        std::atomic<bool> _standaloneTriggerDown{ false };
-        std::atomic<bool> _standaloneGripDown{ false };
-        std::atomic<float> _standaloneStickX{ 0.0f };
-        std::atomic<float> _standaloneStickY{ 0.0f };
-        bool _pointerWasOnPanel = false;
-        bool _surfaceSubmitted = false;
-        bool _hostSizeSubmitted = false;
-        bool _externalHostEnabled = false;
+        std::atomic<bool> _triggerDown{ false };
+        std::atomic<bool> _gripDown{ false };
+        std::atomic<float> _stickX{ 0.0f };
+        std::atomic<float> _stickY{ 0.0f };
         bool _scenePanelVisible = false;
         std::atomic<bool> _pointerInHostedPanel{ false };
-        uint32_t _hostedClientId = 0;
         RE::NiPointer<RE::NiNode> _screenNode;
         RE::NiPointer<RE::NiSourceTexture> _screenSourceTexture;
         RE::BSGraphics::Texture* _originalRendererTexture = nullptr;
         std::unique_ptr<RE::BSGraphics::Texture> _sceneTextureBridge;
-        ImGuiVRHelperPluginAPI::PanelTextureHandle _panelTexture{};
-        ID3D11Texture2D* _boundTexture = nullptr;
-        ID3D11ShaderResourceView* _boundSrv = nullptr;
     };
 }

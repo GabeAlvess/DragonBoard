@@ -16,7 +16,7 @@
 #include <atomic>
 #include <windows.h> // for GetModuleHandleA
 #include "ui/menu/MenuComposition.h"
-#include "ui/imgui/DragonBoardSettingsMenu.h"
+#include "ui/rml/RmlPanelHost.h"
 
 namespace vrui
 {
@@ -93,7 +93,7 @@ namespace vrui
                     }
 
                     VRMenuManager::get().onFrameUpdate(deltaTime);
-                    dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton().UpdateGameThread(deltaTime);
+                    dragonboard::ui::rml::RmlPanelHost::GetSingleton().UpdateGameThread(deltaTime);
                     ModActionManager::get().update(deltaTime);
                 });
             }
@@ -214,7 +214,7 @@ namespace vrui
                     }
 
                     if (isDominantHand && (isTriggerButton || isGripButton)) {
-                        dragonboard::ui::imgui::DragonBoardSettingsMenu::GetSingleton()
+                        dragonboard::ui::rml::RmlPanelHost::GetSingleton()
                             .OnDominantVrButtonEvent(
                                 isTriggerButton,
                                 isGripButton,

@@ -35,14 +35,6 @@
             },
             version = "2.14.1"
         },
-        ["imgui#c426553d"] = {
-            repo = {
-                branch = "master",
-                commit = "104a71cea913ff1931ab8a2f7c9ba5a9e428f303",
-                url = "https://gitlab.com/tboox/xmake-repo.git"
-            },
-            version = "v1.92.5"
-        },
         ["meson#31fecfc4"] = {
             repo = {
                 branch = "master",
