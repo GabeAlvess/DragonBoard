@@ -11,10 +11,42 @@
 #include <RE/B/BGSMenuDisplayObject.h>
 #include <REL/Relocation.h>
 #include <RE/A/Actor.h>
+#include <RE/T/TESFile.h>
 #include <algorithm>
+#include <format>
 
 namespace vrui::ItemUtils
 {
+    namespace
+    {
+        std::string resolveOverrideCategory(RE::TESForm* form)
+        {
+            if (!form) return "Misc";
+
+            const auto formType = form->GetFormType();
+            if (formType == RE::FormType::Book) return "Books";
+            if (formType == RE::FormType::Spell) return "Magic";
+            if (formType == RE::FormType::Weapon || formType == RE::FormType::Ammo) return "Weapons";
+            if (formType == RE::FormType::Armor) return "Armor";
+
+            if (auto* alchemy = form->As<RE::AlchemyItem>()) {
+                return alchemy->IsFood() ? "Food" : "Potions";
+            }
+            if (formType == RE::FormType::Ingredient) return "Food";
+            if (formType == RE::FormType::Misc) return "Misc";
+
+            std::string lowerPath = getModelPath(form);
+            std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            if (lowerPath.find("weapon") != std::string::npos || lowerPath.find("shield") != std::string::npos) return "Weapons";
+            if (lowerPath.find("armor") != std::string::npos || lowerPath.find("clothes") != std::string::npos) return "Armor";
+            if (lowerPath.find("alchemy") != std::string::npos || lowerPath.find("potion") != std::string::npos) return "Potions";
+            if (lowerPath.find("food") != std::string::npos || lowerPath.find("ingredient") != std::string::npos) return "Food";
+            return "Misc";
+        }
+    }
+
     void PapyrusUnequipSpell(RE::Actor* actor, RE::SpellItem* spell, int source)
     {
         if (!actor || !spell) return;
@@ -88,10 +120,79 @@ namespace vrui::ItemUtils
         return cleaned.substr(start, end - start + 1);
     }
 
-    void getItemOverrides(RE::TESForm* form,
-                          float& rotX, float& rotY, float& rotZ,
-                          float& xOff, float& yOff, float& zOff,
-                          float& scaleMult)
+    std::string getStableItemOverrideKey(RE::TESForm* form)
+    {
+        if (!form || form->IsDynamicForm()) return {};
+        auto* file = form->GetFile(0);
+        if (!file || file->GetFilename().empty()) return {};
+        return std::format("{}|{:08X}", file->GetFilename(), form->GetLocalFormID());
+    }
+
+    bool findItemOverride(RE::TESForm* form, ItemOffsetData& data)
+    {
+        if (!form) return false;
+        auto& settings = VRUISettings::get();
+        const auto stableKey = getStableItemOverrideKey(form);
+        if (!stableKey.empty()) {
+            if (const auto it = settings.stableItemOverrides.find(stableKey);
+                it != settings.stableItemOverrides.end()) {
+                data = it->second;
+                return true;
+            }
+        }
+
+        if (const auto it = settings.itemOverrides.find(form->GetFormID());
+            it != settings.itemOverrides.end()) {
+            data = it->second;
+            return true;
+        }
+        return false;
+    }
+
+    void setItemOverride(RE::TESForm* form, const ItemOffsetData& data)
+    {
+        if (!form) return;
+        auto& settings = VRUISettings::get();
+        const auto stableKey = getStableItemOverrideKey(form);
+        if (!stableKey.empty()) {
+            settings.stableItemOverrides[stableKey] = data;
+            settings.itemOverrides.erase(form->GetFormID());
+            logger::info(
+                "DragonBoardVR: stored stable item override key='{}' runtimeFormID={:08X}",
+                stableKey, form->GetFormID());
+        } else {
+            settings.itemOverrides[form->GetFormID()] = data;
+            logger::warn(
+                "DragonBoardVR: item {:08X} has no stable plugin key; using runtime FormID override",
+                form->GetFormID());
+        }
+    }
+
+    void eraseItemOverride(RE::TESForm* form)
+    {
+        if (!form) return;
+        auto& settings = VRUISettings::get();
+        const auto stableKey = getStableItemOverrideKey(form);
+        if (!stableKey.empty()) settings.stableItemOverrides.erase(stableKey);
+        settings.itemOverrides.erase(form->GetFormID());
+    }
+
+    bool isExplicitOverride(ItemTransformSource source)
+    {
+        return source == ItemTransformSource::ItemOverride ||
+               source == ItemTransformSource::CategoryOverride;
+    }
+
+    ItemTransformSource getItemTransformSource(RE::TESForm* form)
+    {
+        float rotX, rotY, rotZ, xOff, yOff, zOff, scale;
+        return getItemOverrides(form, rotX, rotY, rotZ, xOff, yOff, zOff, scale);
+    }
+
+    ItemTransformSource getItemOverrides(RE::TESForm* form,
+                                         float& rotX, float& rotY, float& rotZ,
+                                         float& xOff, float& yOff, float& zOff,
+                                         float& scaleMult)
     {
         const float kNaN = std::numeric_limits<float>::quiet_NaN();
         rotX = kNaN; rotY = kNaN; rotZ = kNaN;
@@ -100,7 +201,7 @@ namespace vrui::ItemUtils
         zOff = 0.0f;
         scaleMult = 1.0f;
 
-        if (!form) return;
+        if (!form) return ItemTransformSource::Default;
 
         uint32_t formID = form->GetFormID();
         std::string rawName = form->GetName();
@@ -109,33 +210,27 @@ namespace vrui::ItemUtils
 
         auto& settings = vrui::VRUISettings::get();
 
-        // First: check per-item override by FormID (uses variable declared above)
-        if (formID != 0 && settings.itemOverrides.contains(formID)) {
-            const auto& data = settings.itemOverrides[formID];
+        // Player-authored per-item overrides are always the highest authority.
+        ItemOffsetData itemData;
+        if (findItemOverride(form, itemData)) {
+            const auto& data = itemData;
             rotX = data.rotX; rotY = data.rotY; rotZ = data.rotZ;
             xOff = data.posX; yOff = data.posY; zOff = data.posZ;
             scaleMult = data.scale;
-            return;
+            return ItemTransformSource::ItemOverride;
         }
 
-        std::string category = "Misc";
-        std::string lowerPath = getModelPath(form);
-        for (auto& c : lowerPath) c = std::tolower(c);
-        if (fType == RE::FormType::Book) category = "Books";
-        else if (fType == RE::FormType::Spell) category = "Magic";
-        else if (fType == RE::FormType::Misc) category = "Misc";
-        else if (lowerPath.find("weapon") != std::string::npos || lowerPath.find("shield") != std::string::npos) category = "Weapons";
-        else if (lowerPath.find("armor") != std::string::npos || lowerPath.find("clothes") != std::string::npos) category = "Armor";
-        else if (lowerPath.find("alchemy") != std::string::npos || lowerPath.find("potion") != std::string::npos) category = "Potions";
-        else if (lowerPath.find("food") != std::string::npos || lowerPath.find("ingredient") != std::string::npos) category = "Food";
+        const std::string category = resolveOverrideCategory(form);
 
         if (settings.categoryOverrides.contains(category)) {
             const auto& data = settings.categoryOverrides[category];
             rotX = data.rotX; rotY = data.rotY; rotZ = data.rotZ;
             xOff = data.posX; yOff = data.posY; zOff = data.posZ;
             scaleMult = data.scale;
-            return;
+            return ItemTransformSource::CategoryOverride;
         }
+
+        ItemTransformSource resolvedSource = ItemTransformSource::Default;
 
         // 1. Specific Item Overrides (by FormID or Name)
         
@@ -145,7 +240,7 @@ namespace vrui::ItemUtils
             rotX = 90.0f; rotY = 0.0f; rotZ = 0.0f;
             yOff = -1.0f;
             zOff = -1.0f;
-            return;
+            return ItemTransformSource::TypeFallback;
         }
 
         // Skooma Variants (Checking by FormID base to handle DLC load order, and Name)
@@ -156,7 +251,7 @@ namespace vrui::ItemUtils
             rotX = 0.0f; rotY = 0.0f; rotZ = 90.0f; // Stand up
             scaleMult = 0.5f;
             yOff = -0.75f; // Adjusted from -1.0 to -0.75 (+0.25)
-            return;
+            return ItemTransformSource::TypeFallback;
         }
 
         // Cicero's Clothes (ID: 0x0006492C and others in the set)
@@ -170,6 +265,7 @@ namespace vrui::ItemUtils
 
         // 2. Type-based Overrides
         if (fType == RE::FormType::Weapon) {
+            resolvedSource = ItemTransformSource::TypeFallback;
             rotX = -90.0f; rotY = -35.0f; rotZ = 35.0f;
             auto* weap = form->As<RE::TESObjectWEAP>();
             if (weap && (weap->IsBow() || weap->IsCrossbow()))
@@ -177,7 +273,8 @@ namespace vrui::ItemUtils
 
         } else if (fType == RE::FormType::AlchemyItem || fType == RE::FormType::Ingredient
                 || fType == RE::FormType::SoulGem || fType == RE::FormType::Scroll
-                || fType == RE::FormType::Spell) {
+                 || fType == RE::FormType::Spell) {
+            resolvedSource = ItemTransformSource::TypeFallback;
             
             // 1. Resolve and normalize model path
             std::string modelPath = getModelPath(form);
@@ -215,6 +312,7 @@ namespace vrui::ItemUtils
             }
 
         } else if (fType == RE::FormType::Armor) {
+            resolvedSource = ItemTransformSource::TypeFallback;
             auto* armo = form->As<RE::TESObjectARMO>();
             if (armo) {
                 yOff = -0.25f; // All armors/equipment moved down slightly
@@ -234,5 +332,6 @@ namespace vrui::ItemUtils
                 }
             }
         }
+        return resolvedSource;
     }
 }

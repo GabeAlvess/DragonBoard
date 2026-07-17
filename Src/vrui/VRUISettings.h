@@ -54,6 +54,10 @@ namespace vrui
     {
         std::map<std::string, ItemOffsetData, CaseInsensitiveComparator> categoryOverrides;
         std::map<std::string, ItemOffsetData, CaseInsensitiveComparator> categoryButtons;
+        // Stable overrides use "Plugin.esp|LOCAL_FORM_ID" keys so a load-order
+        // change does not redirect a player's correction to another item.
+        std::map<std::string, ItemOffsetData, CaseInsensitiveComparator> stableItemOverrides;
+        // Legacy full runtime FormIDs remain readable for backwards compatibility.
         std::map<uint32_t, ItemOffsetData> itemOverrides;
         std::vector<FixedWidgetItem> fixedWidgets;
 
@@ -105,6 +109,8 @@ namespace vrui
         float itemPotionScale = 1.0f;       // Specific multiplier for potions
         float itemFoodScale   = 1.0f;       // Specific multiplier for food/ingredients
         float itemMiscScale   = 1.0f;       // Specific multiplier for misc/clutter/books
+        bool  normalizeItemVisuals = true;  // Center visible geometry and fit it uniformly
+        bool  useNifInventoryMarkerRotation = true; // Use BSInvMarker only without an INI override
         int   gridColumns     = 5;          // Grid columns for main panel and dynamic containers
         int   gridPageSize    = 20;         // Items per page in grid containers
 

@@ -92,10 +92,12 @@ namespace vrui
 
                 std::string modelPath = ItemUtils::getModelPath(spell);
                 float rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult;
-                ItemUtils::getItemOverrides(spell, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
+                const auto transformSource = ItemUtils::getItemOverrides(
+                    spell, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
 
                 auto button = std::make_shared<VRUIButton>(label, modelPath, "",
-                    2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
+                    2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff,
+                    scaleMult, false, transformSource);
                 button->setNoPopAnimation(true); // prevent render glitch with large models
                 button->setUseDynamicLabelOffset(true); // push label forward of 3D model
                 button->setShowLabelsOnHoverOnly(true);
@@ -195,10 +197,12 @@ namespace vrui
 
             // Per-type rotation/scale via shared utility
             float rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult;
-            ItemUtils::getItemOverrides(item, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
+            const auto transformSource = ItemUtils::getItemOverrides(
+                item, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
 
             auto button = std::make_shared<VRUIButton>(label, modelPath, "",
-                2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult, true);
+                2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff,
+                scaleMult, true, transformSource);
             button->setNoPopAnimation(true); // prevent render glitch with large models
             button->setUseDynamicLabelOffset(true); // push label forward of 3D model
             button->setShowLabelsOnHoverOnly(true);
@@ -453,10 +457,12 @@ namespace vrui
 
                     // Spells in favorites also get the default rotation/offset
                     float rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult;
-                    ItemUtils::getItemOverrides(spell, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
+                    const auto transformSource = ItemUtils::getItemOverrides(
+                        spell, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
 
                     auto button = std::make_shared<VRUIButton>(label, "DragonBoardVR\\IconPlane.nif", "",
-                        2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
+                        2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff,
+                        scaleMult, false, transformSource);
                     button->setShowLabelsOnHoverOnly(true);
                     button->setItemRotationPersistence(spell->formID, xOff, yOff, zOff, scaleMult, rotX, rotY, rotZ);
                     _formToButton[spell->formID] = button;
@@ -517,10 +523,12 @@ namespace vrui
 
                 // Per-type rotation/scale via shared utility
                 float rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult;
-                ItemUtils::getItemOverrides(obj, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
+                const auto transformSource = ItemUtils::getItemOverrides(
+                    obj, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
 
                 auto button = std::make_shared<VRUIButton>(label, modelPath, "",
-                    2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult);
+                    2.0f, 2.0f, rotX, rotY, rotZ, xOff, yOff, zOff,
+                    scaleMult, false, transformSource);
                 button->setShowLabelsOnHoverOnly(true);
                 button->setItemRotationPersistence(obj->formID, xOff, yOff, zOff, scaleMult, rotX, rotY, rotZ);
                 _formToButton[obj->formID] = button;

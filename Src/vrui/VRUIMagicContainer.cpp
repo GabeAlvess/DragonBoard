@@ -565,7 +565,7 @@ namespace vrui
             float yOff = 0.0f;
             float zOff = 0.0f;
             float scaleMult = 1.0f;
-            ItemUtils::getItemOverrides(
+            const auto transformSource = ItemUtils::getItemOverrides(
                 spell,
                 rotX, rotY, rotZ,
                 xOff, yOff, zOff,
@@ -582,7 +582,7 @@ namespace vrui
                 2.0f, 2.0f,
                 rotX, rotY, rotZ,
                 xOff, yOff, zOff,
-                scaleMult, true);
+                scaleMult, true, transformSource);
             button->setNoPopAnimation(true);
             button->setUseDynamicLabelOffset(true);
             button->setShowLabelsOnHoverOnly(true);

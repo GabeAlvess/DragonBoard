@@ -483,11 +483,19 @@ namespace vrui
     {
         if (!a_obj) return;
 
-        // 1. Strip Physics, Animations and ensure visibility
-        RE::BSVisit::TraverseScenegraphObjects(a_obj, [](RE::NiAVObject* obj) -> RE::BSVisit::BSVisitControl {
+        // The cloned root must be visible, but world-item NIFs often contain
+        // intentionally hidden alternate parts. Preserve those child culling
+        // flags so neither the preview nor its measured bounds include them.
+        a_obj->SetAppCulled(false);
+
+        // 1. Strip Physics and Animations. Only DragonBoard-owned UI meshes
+        // are safe to force visible recursively.
+        RE::BSVisit::TraverseScenegraphObjects(a_obj, [applyUIShaderTweaks](RE::NiAVObject* obj) -> RE::BSVisit::BSVisitControl {
             obj->collisionObject = nullptr;
             obj->controllers = nullptr;
-            obj->SetAppCulled(false);
+            if (applyUIShaderTweaks) {
+                obj->SetAppCulled(false);
+            }
             return RE::BSVisit::BSVisitControl::kContinue;
         });
 

@@ -3,6 +3,7 @@
 #include "VRUIWidget.h"
 #include "VRUITextHelper.h"
 #include "VRUIModelHelper.h"
+#include "VRUIItemUtils.h"
 #include <RE/B/BSModelDB.h>
 #include <functional>
 
@@ -38,7 +39,8 @@ namespace vrui
                    float width, float height,
                    float itemRotX, float itemRotY, float itemRotZ,
                    float itemXOffset, float itemYOffset, float itemZOffset,
-                   float itemScaleMult, bool deferInit = false);
+                   float itemScaleMult, bool deferInit = false,
+                   ItemUtils::ItemTransformSource transformSource = ItemUtils::ItemTransformSource::TypeFallback);
         void update(float deltaTime) override;
         void setLocalScale(float scale) override;
 
@@ -133,6 +135,10 @@ namespace vrui
         /// When true, the label nodes stay hidden unless this button is currently hovered by the laser.
         void setShowLabelsOnHoverOnly(bool val);
         bool showLabelsOnHoverOnly() const { return _showLabelsOnHoverOnly; }
+        void setItemTransformSource(ItemUtils::ItemTransformSource source)
+        {
+            _itemTransformSource = source;
+        }
         
         // --- Dashboard / HIGGS Proximity Equip ---
         void setDashboardPinned(bool pinned);
@@ -181,6 +187,7 @@ namespace vrui
         float _itemYOffset = 0.0f;       // Y offset applied to the model node
         float _itemZOffset = 0.0f;       // Z offset applied to the model node
         float _itemScaleMult = 1.0f;     // Scale multiplier on top of the normal item scale
+        ItemUtils::ItemTransformSource _itemTransformSource = ItemUtils::ItemTransformSource::TypeFallback;
         float _visualOffsetX = 0.0f;
         float _visualOffsetY = 0.0f;
         float _visualOffsetZ = 0.0f;

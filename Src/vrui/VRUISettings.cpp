@@ -61,6 +61,12 @@ namespace vrui
 
         logger::trace("DragonBoardVR: Loading settings from '{}'", iniPath);
 
+        // These sections can be edited or cleared while the plugin is running.
+        // Rebuild them from the file so a hot reload cannot retain deleted keys.
+        categoryOverrides.clear();
+        stableItemOverrides.clear();
+        itemOverrides.clear();
+
         // [General]
         verboseLogging = ini.GetBoolValue("General", "bVerboseLogging", verboseLogging);
         editModeEnabled = ini.GetBoolValue("General", "bEditModeEnabled", editModeEnabled);
@@ -125,6 +131,9 @@ namespace vrui
         itemPotionScale = (float)ini.GetDoubleValue("Buttons", "fItemPotionScale", itemPotionScale);
         itemFoodScale   = (float)ini.GetDoubleValue("Buttons", "fItemFoodScale",   itemFoodScale);
         itemMiscScale   = (float)ini.GetDoubleValue("Buttons", "fItemMiscScale",   itemMiscScale);
+        normalizeItemVisuals = ini.GetBoolValue("Buttons", "bNormalizeItemVisuals", normalizeItemVisuals);
+        useNifInventoryMarkerRotation = ini.GetBoolValue(
+            "Buttons", "bUseNifInventoryMarkerRotation", useNifInventoryMarkerRotation);
         gridColumns     = (int)ini.GetLongValue    ("Buttons", "iGridColumns",     gridColumns);
         gridPageSize    = (int)ini.GetLongValue    ("Buttons", "iGridPageSize",    gridPageSize);
 
@@ -332,7 +341,8 @@ namespace vrui
         loadCategoryOffsets("CategoryOverrides", categoryOverrides);
         loadCategoryOffsets("CategoryButtons",   categoryButtons);
 
-        // [ItemOverrides] — keyed by FormID (hex string, e.g. "0x0001A2B3")
+        // [ItemOverrides] supports both stable "Plugin.esp|LOCAL_FORM_ID"
+        // keys and legacy full runtime FormIDs.
         {
             CSimpleIniA::TNamesDepend keys;
             if (ini.GetAllKeys("ItemOverrides", keys)) {
@@ -340,10 +350,15 @@ namespace vrui
                     std::string val = ini.GetValue("ItemOverrides", key.pItem, "");
                     ItemOffsetData data;
                     if (sscanf_s(val.c_str(), "%f,%f,%f,%f,%f,%f,%f", &data.posX, &data.posY, &data.posZ, &data.rotX, &data.rotY, &data.rotZ, &data.scale) == 7) {
-                        // Parse hex FormID (support both '0x' prefix and plain hex)
-                        uint32_t fid = 0;
-                        sscanf_s(key.pItem, "%i", &fid); // %i auto-detects 0x prefix
-                        if (fid != 0) itemOverrides[fid] = data;
+                        const std::string overrideKey = key.pItem;
+                        if (overrideKey.find('|') != std::string::npos) {
+                            stableItemOverrides[overrideKey] = data;
+                        } else {
+                            // Parse hex FormID (support both '0x' prefix and plain hex)
+                            uint32_t fid = 0;
+                            sscanf_s(key.pItem, "%i", &fid); // %i auto-detects 0x prefix
+                            if (fid != 0) itemOverrides[fid] = data;
+                        }
                     }
                 }
             }
@@ -425,6 +440,10 @@ namespace vrui
         ini.SetDoubleValue("Buttons", "fItemPotionScale", itemPotionScale, "; Multiplier specifically for potions");
         ini.SetDoubleValue("Buttons", "fItemFoodScale",   itemFoodScale,   "; Multiplier specifically for food/ingredients");
         ini.SetDoubleValue("Buttons", "fItemMiscScale",   itemMiscScale,   "; Multiplier specifically for misc/books/clutter");
+        ini.SetBoolValue  ("Buttons", "bNormalizeItemVisuals", normalizeItemVisuals,
+                           "; Center visible item geometry and use uniform automatic fitting");
+        ini.SetBoolValue  ("Buttons", "bUseNifInventoryMarkerRotation", useNifInventoryMarkerRotation,
+                           "; Use NIF inventory rotation only when no player/category override exists");
         ini.SetLongValue  ("Buttons", "iGridColumns",     gridColumns,     "; Number of grid columns for all containers");
         ini.SetLongValue  ("Buttons", "iGridPageSize",    gridPageSize,    "; Number of items per page in grid containers");
 
@@ -613,7 +632,17 @@ namespace vrui
         };
         saveCategoryOffsets("CategoryOverrides", categoryOverrides);
 
-        // Save ItemOverrides (uint32_t FormID keys stored as hex)
+        // Save stable player overrides first.
+        for (const auto& kv : stableItemOverrides) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
+                     kv.second.posX, kv.second.posY, kv.second.posZ,
+                     kv.second.rotX, kv.second.rotY, kv.second.rotZ, kv.second.scale);
+            ini.SetValue("ItemOverrides", kv.first.c_str(), buf);
+        }
+
+        // Preserve legacy runtime FormID entries until the player edits or
+        // resets that item, at which point ItemUtils writes a stable key.
         for (const auto& kv : itemOverrides) {
             char keyBuf[16];
             snprintf(keyBuf, sizeof(keyBuf), "0x%08X", kv.first);

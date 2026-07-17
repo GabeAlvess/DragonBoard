@@ -149,11 +149,14 @@ namespace vrui
 
         // Calculate the exact _baseScaleMult equivalent to a 3.0f width UI Inventory button
         auto& settings = VRUISettings::get();
-        float specificMult = settings.itemMiscScale;
-        if (_targetCategory == "Weapons") specificMult = settings.itemWeaponScale;
-        else if (_targetCategory == "Armor") specificMult = settings.itemArmorScale;
-        else if (_targetCategory == "Potions") specificMult = settings.itemPotionScale;
-        else if (_targetCategory == "Food") specificMult = settings.itemFoodScale;
+        float specificMult = 1.0f;
+        if (!settings.normalizeItemVisuals) {
+            specificMult = settings.itemMiscScale;
+            if (_targetCategory == "Weapons") specificMult = settings.itemWeaponScale;
+            else if (_targetCategory == "Armor") specificMult = settings.itemArmorScale;
+            else if (_targetCategory == "Potions") specificMult = settings.itemPotionScale;
+            else if (_targetCategory == "Food") specificMult = settings.itemFoodScale;
+        }
 
         float userMultiplier = settings.itemMeshScale * specificMult;
         if (userMultiplier < 0.1f) {
@@ -175,7 +178,7 @@ namespace vrui
         data.rotZ = editorRotZToRuntime(_rotX, _rotZ, _targetModelPath);
         data.scale = _scale;
         
-        VRUISettings::get().itemOverrides[_targetFormID] = data;
+        ItemUtils::setItemOverride(RE::TESForm::LookupByID(_targetFormID), data);
         VRMenuManager::get().requestSettingsSave();
         
         // Also apply the new values immediately to existing objects
@@ -289,7 +292,7 @@ namespace vrui
         data.rotY = editorRotYToRuntime(_rotY, _targetModelPath);
         data.rotZ = editorRotZToRuntime(_rotX, _rotZ, _targetModelPath);
         data.scale = _scale;
-        VRUISettings::get().itemOverrides[_targetFormID] = data;
+        ItemUtils::setItemOverride(RE::TESForm::LookupByID(_targetFormID), data);
         VRMenuManager::get().requestSettingsSave();
 
         // The source container is hidden while the RmlUi editor is open. It is
@@ -315,7 +318,7 @@ namespace vrui
 
     void VRUIItemEditPanel::resetItemOffsets()
     {
-        VRUISettings::get().itemOverrides.erase(_targetFormID);
+        ItemUtils::eraseItemOverride(RE::TESForm::LookupByID(_targetFormID));
         VRMenuManager::get().requestSettingsSave();
         VRMenuManager::get().refreshActiveDynamicContainers();
     }
@@ -498,7 +501,32 @@ namespace vrui
 
         if (!_targetModelPath.empty()) {
             // Replicate exactly what Dashboard does
-            _previewWidget = std::make_shared<VRUIButton>("", _targetModelPath, "", 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+            auto* targetForm = RE::TESForm::LookupByID(_targetFormID);
+            const auto transformSource = ItemUtils::getItemTransformSource(targetForm);
+            _previewWidget = std::make_shared<VRUIButton>(
+                "", _targetModelPath, "", 1.0f, 1.0f,
+                editorRotXToRuntime(_rotX, _rotZ, _targetModelPath),
+                editorRotYToRuntime(_rotY, _targetModelPath),
+                editorRotZToRuntime(_rotX, _rotZ, _targetModelPath),
+                _posX, _posY, _posZ, _scale, false, transformSource);
+
+            // For untouched items, synchronize the editor with the automatic
+            // baseline (including a NIF inventory marker if one was used).
+            // Explicit INI values remain unchanged and are never replaced.
+            if (VRUISettings::get().normalizeItemVisuals &&
+                !ItemUtils::isExplicitOverride(transformSource)) {
+                RE::NiPoint3 resolvedPosition;
+                RE::NiMatrix3 resolvedRotation;
+                float resolvedScale = 1.0f;
+                if (_previewWidget->getPrimaryVisualTransform(
+                        resolvedPosition, resolvedRotation, resolvedScale)) {
+                    _posX = resolvedPosition.x;
+                    _posY = resolvedPosition.y;
+                    _posZ = resolvedPosition.z;
+                    _scale = resolvedScale;
+                    syncRotationFromPreviewGrab(resolvedRotation);
+                }
+            }
             
             if (_previewWidget) {
                 _previewWidget->setItemRotationPersistence(_targetFormID, _posX, _posY, _posZ, _scale);
@@ -718,7 +746,7 @@ namespace vrui
 
         auto btnReset = std::make_shared<VRUIButton>("Reset", "", "", 1.2f, 0.8f);
         btnReset->setOnPressHandler([this](VRUIButton*, EquipHand) {
-            VRUISettings::get().itemOverrides.erase(_targetFormID);
+            ItemUtils::eraseItemOverride(RE::TESForm::LookupByID(_targetFormID));
             VRMenuManager::get().requestSettingsSave();
             VRMenuManager::get().refreshActiveDynamicContainers();
             VRMenuManager::get().switchToPanel(_sourcePanel);

@@ -1112,7 +1112,8 @@ namespace vrui
 
         auto button = std::make_shared<VRUIButton>(pending.label, pending.modelPath, "",
             2.0f, 2.0f, pending.rotX, pending.rotY, pending.rotZ,
-            pending.xOff, pending.yOff, pending.zOff, pending.scaleMult, true);
+            pending.xOff, pending.yOff, pending.zOff, pending.scaleMult, true,
+            ItemUtils::getItemTransformSource(item));
         button->setNoPopAnimation(true);
         button->setUseDynamicLabelOffset(true);
         button->setShowLabelsOnHoverOnly(true);

@@ -183,7 +183,8 @@ namespace vrui
                            float width, float height,
                            float itemRotX, float itemRotY, float itemRotZ,
                            float itemXOffset, float itemYOffset, float itemZOffset,
-                           float itemScaleMult, bool deferInit)
+                           float itemScaleMult, bool deferInit,
+                           ItemUtils::ItemTransformSource transformSource)
         : VRUIWidget(label, width, height)
         , _label(label)
         , _buttonId(label)
@@ -197,6 +198,7 @@ namespace vrui
         , _itemYOffset(itemYOffset)
         , _itemZOffset(itemZOffset)
         , _itemScaleMult(itemScaleMult)
+        , _itemTransformSource(transformSource)
         , _state(ButtonState::Normal)
         , _maxCharsPerLine(12)
         , _slotIndex(-1)
@@ -337,19 +339,10 @@ namespace vrui
         if (!_nifPath.empty()) {
             auto loaded = loadModelFromNif(_nifPath, applyUIShaderTweaks);
             if (loaded && _node) {
-                // 1. Recursive Sanitization
+                // 1. Strip unsafe runtime data while preserving hidden child
+                // geometry on external world-item NIFs.
                 VRUIWidget::sanitizeModel(loaded.get(), applyUIShaderTweaks);
 
-                // 2. Normalization (Target = 1.0 unit total size)
-                VRUIModelHelper::normalizeAndCenterModel(loaded.get());
-
-                // 3. Final Scaling Calculation
-                float buttonTargetSize = (_width < _height) ? _width : _height;
-                buttonTargetSize *= 0.8f; // Use 80% of button space
-                
-                float userMultiplier = settings.buttonMeshScale;
-                
-                bool isWorldItem = false;
                 std::string pathLower = _nifPath;
                 std::transform(pathLower.begin(), pathLower.end(), pathLower.begin(), 
                                [](unsigned char c){ return std::tolower(c); });
@@ -393,27 +386,72 @@ namespace vrui
                 // non-uniform scale into the rotation matrix and makes pinned
                 // magic appear stretched after FixedWidgetPresenter rebuilds
                 // it on the dashboard.
-                isWorldItem = !isInternalUiMesh ||
-                              hasWeapons || hasShield || hasClutter || hasArmor || hasJewelry ||
-                              hasAlchemy || hasFood || hasClothes || hasBook || hasScroll ||
-                              hasKey || hasMisc || hasIngredients || hasIngredient || hasSkooma ||
-                              hasFlora || hasPlants || hasFlowers || hasNature || hasLandscape ||
-                              hasVegetable || hasFruit || hasLight || hasTorch || hasItem ||
-                              hasArtifact || hasMagic || hasSpell || hasVfx || hasCompass;
+                const bool isWorldItem = !isInternalUiMesh ||
+                                         hasWeapons || hasShield || hasClutter || hasArmor || hasJewelry ||
+                                         hasAlchemy || hasFood || hasClothes || hasBook || hasScroll ||
+                                         hasKey || hasMisc || hasIngredients || hasIngredient || hasSkooma ||
+                                         hasFlora || hasPlants || hasFlowers || hasNature || hasLandscape ||
+                                         hasVegetable || hasFruit || hasLight || hasTorch || hasItem ||
+                                         hasArtifact || hasMagic || hasSpell || hasVfx || hasCompass;
+
+                RE::NiMatrix3 presentationRotation{};
+                bool usedInventoryMarker = false;
+                float inventoryMarkerZoom = 1.0f;
+                if (isWorldItem) {
+                    constexpr float kItemRotDefault = -90.0f;
+                    const float rotX = std::isnan(_itemRotOverrideX) ? kItemRotDefault : _itemRotOverrideX;
+                    const float rotY = std::isnan(_itemRotOverrideY) ? kItemRotDefault : _itemRotOverrideY;
+                    const float rotZ = std::isnan(_itemRotOverrideZ) ? kItemRotDefault : _itemRotOverrideZ;
+                    presentationRotation.SetEulerAnglesXYZ(
+                        rotX * kDegToRad, rotY * kDegToRad, rotZ * kDegToRad);
+
+                    // A player's item/category correction always wins. The NIF
+                    // marker is only an automatic fallback for untouched items.
+                    if (settings.useNifInventoryMarkerRotation &&
+                        !ItemUtils::isExplicitOverride(_itemTransformSource)) {
+                        usedInventoryMarker = VRUIModelHelper::getInventoryMarkerTransform(
+                            loaded.get(), presentationRotation, inventoryMarkerZoom);
+                    }
+                }
+
+                // Keep automatic centering on its own node. The editable parent
+                // can then change position/rotation/scale without destroying the
+                // pivot correction calculated from visible geometry.
+                RE::NiPointer<RE::NiNode> visualContent = loaded;
+                if (isWorldItem && settings.normalizeItemVisuals) {
+                    auto normalizedVisual = RE::NiPointer<RE::NiNode>(RE::NiNode::Create());
+                    if (normalizedVisual) {
+                        normalizedVisual->name = "AutoNormalizedVisual";
+                        normalizedVisual->AttachChild(loaded.get());
+                        VRUIModelHelper::normalizeAndCenterWorldModel(
+                            normalizedVisual.get(), presentationRotation);
+                        visualContent = normalizedVisual;
+                    } else {
+                        VRUIModelHelper::normalizeAndCenterModel(loaded.get());
+                    }
+                } else {
+                    VRUIModelHelper::normalizeAndCenterModel(loaded.get());
+                }
+
+                // 2. Final uniform slot scaling.
+                float buttonTargetSize = ((_width < _height) ? _width : _height) * 0.8f;
+                float userMultiplier = settings.buttonMeshScale;
 
                 if (isWorldItem) {
                     loadedWorldItemVisual = true;
-                    float specificMult = settings.itemMiscScale;
-                    if (hasWeapons || hasShield) {
-                        specificMult = settings.itemWeaponScale;
-                    } else if (hasArmor || hasClothes || hasJewelry) {
-                        specificMult = settings.itemArmorScale;
-                    } else if (hasAlchemy || hasPotion || hasSkooma) {
-                        specificMult = settings.itemPotionScale;
-                    } else if (hasFood || hasIngredient || hasIngredients) {
-                        specificMult = settings.itemFoodScale;
+                    float specificMult = 1.0f;
+                    if (!settings.normalizeItemVisuals) {
+                        specificMult = settings.itemMiscScale;
+                        if (hasWeapons || hasShield) {
+                            specificMult = settings.itemWeaponScale;
+                        } else if (hasArmor || hasClothes || hasJewelry) {
+                            specificMult = settings.itemArmorScale;
+                        } else if (hasAlchemy || hasPotion || hasSkooma) {
+                            specificMult = settings.itemPotionScale;
+                        } else if (hasFood || hasIngredient || hasIngredients) {
+                            specificMult = settings.itemFoodScale;
+                        }
                     }
-
                     userMultiplier = settings.itemMeshScale * specificMult;
                 }
 
@@ -433,7 +471,7 @@ namespace vrui
                     return;
                 }
                 visualTransform->name = "PrimaryVisualTransform";
-                visualTransform->AttachChild(loaded.get());
+                visualTransform->AttachChild(visualContent.get());
 
                 // The child is normalized to one model-space unit.  The parent
                 // supplies the slot size and remains the node edited/grabbed by the
@@ -441,7 +479,7 @@ namespace vrui
                 visualTransform->local.scale = buttonTargetSize * userMultiplier;
                 const float referenceVisualScale = visualTransform->local.scale;
 
-                // 4. Rotation Logic
+                // 3. Rotation logic
                 if (!isWorldItem) {
                     // UI Planes: fixed rotation (90° X, 0° Y, 180° Z) — these are the only values that work
                     constexpr float kMeshRotX = 90.0f  * kDegToRad;
@@ -456,25 +494,21 @@ namespace vrui
                         visualTransform->local.rotate.entry[i][2] *= scaleZ;
                     }
                 } else {
-                    // World items: default rotation -90/-90/-90 (override per-item with NaN sentinel)
-                    constexpr float kItemRotDefault = -90.0f;
-                    float rotX = std::isnan(_itemRotOverrideX) ? kItemRotDefault : _itemRotOverrideX;
-                    float rotY = std::isnan(_itemRotOverrideY) ? kItemRotDefault : _itemRotOverrideY;
-                    float rotZ = std::isnan(_itemRotOverrideZ) ? kItemRotDefault : _itemRotOverrideZ;
+                    visualTransform->local.rotate = presentationRotation;
 
-                    RE::NiMatrix3 baseRot{};
-                    baseRot.SetEulerAnglesXYZ(rotX * kDegToRad, rotY * kDegToRad, rotZ * kDegToRad);
-                    visualTransform->local.rotate = baseRot;
-
-                    // Apply per-item scale multiplier (e.g. 0.5 for bows)
-                    if (_itemScaleMult != 1.0f) {
+                    // With automatic fitting, old type/category compensations
+                    // are ignored. Explicit INI corrections remain final.
+                    const bool applyStoredCorrection =
+                        ItemUtils::isExplicitOverride(_itemTransformSource) ||
+                        !settings.normalizeItemVisuals;
+                    if (applyStoredCorrection && _itemScaleMult != 1.0f) {
                         visualTransform->local.scale *= _itemScaleMult;
                     }
-
-                    // Apply per-item position offsets (to separate model from label)
-                    visualTransform->local.translate.x += _itemXOffset;
-                    visualTransform->local.translate.y += _itemYOffset;
-                    visualTransform->local.translate.z += _itemZOffset;
+                    if (applyStoredCorrection) {
+                        visualTransform->local.translate.x += _itemXOffset;
+                        visualTransform->local.translate.y += _itemYOffset;
+                        visualTransform->local.translate.z += _itemZOffset;
+                    }
                 }
 
                 visualTransform->local.translate.x += _visualOffsetX;
@@ -489,8 +523,12 @@ namespace vrui
                 visualTransform->Update(finalUpdate);
 
                 successfullyLoaded = true;
-                logger::trace("DragonBoardVR: Button '{}' loaded NIF (world={}) finalScale={:.3f}", 
-                    _label, isWorldItem, visualTransform->local.scale);
+                logger::trace(
+                    "DragonBoardVR: Button '{}' loaded NIF world={} normalized={} "
+                    "source={} marker={} markerZoom={:.3f} finalScale={:.3f}",
+                    _label, isWorldItem, isWorldItem && settings.normalizeItemVisuals,
+                    static_cast<int>(_itemTransformSource), usedInventoryMarker,
+                    inventoryMarkerZoom, visualTransform->local.scale);
             }
         }
 
@@ -1632,7 +1670,7 @@ namespace vrui
             data.rotY = effectiveRy / kDegToRad;
             data.rotZ = effectiveRz / kDegToRad;
             data.scale = effectiveScale;
-            settings.itemOverrides[_itemOverrideFormID] = data;
+            ItemUtils::setItemOverride(RE::TESForm::LookupByID(_itemOverrideFormID), data);
             setItemRotationPersistence(
                 _itemOverrideFormID,
                 data.posX,
