@@ -18,11 +18,13 @@ namespace vrui
         inline constexpr float kEditPanelPreviewAnchorX = 0.0f;
         inline constexpr float kEditPanelPreviewAnchorY = 2.2f;
         inline constexpr float kEditPanelPreviewAnchorZ = 0.23f;
-        // Fine-tuned after visible-geometry normalization: move the common
-        // RmlUi preview slightly right without changing per-item INI offsets.
-        inline constexpr float kInventoryPreviewAnchorX = 1.25f;
+        // In the transformed RmlUi preview, X maps visually to the vertical
+        // direction. Keep the previously approved vertical anchor unchanged.
+        inline constexpr float kInventoryPreviewAnchorX = 1.0f;
         inline constexpr float kInventoryPreviewAnchorY = 2.2f;
-        inline constexpr float kInventoryPreviewAnchorZ = -0.35f;
+        // The horizontal correction belongs on Z; negative moves the preview
+        // toward the visual right with the current panel orientation.
+        inline constexpr float kInventoryPreviewAnchorZ = -0.60f;
         // Requested global RmlUi preview increase: previous 1.3 * 1.8 = 2.34.
         inline constexpr float kInventoryPreviewScaleMultiplier = 2.34f;
         inline constexpr float kEditPanelPageAreaX = -4.0f;
