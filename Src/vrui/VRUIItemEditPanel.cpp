@@ -12,9 +12,16 @@ namespace vrui
 {
     namespace
     {
-        inline constexpr float kEditPanelPreviewAnchorX = 5.6f;
-        inline constexpr float kEditPanelPreviewAnchorY = 3.0f;
-        inline constexpr float kEditPanelPreviewAnchorZ = 0.5f;
+        // Calibrated in VR against the RmlUi preview circle. The residual
+        // item transform needed to center the mesh was X +1.0 / Y -0.8, so
+        // it is baked into the anchor and the editor sliders can open at zero.
+        inline constexpr float kEditPanelPreviewAnchorX = 0.0f;
+        inline constexpr float kEditPanelPreviewAnchorY = 2.2f;
+        inline constexpr float kEditPanelPreviewAnchorZ = 0.23f;
+        inline constexpr float kInventoryPreviewAnchorX = 1.0f;
+        inline constexpr float kInventoryPreviewAnchorY = 2.2f;
+        inline constexpr float kInventoryPreviewAnchorZ = -0.35f;
+        inline constexpr float kInventoryPreviewScaleMultiplier = 1.3f;
         inline constexpr float kEditPanelPageAreaX = -4.0f;
         inline constexpr float kEditPanelPageAreaZ = 4.0f;
 
@@ -122,6 +129,7 @@ namespace vrui
         // Rebuild once for every newly selected object so the preview mesh is
         // replaced before the RmlUi host enters preview-only mode.
         _rmlPreviewMode = false;
+        _rmlPreviewLayout = RmlPreviewLayout::ItemEditor;
         _targetCategory = category;
         _targetFormID = formID;
         _targetItemName = ItemUtils::sanitizeName(itemName);
@@ -227,6 +235,47 @@ namespace vrui
         if (_previewWidget) {
             _previewWidget->setVisible(true);
             updatePreview();
+        }
+    }
+
+    void VRUIItemEditPanel::setRmlPreviewLayout(RmlPreviewLayout layout)
+    {
+        _rmlPreviewLayout = layout;
+        updateInventoryPreviewInteraction();
+        if (_previewWidget) {
+            updatePreview();
+        }
+    }
+
+    void VRUIItemEditPanel::setInventoryPreviewInteractionHandler(
+        InventoryPreviewInteractionHandler handler)
+    {
+        _inventoryPreviewInteractionHandler = std::move(handler);
+        updateInventoryPreviewInteraction();
+    }
+
+    void VRUIItemEditPanel::updateInventoryPreviewInteraction()
+    {
+        if (!_previewWidget) return;
+
+        const bool enabled =
+            (_rmlPreviewLayout == RmlPreviewLayout::Inventory ||
+             _rmlPreviewLayout == RmlPreviewLayout::Magic) &&
+            _targetFormID != 0 &&
+            static_cast<bool>(_inventoryPreviewInteractionHandler);
+        _previewWidget->setDashboardPinned(enabled);
+        if (enabled) {
+            _previewWidget->setOnPressHandler([this](VRUIButton*, EquipHand hand) {
+                if ((_rmlPreviewLayout == RmlPreviewLayout::Inventory ||
+                     _rmlPreviewLayout == RmlPreviewLayout::Magic) &&
+                    _targetFormID != 0 &&
+                    _inventoryPreviewInteractionHandler) {
+                    _inventoryPreviewInteractionHandler(
+                        static_cast<std::uint32_t>(_targetFormID), hand);
+                }
+            });
+        } else {
+            _previewWidget->setOnPressHandler({});
         }
     }
 
@@ -354,12 +403,18 @@ namespace vrui
         _rotX = runtimeRotXToEditor(runtimeRotX, runtimeRotZ, _targetModelPath);
         _rotY = runtimeRotYToEditor(runtimeRotY, _targetModelPath);
         _rotZ = runtimeRotZToEditor(runtimeRotX, runtimeRotZ, _targetModelPath);
-        refresh();
     }
 
     void VRUIItemEditPanel::updatePreview()
     {
         if (_previewWidget) {
+            const bool listPanelLayout =
+                _rmlPreviewLayout == RmlPreviewLayout::Inventory ||
+                _rmlPreviewLayout == RmlPreviewLayout::Magic;
+            const float anchorX = listPanelLayout ? kInventoryPreviewAnchorX : kEditPanelPreviewAnchorX;
+            const float anchorY = listPanelLayout ? kInventoryPreviewAnchorY : kEditPanelPreviewAnchorY;
+            const float anchorZ = listPanelLayout ? kInventoryPreviewAnchorZ : kEditPanelPreviewAnchorZ;
+            const float previewScale = listPanelLayout ? kInventoryPreviewScaleMultiplier : 1.0f;
             RE::NiMatrix3 rot;
             VRUILayoutManager::setMatrixEuler(
                 rot,
@@ -370,11 +425,11 @@ namespace vrui
             
             _previewWidget->setLocalRotation(RE::NiMatrix3());
             _previewWidget->setLocalPosition({
-                kEditPanelPreviewAnchorX,
-                kEditPanelPreviewAnchorY,
-                kEditPanelPreviewAnchorZ
+                anchorX,
+                anchorY,
+                anchorZ
             });
-            _previewWidget->setLocalScale(_normalizedScale * _baseScaleMult);
+            _previewWidget->setLocalScale(_normalizedScale * _baseScaleMult * previewScale);
             _previewWidget->setPrimaryVisualTransform({ _posX, _posY, _posZ }, rot, _scale);
         }
     }
@@ -436,12 +491,12 @@ namespace vrui
         previewRow->addElement(previewSpacer);
         addElement(previewRow);
 
+        if (_previewWidget) {
+            removeChild(_previewWidget);
+            _previewWidget = nullptr;
+        }
+
         if (!_targetModelPath.empty()) {
-            if (_previewWidget) {
-                removeChild(_previewWidget);
-                _previewWidget = nullptr;
-            }
-            
             // Replicate exactly what Dashboard does
             _previewWidget = std::make_shared<VRUIButton>("", _targetModelPath, "", 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
             
@@ -451,20 +506,33 @@ namespace vrui
                     if (!btn) {
                         return;
                     }
-                    auto* visualNode = btn->getPrimaryVisualNode();
-                    if (!visualNode) {
+                    RE::NiPoint3 position;
+                    RE::NiMatrix3 rotation;
+                    float scale = 1.0f;
+                    if (!btn->getPrimaryVisualTransform(position, rotation, scale)) {
                         return;
                     }
-                    _posX = visualNode->local.translate.x;
-                    _posY = visualNode->local.translate.y;
-                    _posZ = visualNode->local.translate.z;
-                    if (btn->getPrimaryVisualNode()) {
-                        this->syncRotationFromPreviewGrab(visualNode->local.rotate);
+
+                    _posX = std::clamp(position.x, -20.0f, 20.0f);
+                    _posY = std::clamp(position.y, -20.0f, 20.0f);
+                    _posZ = std::clamp(position.z, -20.0f, 20.0f);
+                    // Preserve the exact scale reached by two-hand editing.
+                    // Existing item overrides can legitimately exceed the
+                    // slider's ordinary range.
+                    _scale = std::max(0.01f, scale);
+                    syncRotationFromPreviewGrab(rotation);
+
+                    // Keep the exact released scene transform visible. The
+                    // RmlUi draft and sliders are synchronized separately,
+                    // without reconstructing the preview in the same frame.
+                    if (_workingTransformChangedHandler) {
+                        _workingTransformChangedHandler(getEditState());
                     }
                 });
                 addChild(_previewWidget);
             }
         }
+        updateInventoryPreviewInteraction();
         updatePreview();
 
         // Page Host Area (MCM Style Content Area)

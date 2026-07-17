@@ -35,7 +35,7 @@ namespace vrui
         if (inputMgr) {
             inputMgr->AddEventSink(GetSingleton());
             registered = true;
-            logger::trace("DragonBoardVR: VRFrameUpdater input sink registered!");
+            logger::info("DragonBoardVR: VRFrameUpdater input sink registered.");
         } else {
             logger::error("DragonBoardVR: Failed to get BSInputDeviceManager!");
         }
@@ -189,6 +189,10 @@ namespace vrui
                     // Y/B Button: keyCode 1 (Oculus)
                     if (keyCode == 1) {
                         VRMenuManager::get().onSecondaryButtonChanged(btnEvent->IsPressed());
+                        if (isDominantHand) {
+                            VRMenuManager::get().onDominantSecondaryButtonChanged(
+                                btnEvent->IsPressed());
+                        }
                     }
 
                     // Grips
@@ -213,9 +217,10 @@ namespace vrui
                         if (!isDominantHand) VRMenuManager::get().onOffhandGripButtonChanged(btnEvent->IsPressed());
                     }
 
-                    if (isDominantHand && (isTriggerButton || isGripButton)) {
+                    if (isTriggerButton || (isDominantHand && isGripButton)) {
                         dragonboard::ui::rml::RmlPanelHost::GetSingleton()
-                            .OnDominantVrButtonEvent(
+                            .OnVrButtonEvent(
+                                isLeftHand,
                                 isTriggerButton,
                                 isGripButton,
                                 btnEvent->IsPressed());

@@ -1,340 +1,179 @@
-.edit-mark {
-    color: #5a321b;
-    border-color: #9f6b28;
+/* Item editor: charcoal three-column layout tuned for the 1920x1080 VR surface. */
+.edit-app {
+    color: #d6d6d6;
+    background-color: #101111;
+    border-color: #333535;
 }
 
-.item-summary {
-    display: flex;
-    flex-direction: column;
-    width: 330px;
-    height: 170px;
-    margin: 10px 8px 20px;
-    padding: 20px 18px;
-    background-color: #f7eddd;
-    border: 1px #c5aa7c;
-    border-radius: 6px;
+.edit-sidebar {
+    width: 376px;
+    height: 1076px;
+    padding: 28px 32px;
+    background-color: #121313;
+    border-right: 1px #454747;
 }
 
-.summary-label {
+.edit-sidebar .brand {
+    height: 126px;
+    padding: 0 4px;
+}
+
+.edit-sidebar .brand-copy {
     display: block;
-    color: #9b6d2a;
-    font-size: 21px;
+    width: 300px;
+    margin-left: 0;
+}
+
+.edit-sidebar .brand-name {
+    display: inline-block;
+    color: #e0e0e0;
+    font-size: 46px;
+}
+
+.edit-sidebar .brand-edition {
+    display: inline-block;
+    color: #c6c6c6;
+    font-size: 26px;
     letter-spacing: 3px;
 }
 
-.summary-name {
+.item-summary {
     display: block;
-    max-height: 82px;
-    margin-top: 6px;
-    color: #3e2818;
-    font-size: 34px;
-    overflow: hidden;
+    width: 288px;
+    height: 176px;
+    margin: 0 10px 20px;
+    padding: 20px 18px;
+    background-color: #202121;
+    border: 1px #505252;
+    border-radius: 5px;
 }
 
-.summary-meta {
-    display: block;
-    width: 294px;
-    margin-top: 8px;
-    color: #936625;
-    font-size: 23px;
-}
-
-.meta-separator {
-    margin: 0 9px;
-    color: #b4a187;
-}
+.summary-label { display: block; width: 250px; height: 28px; color: #a9aaaa; font-size: 23px; letter-spacing: 3px; }
+.summary-name { display: block; width: 250px; height: 48px; margin-top: 6px; color: #e1e1e1; font-size: 35px; overflow: hidden; }
+.summary-meta { display: block; width: 250px; height: 30px; margin-top: 7px; color: #a6a6a6; font-size: 23px; overflow: hidden; }
+.meta-separator { margin: 0 7px; color: #707272; }
 
 .edit-section-label {
-    margin-top: 12px;
+    margin: 15px 12px 18px;
+    padding-bottom: 12px;
+    color: #aeb0b0;
+    font-size: 23px;
+    border-bottom-width: 0;
 }
 
-.model-path {
-    width: 290px;
-    max-height: 58px;
+.edit-sidebar .nav-item {
+    width: 310px;
+    height: 81px;
+    margin-bottom: 7px;
+    padding: 0 16px;
+    color: #c8c9c9;
+    font-size: 33px;
+    border-radius: 4px;
+}
+
+.edit-sidebar .nav-item:hover { color: #eeeeee; background-color: #292a2a; border-color: #4b4d4d; }
+.edit-sidebar .nav-item.active { color: #eeeeee; background-color: #303131; border-color: #555757; }
+
+#edit-tab-pin {
+    color: #ffe6e6;
+    background-color: #721d1d;
+    border-color: #a43d3d;
+}
+
+#edit-tab-pin:hover {
+    color: #fff4f4;
+    background-color: #8b2727;
+    border-color: #c25656;
+}
+
+.edit-sidebar .sidebar-status {
+    left: 40px;
+    right: 40px;
+    bottom: 24px;
+    padding: 22px 8px 0;
+    color: #d0d0d0;
+    font-size: 23px;
+    border-top-color: #3e4040;
+}
+
+.edit-dot { background-color: #d78a08; }
+.model-path { width: 270px; max-height: 52px; color: #878989; font-size: 19px; overflow: hidden; }
+
+.edit-shell { position: relative; width: 1540px; height: 1076px; background-color: #111212; }
+.edit-header { width: 1540px; height: 104px; padding: 0 42px; background-color: #171818; border-bottom-color: #222424; }
+.edit-header .breadcrumb { color: #d4d4d4; font-size: 27px; }
+.edit-header .breadcrumb-muted { color: #898b8b; }
+.edit-header .breadcrumb-slash { color: #777979; }
+.edit-header .close-button { color: #dedede; border-color: #565858; }
+.edit-header .close-button:hover { background-color: #292a2a; border-color: #777979; }
+.edit-header .keycap { color: #d6d6d6; background-color: #1b1c1c; border-color: #444646; }
+
+.editor-workspace { width: 1540px; height: 822px; display: flex; }
+.preview-stage { position: relative; width: 960px; height: 822px; background-color: #101111; border-right: 1px #292b2b; }
+.preview-circle {
+    position: absolute;
+    left: 132px;
+    top: 66px;
+    width: 690px;
+    height: 690px;
     overflow: hidden;
+    background-color: #111212;
+    border: 2px #505252;
+    border-radius: 346px;
 }
-
-.edit-dot {
-    background-color: #c08a3b;
-}
+.preview-horizon { position: absolute; left: 35px; top: 500px; width: 620px; height: 1px; background-color: #252727; }
+.preview-center-mark { position: absolute; left: 342px; top: 342px; width: 6px; height: 6px; background-color: #555757; border-radius: 3px; }
 
 .edit-main {
-    padding-top: 34px;
+    width: 580px;
+    height: 822px;
+    padding: 42px 42px 20px;
+    background-color: #151616;
+    overflow-y: auto;
 }
+.edit-page { width: 496px; }
+.edit-page .page-eyebrow { width: 496px; margin: 0; color: #c5c6c6; font-size: 23px; text-align: left; }
+.edit-page h1 { width: 496px; margin: 10px 0 28px; color: #e4e4e4; font-size: 36px; letter-spacing: 1px; text-align: left; }
+.edit-card { width: 496px; border-width: 0; }
+.edit-card .setting-row { width: 496px; height: 190px; display: block; padding: 0; border-width: 0; }
+.edit-card .setting-row:hover, .edit-card .setting-row.featured:hover { background-color: transparent; }
+.edit-card .setting-copy { width: 496px; height: 78px; }
+.edit-card .setting-label { color: #d3d4d4; font-size: 31px; }
+.edit-card .setting-help { margin-top: 5px; color: #898b8b; font-size: 23px; }
+.edit-card .setting-row input.range { width: 350px; height: 67px; margin: 0 14px 0 0; }
+.edit-card input.range slidertrack { height: 8px; margin-top: 29px; background-color: #555757; }
+.edit-card input.range sliderprogress { height: 8px; background-color: #bfc0c0; }
+.edit-card input.range sliderbar { width: 30px; height: 30px; margin-top: 18px; background-color: #d5d6d6; border: 3px #858787; border-radius: 16px; }
+.edit-card input.range:hover sliderbar { background-color: #eeeeee; border-color: #a4a6a6; }
+.edit-card .value { width: 120px; padding: 10px 8px; color: #d8d8d8; font-size: 27px; background-color: #171818; border-color: #454747; }
+.single-card { margin-top: 0; }
+.hint { width: 496px; margin-top: 30px; color: #8e9090; background-color: #1b1c1c; border-color: #3d3f3f; }
 
-.edit-page {
-    width: 1394px;
-}
-
-.edit-card .setting-row {
-    height: 172px;
-}
-
-.single-card {
-    margin-top: 30px;
-}
-
-.pin-grid {
-    width: 1394px;
-    height: 170px;
-    display: flex;
-}
-
-.pin-card {
-    width: 677px;
-    height: 170px;
-    display: block;
-    margin-right: 40px;
-    padding: 30px 34px;
-    color: #432c1b;
-    text-align: left;
-    background-color: #f5e9d7;
-    border: 1px #c5aa7c;
-    border-radius: 6px;
-    tab-index: auto;
-}
-
-.pin-card:last-child {
-    margin-right: 0;
-}
-
-.pin-card:hover {
-    background-color: #eed8b1;
-    border-color: #a96f20;
-}
-
-.pin-card.disabled {
-    color: #9c8c77;
-    background-color: #eee4d4;
-    border-color: #d2c5b1;
-}
-
-.pin-title {
-    display: block;
-    font-size: 38px;
-    pointer-events: none;
-}
-
-.pin-description {
-    display: block;
-    margin-top: 14px;
-    color: #796650;
-    font-size: 27px;
-    pointer-events: none;
-}
-
-.pin-group-label {
-    margin: 34px 0 16px;
-}
-
-.magic-pin-actions {
-    display: none;
-}
+.pin-grid { width: 496px; height: auto; display: block; }
+.pin-card { width: 496px; height: 120px; margin: 0 0 14px; padding: 20px 22px; color: #dddddd; background-color: #202121; border: 1px #4c4e4e; border-radius: 5px; }
+.pin-card:hover { background-color: #303131; border-color: #737575; }
+.pin-card.disabled { color: #747676; background-color: #191a1a; border-color: #333535; }
+.pin-title { display: block; color: #dddddd; font-size: 30px; pointer-events: none; }
+.pin-description { display: block; margin-top: 9px; color: #999b9b; font-size: 21px; pointer-events: none; }
+.pin-group-label { margin: 20px 0 12px; color: #999b9b; font-size: 19px; }
+.magic-pin-actions { display: none; }
 
 .edit-footer {
-    padding-left: 48px;
+    width: 1540px;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    padding: 0 38px;
+    background-color: #151616;
+    border-top: 1px #292b2b;
 }
-
-.reset-button,
-.category-button {
-    height: 62px;
-    margin-left: 14px;
-    padding: 0 26px;
-    font-size: 29px;
-    border: 1px #bc9e73;
-    border-radius: 6px;
-}
-
-.reset-button {
-    color: #984f3d;
-    border-color: #c59384;
-}
-
-.reset-button:hover {
-    background-color: #edc9bf;
-    border-color: #a95d4b;
-}
-
-.category-button {
-    color: #80591f;
-    border-color: #bc9156;
-}
-
-/* VR-safe item editor surfaces. */
-.edit-mark {
-    color: #f1d9b5;
-    border-color: #b9843d;
-}
-
-.item-summary,
-.pin-card {
-    background-color: #33291f;
-    border-color: #765938;
-}
-
-.summary-label,
-.summary-meta {
-    color: #d09a4b;
-}
-
-.summary-name,
-.pin-title {
-    color: #f1ddbf;
-}
-
-.meta-separator {
-    color: #806d55;
-}
-
-.pin-description {
-    color: #c0aa8d;
-}
-
-.pin-card:hover {
-    background-color: #493624;
-    border-color: #c38a3a;
-}
-
-.pin-card.disabled {
-    color: #817363;
-    background-color: #27211c;
-    border-color: #4a4035;
-}
-
-.reset-button {
-    color: #e8aa98;
-    border-color: #a96959;
-}
-
-.reset-button:hover {
-    background-color: #4a2922;
-    border-color: #d18570;
-}
-
-.category-button {
-    color: #e0b46f;
-    border-color: #a87839;
-}
-
-/* Extreme VR exposure compensation. */
-.item-summary,
-.pin-card {
-    background-color: #0f0c09;
-    border-color: #4d391f;
-}
-
-.pin-card:hover {
-    background-color: #21170f;
-    border-color: #936022;
-}
-
-.pin-card.disabled {
-    background-color: #080706;
-    border-color: #2b251e;
-}
-
-.reset-button:hover {
-    background-color: #21100c;
-}
-
-/* Final neutral-grey editor palette. */
-.edit-mark {
-    color: #dddddd;
-    border-color: #777777;
-}
-
-.item-summary,
-.pin-card {
-    background-color: #242424;
-    border-color: #505050;
-}
-
-.summary-label,
-.summary-meta {
-    color: #aaaaaa;
-}
-
-.summary-name,
-.pin-title {
-    color: #dddddd;
-}
-
-.meta-separator {
-    color: #777777;
-}
-
-.pin-description {
-    color: #a5a5a5;
-}
-
-.pin-card:hover {
-    background-color: #343434;
-    border-color: #737373;
-}
-
-.pin-card.disabled {
-    color: #727272;
-    background-color: #1a1a1a;
-    border-color: #393939;
-}
-
-.reset-button {
-    color: #b7b7b7;
-    border-color: #666666;
-}
-
-.reset-button:hover {
-    color: #dedede;
-    background-color: #303030;
-    border-color: #838383;
-}
-
-/* Apply category joins Apply item in the dark-red action family. */
-.category-button {
-    color: #f0dddd;
-    background-color: #5c1717;
-    border-color: #944343;
-}
-
-.category-button:hover {
-    color: #fff0f0;
-    background-color: #762020;
-    border-color: #b45b5b;
-}
-
-/* Large-format item editor typography. */
-.item-summary {
-    height: 208px;
-}
-
-.summary-label {
-    font-size: 34px;
-}
-
-.summary-name {
-    max-height: 104px;
-    font-size: 52px;
-    line-height: 1.1;
-}
-
-.summary-meta {
-    font-size: 37px;
-    line-height: 1.2;
-}
-
-.pin-title {
-    font-size: 56px;
-    line-height: 1.1;
-}
-
-.pin-description {
-    margin-top: 18px;
-    font-size: 41px;
-    line-height: 1.2;
-}
-
-.reset-button,
-.category-button {
-    height: 82px;
-    font-size: 41px;
-}
+.edit-footer .classic-button { display: none; }
+.edit-footer .footer-spacer { width: 846px; }
+.reset-button, .category-button, .edit-footer .save-button { height: 66px; padding: 0 24px; font-size: 29px; border-radius: 5px; }
+.reset-button { margin-right: 10px; color: #d4d4d4; background-color: #151616; border: 1px #5b5d5d; }
+.reset-button:hover { color: #eeeeee; background-color: #242525; border-color: #777979; }
+.category-button { margin-right: 10px; color: #f1dddd; background-color: #6f1d1d; border: 1px #a13b3b; }
+.category-button:hover { color: #fff0f0; background-color: #852525; border-color: #bd5050; }
+.edit-footer .save-button { width: 183px; color: #fff0f0; background-color: #771e1e; border-color: #a83d3d; }
+.edit-footer .save-button:hover { background-color: #902828; border-color: #c45555; }
+.edit-footer .save-button .keycap { color: #f3dddd; background-color: #6b1a1a; border-color: #a54141; }

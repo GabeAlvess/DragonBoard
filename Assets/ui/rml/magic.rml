@@ -1,0 +1,139 @@
+<rml>
+<head>
+    <title>DragonBoard Magic</title>
+    <link type="text/rcss" href="magic.rcss" />
+</head>
+<body>
+    <div id="app" class="magic-app">
+        <header class="magic-header">
+            <div class="magic-status-tab">
+                <button class="magic-tab future-tab" disabled="disabled">
+                    <span>STATUS</span>
+                    <span class="future-label">COMING SOON</span>
+                </button>
+            </div>
+
+            <div class="magic-title"><span>MAGIC</span></div>
+
+            <div class="player-identity">
+                <span id="magic-player-name" class="player-name">Dragonborn</span>
+                <div class="player-level">
+                    <span class="player-level-label">LEVEL</span>
+                    <span id="magic-player-level" class="player-level-value">1</span>
+                </div>
+            </div>
+
+            <div class="magic-search-shell">
+                <button id="magic-search" class="magic-search">
+                    <span id="magic-search-text">SEARCH</span>
+                </button>
+                <button id="magic-search-clear" class="magic-search-clear">
+                    <span>X</span>
+                </button>
+            </div>
+
+            <button id="magic-close" class="close-button"><span>X</span></button>
+        </header>
+
+        <main class="magic-workspace">
+            <section class="magic-list-column">
+                <div class="magic-list-header">
+                    <div class="list-heading-row">
+                        <span class="spells-label">SPELLS</span>
+                        <span id="magic-spell-count" class="spell-count">0</span>
+                    </div>
+                    <div class="magic-filters">
+                        <button id="magic-filter-destruction" class="magic-filter" title="Destruction"><img src="assets/destructionicon.png" /></button>
+                        <button id="magic-filter-conjuration" class="magic-filter" title="Conjuration"><img src="assets/conjurationicon.png" /></button>
+                        <button id="magic-filter-restoration" class="magic-filter" title="Restoration"><img src="assets/restorationicon.png" /></button>
+                        <button id="magic-filter-illusion" class="magic-filter" title="Illusion"><img src="assets/illusionicon.png" /></button>
+                        <button id="magic-filter-alteration" class="magic-filter" title="Alteration"><img src="assets/alterationicon.png" /></button>
+                        <button id="magic-filter-powers" class="magic-filter" title="Powers"><img src="assets/powericon.png" /></button>
+                        <button id="magic-filter-passive" class="magic-filter" title="Passive Effects"><img src="assets/passiveicon.png" /></button>
+                    </div>
+                </div>
+                <div id="magic-spell-list" class="magic-spell-list">
+                    <div class="magic-empty">No spells available</div>
+                </div>
+            </section>
+
+            <section class="magic-preview-column">
+                <div class="preview-heading">
+                    <span id="magic-selected-category" class="preview-category">MAGIC</span>
+                    <div class="preview-title-row">
+                        <div id="magic-left-hand-state" class="hand-state">
+                            <span>LEFT HAND</span>
+                        </div>
+                        <span id="magic-selected-name" class="preview-name">Select a spell</span>
+                        <div id="magic-right-hand-state" class="hand-state">
+                            <span>RIGHT HAND</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="preview-stage">
+                    <img id="magic-preview-icon" class="preview-icon" src="assets/destructionicon.png" />
+                    <div class="preview-reticle"></div>
+                </div>
+            </section>
+
+            <section class="magic-details-column">
+                <div class="column-heading details-heading"><span>ATTRIBUTES</span></div>
+
+                <div class="attribute-list">
+                    <div class="attribute-row">
+                        <span class="attribute-label">MAGICKA COST</span>
+                        <span id="magic-cost" class="attribute-value">--</span>
+                    </div>
+                    <div class="attribute-row">
+                        <span class="attribute-label">LEVEL</span>
+                        <span id="magic-skill-level" class="attribute-value text-value">--</span>
+                    </div>
+                    <div class="attribute-row">
+                        <span class="attribute-label">CAST TYPE</span>
+                        <span id="magic-cast-type" class="attribute-value text-value">--</span>
+                    </div>
+                    <div class="attribute-row">
+                        <span class="attribute-label">TARGET</span>
+                        <span id="magic-target" class="attribute-value text-value">--</span>
+                    </div>
+                    <div class="attribute-row compact-row">
+                        <span class="attribute-label">DURATION</span>
+                        <span id="magic-duration" class="attribute-value text-value">--</span>
+                    </div>
+                    <div class="attribute-row compact-row">
+                        <span class="attribute-label">RANGE</span>
+                        <span id="magic-range" class="attribute-value text-value">--</span>
+                    </div>
+                </div>
+
+                <div class="spell-description">
+                    <span class="description-label">DESCRIPTION</span>
+                    <span id="magic-description" class="description-text">No description available.</span>
+                </div>
+
+                <div id="magic-pin-menu" class="magic-pin-menu">
+                    <button id="magic-pin-dashboard" class="pin-option"><span>DASHBOARD</span></button>
+                    <button id="magic-pin-left" class="pin-option"><span>LEFT HAND</span></button>
+                    <button id="magic-pin-world" class="pin-option"><span>WORLD</span></button>
+                    <button id="magic-pin-label" class="pin-option"><span>LABEL</span></button>
+                </div>
+
+                <div class="magic-actions">
+                    <button id="magic-equip" class="magic-action primary-action"><span id="magic-equip-label">EQUIP</span></button>
+                    <button id="magic-edit" class="magic-action edit-action"><span>EDIT</span></button>
+                    <button id="magic-pin" class="magic-action pin-action"><span>PIN</span></button>
+                </div>
+            </section>
+        </main>
+
+        <div class="player-summary">
+            <div class="summary-block magicka-block">
+                <span class="summary-label">MAGICKA</span>
+                <span id="magic-magicka" class="summary-value">0 / 0</span>
+            </div>
+        </div>
+
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

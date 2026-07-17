@@ -1,0 +1,31 @@
+.mods-app { color: #d8d8d8; background-color: #0e0f0f; border-color: transparent; decorator: image("assets/mods_nordic_bg.png" fill); }
+.mods-sidebar { width: 468px; height: 1076px; padding: 0; background-color: rgba(11, 12, 12, 205); border-right-color: transparent; }
+.mods-sidebar .brand { width: 468px; height: 118px; display: flex; align-items: center; justify-content: center; margin-left: 0; padding: 0; }
+.mods-sidebar .brand-copy { width: 468px; margin-left: 0; }
+.mods-sidebar .brand-name { position: relative; top: 59px; width: 468px; display: flex; justify-content: center; color: #999b9b; font-size: 32px; letter-spacing: 1px; text-align: center; }
+.mods-sidebar .brand-name span { display: block; }
+.mods-sidebar-copy { position: relative; top: 32px; width: 468px; margin: 8px 0 0; color: #a7a9a9; font-size: 36px; line-height: 1.08; text-align: center; }
+.mods-sidebar-line { width: 468px; display: flex; justify-content: center; text-align: center; }
+.mods-sidebar-line span { display: block; }
+.mods-sidebar-gap { display: block; width: 468px; height: 24px; }
+.mods-sidebar-copy strong { color: #eeeeee; font-weight: bold; }
+.mods-shell { position: relative; width: 1448px; height: 1076px; background-color: rgba(12, 13, 13, 118); }
+.mods-header { width: 1448px; height: 145px; padding: 0 72px 0 96px; background-color: rgba(17, 18, 18, 105); border-bottom-color: transparent; }
+.mods-header .breadcrumb { position: relative; top: 28px; color: #eeeeee; font-size: 72px; line-height: 1.0; }
+.mods-header .breadcrumb-muted { color: #898b8b; }
+.mods-header .close-button { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; padding: 0; color: #dedede; font-size: 40px; line-height: 1.0; text-align: center; border-color: #565858; }
+.mods-main { width: 1448px; height: 781px; padding: 42px 42px 30px 96px; background-color: rgba(10, 11, 11, 96); }
+.mods-grid { position: relative; z-index: 2; width: 1310px; display: flex; flex-wrap: wrap; }
+.mod-card { position: relative; z-index: 3; width: 410px; height: 142px; display: flex; align-items: center; justify-content: center; margin: 0 20px 24px 0; padding: 22px 22px; color: #dddddd; font-size: 48px; line-height: 1.15; text-align: center; background-color: rgba(24, 25, 25, 225); border: 1px #606260; border-radius: 3px; tab-index: auto; }
+.mod-card:hover { color: #ffffff; background-color: rgba(43, 44, 44, 238); border-color: #969895; }
+.mod-card-mark { display: block; width: 42px; margin-right: 14px; color: #8b3131; font-size: 28px; text-align: center; pointer-events: none; }
+.mod-card-label { display: block; width: 304px; color: #eeeeee; font-size: 48px; line-height: 1.15; text-align: center; pointer-events: none; }
+.mods-empty { width: 1310px; padding: 90px 0; color: #929494; font-size: 44px; text-align: center; }
+.mods-footer { width: 1448px; height: 150px; display: flex; align-items: center; padding: 0 150px 0 96px; background-color: rgba(15, 16, 16, 105); border-top: 0px transparent; }
+.mods-control-hints { position: relative; top: -26px; display: flex; align-items: center; color: #d0d1d1; font-size: 40px; line-height: 1.1; }
+.mods-control-hints span { display: block; }
+.mods-hint-divider { width: 1px; height: 30px; margin: 0 28px; background-color: #656766; }
+.mods-add-button { position: relative; top: -26px; z-index: 3; width: 200px; height: 58px; display: flex; align-items: center; justify-content: center; color: #fff0f0; font-size: 32px; line-height: 1.1; text-align: center; background-color: #771e1e; border: 1px #a83d3d; border-radius: 5px; tab-index: auto; }
+.mods-add-button:hover { color: #ffffff; background-color: #902828; border-color: #c45555; }
+.mods-add-mark { display: block; width: 28px; color: #f2d7d7; font-size: 27px; text-align: center; pointer-events: none; }
+.mods-add-label { display: block; width: 170px; color: #fff0f0; font-size: 34px; line-height: 1.1; text-align: center; pointer-events: none; }

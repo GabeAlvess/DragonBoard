@@ -29,8 +29,6 @@
 #include "vrui/VRUIInventoryContainer.h"
 #include "vrui/VRUIMagicContainer.h"
 #include "vrui/VRUIFavoritesContainer.h"
-#include "vrui/VRUIModsContainer.h"
-#include "vrui/ModActionManager.h"
 #include "vrui/VRUIMapMarker.h"
 
 using namespace vrui;
@@ -51,6 +49,22 @@ static VRUIButton::PressCallback openGameMenu(const char* menuName)
         VRMenuManager::get().toggleMenu();
         auto* queue = RE::UIMessageQueue::GetSingleton();
         if (queue) queue->AddMessage(menuName, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+    };
+}
+
+static VRUIButton::PressCallback openJournalPanel()
+{
+    return [](VRUIButton*, EquipHand) {
+        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+        if (rmlHost.IsOpen()) {
+            rmlHost.Close();
+            return;
+        }
+
+        auto& manager = VRMenuManager::get();
+        manager.navigateHome();
+        manager.switchToPanel("MainPanel");
+        (void)rmlHost.OpenJournal();
     };
 }
 
@@ -157,7 +171,6 @@ static void ensureDynamicPanel(const std::string& panelName, const std::string& 
     if (type == "Inventory") container = std::make_shared<VRUIInventoryContainer>(panelName + "_Grid");
     else if (type == "Magic")  container = std::make_shared<VRUIMagicContainer>(panelName + "_Grid");
     else if (type == "Favorites") container = std::make_shared<VRUIFavoritesContainer>(panelName + "_Grid");
-    else if (type == "Mods") container = std::make_shared<VRUIModsContainer>(panelName + "_Grid");
 
     if (container) {
         auto& settings = VRUISettings::get();
@@ -312,24 +325,6 @@ static void ensureDynamicPanel(const std::string& panelName, const std::string& 
             finalizeCategoryButtons(buttons, elementIds, navCont);
         }
 
-        if (type == "Mods") {
-            auto addFuncContainer = std::make_shared<VRUIContainer>(panelName + "_AddFuncCont", ContainerLayout::Free);
-            auto addBtn = std::make_shared<VRUIButton>("Add Function", "DragonBoardVR\\IconPlane.nif", "textures\\test.dds", 2.0f, 2.0f);
-
-            addBtn->setOnPressHandler([](VRUIButton*, EquipHand) {
-                VRMenuManager::get().toggleMenu();
-                ModActionManager::get().startListening();
-            });
-
-            addBtn->setLocalPosition({settings.bAddFuncPosX, settings.bAddFuncPosY, settings.bAddFuncPosZ});
-            addBtn->setLocalRotation(RE::NiMatrix3(settings.bAddFuncRotX * 3.14159f/180.f,
-                                                   settings.bAddFuncRotY * 3.14159f/180.f,
-                                                   settings.bAddFuncRotZ * 3.14159f/180.f));
-
-            addFuncContainer->addElement(addBtn);
-            applyJSONTransform(addBtn, "ModsPanel", "Btn_AddFunc");
-            panel->addElement(addFuncContainer);
-        }
     }
 
     manager.registerPanel(panel);
@@ -347,6 +342,7 @@ static VRUIButton::PressCallback resolveFixedButtonAction(const std::string& act
     if (lower == "magicmenu")                               return openGameMenu("MagicMenu");
     if (lower == "mapmenu" || lower == "map")               return openGameMenu("MapMenu");
     if (lower == "tweenmenu")                               return openGameMenu("TweenMenu");
+    if (lower == "journal" || lower == "journalmenu")       return openJournalPanel();
     if (lower == "mcm_panel" || lower == "settings") {
         return [](VRUIButton*, EquipHand) {
             auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
@@ -765,7 +761,7 @@ void dragonboard::ui::menu::Create()
         } else if (lowerAction == "wait" || lowerAction == "sleep") {
             btn->setOnPressHandler(openGameMenu("Sleep/Wait Menu"));
         } else if (lowerAction == "journal") {
-            btn->setOnPressHandler(openGameMenu("Journal Menu"));
+            btn->setOnPressHandler(openJournalPanel());
         } else if (lowerAction == "map") {
             btn->setOnPressHandler(openGameMenu("MapMenu"));
         } else if (lowerAction == "inventory") {

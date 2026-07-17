@@ -9,6 +9,8 @@
 #include "ui/rml/RmlPanelHost.h"
 #include "VRUIHandTracking.h"
 #include "VRUIItemEditPanel.h"
+#include "VRUIInventoryContainer.h"
+#include "VRUIMagicContainer.h"
 #include "VRUISettings.h"
 #include <RE/N/NiNode.h>
 
@@ -54,6 +56,44 @@ namespace vrui
     void VRMenuManager::switchToPanel(const std::string& panelName)
     {
         auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+        if (panelName == "InventoryPanel") {
+            const auto inventoryPanel = findPanelByName("InventoryPanel");
+            const auto previewPanel = findPanelByName("ItemEditPanel");
+            auto* inventory = inventoryPanel ?
+                dynamic_cast<VRUIInventoryContainer*>(
+                    inventoryPanel->findWidgetByName("InventoryPanel_Grid")) : nullptr;
+            auto* preview = previewPanel ?
+                dynamic_cast<VRUIItemEditPanel*>(
+                    previewPanel->findWidgetByName("ItemEditContainer")) : nullptr;
+            if (inventory && preview && rmlHost.OpenInventory(inventory, preview)) {
+                dragonboard::ui::panels::PanelManagementController::SwitchTo(
+                    *this, "ItemEditPanel");
+                return;
+            }
+            logger::warn(
+                "DragonBoardVR: RmlUi inventory unavailable; using classic InventoryPanel.");
+        }
+        if (panelName == "MagicPanel") {
+            const auto magicPanel = findPanelByName("MagicPanel");
+            const auto previewPanel = findPanelByName("ItemEditPanel");
+            auto* magic = magicPanel ?
+                dynamic_cast<VRUIMagicContainer*>(
+                    magicPanel->findWidgetByName("MagicPanel_Grid")) : nullptr;
+            auto* preview = previewPanel ?
+                dynamic_cast<VRUIItemEditPanel*>(
+                    previewPanel->findWidgetByName("ItemEditContainer")) : nullptr;
+            if (magic && preview && rmlHost.OpenMagic(magic, preview)) {
+                dragonboard::ui::panels::PanelManagementController::SwitchTo(
+                    *this, "ItemEditPanel");
+                return;
+            }
+            logger::warn(
+                "DragonBoardVR: RmlUi magic unavailable; using classic MagicPanel.");
+        }
+        if (panelName == "ModsPanel" && rmlHost.OpenMods()) {
+            dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);
+            return;
+        }
         if (panelName == "ItemEditPanel") {
             if (const auto panel = findPanelByName(panelName)) {
                 auto* editor = dynamic_cast<VRUIItemEditPanel*>(
@@ -62,6 +102,8 @@ namespace vrui
                     // Keep only the selected item's 3D preview active behind
                     // the RmlUi surface. The classic editor controls remain
                     // hidden and the source inventory stays detached.
+                    editor->setRmlPreviewLayout(
+                        VRUIItemEditPanel::RmlPreviewLayout::ItemEditor);
                     editor->setRmlPreviewMode(true);
                     dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);
                     return;
@@ -186,6 +228,11 @@ namespace vrui
     void VRMenuManager::onSecondaryButtonChanged(bool pressed)
     {
         _inputButtons.SetSecondary(pressed);
+    }
+
+    void VRMenuManager::onDominantSecondaryButtonChanged(bool pressed)
+    {
+        _inputButtons.SetDominantSecondary(pressed);
     }
 
     void VRMenuManager::onHotkey8ButtonChanged(bool pressed)

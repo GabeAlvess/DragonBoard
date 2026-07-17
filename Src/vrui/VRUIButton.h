@@ -39,7 +39,6 @@ namespace vrui
                    float itemRotX, float itemRotY, float itemRotZ,
                    float itemXOffset, float itemYOffset, float itemZOffset,
                    float itemScaleMult, bool deferInit = false);
-
         void update(float deltaTime) override;
         void setLocalScale(float scale) override;
 
@@ -136,7 +135,7 @@ namespace vrui
         bool showLabelsOnHoverOnly() const { return _showLabelsOnHoverOnly; }
         
         // --- Dashboard / HIGGS Proximity Equip ---
-        void setDashboardPinned(bool pinned) { _isDashboardPinned = pinned; }
+        void setDashboardPinned(bool pinned);
         bool isDashboardPinned() const { return _isDashboardPinned; }
         void setAmbientWiggleEnabled(bool enabled) { _ambientWiggleEnabled = enabled; }
         bool isAmbientWiggleEnabled() const { return _ambientWiggleEnabled; }
@@ -160,6 +159,10 @@ namespace vrui
         bool persistsItemRotationOnGrab() const { return _persistItemRotationOnGrab; }
         RE::NiNode* getPrimaryVisualNode() const { return _primaryVisualNode.get(); }
         void setPrimaryVisualTransform(const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scaleMult);
+        bool getPrimaryVisualTransform(
+            RE::NiPoint3& pos,
+            RE::NiMatrix3& rot,
+            float& scaleMult) const;
 
     private:
 

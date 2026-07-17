@@ -2,6 +2,7 @@
 
 #include "VRUIDynamicContainer.h"
 #include <cstdint>
+#include <functional>
 #include <string>
 
 namespace vrui
@@ -9,6 +10,16 @@ namespace vrui
     class VRUIItemEditPanel : public VRUIDynamicContainer
     {
     public:
+        using InventoryPreviewInteractionHandler =
+            std::function<void(std::uint32_t, EquipHand)>;
+
+        enum class RmlPreviewLayout : std::uint8_t
+        {
+            ItemEditor,
+            Inventory,
+            Magic
+        };
+
         struct EditState
         {
             std::string category;
@@ -29,6 +40,9 @@ namespace vrui
             bool canPinToWorld = false;
         };
 
+        using WorkingTransformChangedHandler =
+            std::function<void(const EditState&)>;
+
         explicit VRUIItemEditPanel(const std::string& name);
 
         void setTargetItem(const std::string& category, const std::string& itemName, const std::string& modelPath, uint32_t formID,
@@ -38,6 +52,14 @@ namespace vrui
         void refresh() override;
         void updatePreview();
         void setRmlPreviewMode(bool enabled);
+        void setRmlPreviewLayout(RmlPreviewLayout layout);
+        void setInventoryPreviewInteractionHandler(
+            InventoryPreviewInteractionHandler handler);
+        void setWorkingTransformChangedHandler(
+            WorkingTransformChangedHandler handler)
+        {
+            _workingTransformChangedHandler = std::move(handler);
+        }
         void setEditPage(int index);
 
         // Game-thread backend used by both the classic 3D editor and the
@@ -56,6 +78,7 @@ namespace vrui
     private:
         void saveOffsets();
         void syncRotationFromPreviewGrab(const RE::NiMatrix3& localRotation);
+        void updateInventoryPreviewInteraction();
 
         std::string _targetCategory;
         std::string _targetItemName;
@@ -68,6 +91,9 @@ namespace vrui
         float _baseScaleMult = 4.0f;
         float _normalizedScale = 1.0f;
         bool _rmlPreviewMode = false;
+        RmlPreviewLayout _rmlPreviewLayout = RmlPreviewLayout::ItemEditor;
+        InventoryPreviewInteractionHandler _inventoryPreviewInteractionHandler;
+        WorkingTransformChangedHandler _workingTransformChangedHandler;
 
         int _activeTab = 0;
         std::vector<std::shared_ptr<VRUIContainer>> _editPages;

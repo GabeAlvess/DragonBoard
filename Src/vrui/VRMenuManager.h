@@ -181,6 +181,9 @@ namespace vrui
         /// Notify that the secondary button (Y/B) state changed (keyCode 1)
         void onSecondaryButtonChanged(bool pressed);
 
+        /// Notify that Y/B changed specifically on the dominant laser hand.
+        void onDominantSecondaryButtonChanged(bool pressed);
+
         /// Notify that Hotkey8 (Keyboard 8 or VR mapped button) state changed
         void onHotkey8ButtonChanged(bool pressed);
 
@@ -283,6 +286,7 @@ namespace vrui
         dragonboard::ui::input::PressHoldTracker _dominantTriggerTracker;
         dragonboard::ui::input::PressHoldTracker _offhandTriggerTracker;
         dragonboard::ui::input::PressHoldTracker _secondaryButtonTracker;
+        dragonboard::ui::input::PressHoldTracker _dominantSecondaryButtonTracker;
         dragonboard::ui::input::InteractionFocusState _interactionFocus;
 
         dragonboard::core::DeferredTaskQueue _deferredTasks;

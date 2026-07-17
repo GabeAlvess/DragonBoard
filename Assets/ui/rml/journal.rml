@@ -1,0 +1,90 @@
+<rml>
+<head>
+    <title>DragonBoard Journal</title>
+    <link type="text/rcss" href="settings.rcss" />
+    <link type="text/rcss" href="dev.rcss" />
+    <link type="text/rcss" href="journal.rcss" />
+</head>
+<body>
+    <div id="app" class="dev-app journal-app">
+        <aside class="dev-sidebar journal-sidebar">
+            <div class="brand">
+                <div class="brand-copy">
+                    <div class="brand-name"><span>DragonBoard / Journal</span></div>
+                </div>
+            </div>
+
+            <div class="journal-player">
+                <span id="journal-player-name">Dragonborn</span>
+                <span class="journal-player-level">LEVEL <span id="journal-player-level">1</span></span>
+            </div>
+
+            <div id="journal-quest-list" class="journal-quest-list">
+                <div class="journal-empty">Loading journal...</div>
+            </div>
+        </aside>
+
+        <div class="content-shell dev-shell journal-shell">
+            <header class="dev-header journal-header">
+                <div class="breadcrumb"><span>Journal</span></div>
+                <div class="journal-top-tabs">
+                    <button id="journal-tab-quests" class="journal-top-tab active"><span>Quests</span></button>
+                    <button id="journal-tab-stats" class="journal-top-tab"><span>Statistics</span></button>
+                    <button id="journal-settings" class="journal-top-tab journal-config"><span>Settings</span></button>
+                </div>
+                <button id="journal-close" class="close-button"><span>X</span></button>
+            </header>
+
+            <main class="dev-main journal-main">
+                <section id="journal-page-quests" class="page dev-page journal-page">
+                    <div class="journal-workspace">
+                        <div class="journal-details-card">
+                            <div class="subheading">
+                                <span id="journal-quest-type">QUEST DETAILS</span>
+                                <span id="journal-tracking-state" class="journal-tracking-state">NOT TRACKED</span>
+                            </div>
+                            <div id="journal-quest-title" class="command-title journal-title">No quest selected</div>
+                            <div id="journal-quest-summary" class="command-description journal-summary">
+                                Quest information will appear here.
+                            </div>
+
+                            <div class="journal-objectives-heading"><span>OBJECTIVES</span></div>
+                            <div id="journal-objective-list" class="journal-objective-list">
+                                <div class="journal-empty">No objectives available.</div>
+                            </div>
+
+                        </div>
+                    </div>
+                </section>
+
+                <section id="journal-page-stats" class="page dev-page journal-page">
+                    <div class="journal-stats-grid">
+                        <div class="info-card journal-stat-card">
+                            <div class="subheading"><span>CHARACTER</span></div>
+                            <div id="journal-character-stats"></div>
+                        </div>
+                        <div class="info-card journal-stat-card journal-skills-card">
+                            <div class="subheading"><span>SKILLS</span></div>
+                            <div id="journal-skill-stats" class="journal-skills-list"></div>
+                        </div>
+                        <div class="info-card journal-stat-card last-info-card">
+                            <div class="subheading"><span>JOURNAL</span></div>
+                            <div id="journal-general-stats"></div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="dev-footer journal-footer">
+                <div class="journal-footer-active">
+                    <span id="journal-active-quest">Active quest: None</span>
+                </div>
+                <button id="journal-toggle-tracking" class="execute-button journal-track-button">
+                    <span>Track quest</span>
+                </button>
+            </footer>
+        </div>
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

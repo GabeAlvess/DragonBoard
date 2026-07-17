@@ -5,63 +5,59 @@
     <link type="text/rcss" href="dev.rcss" />
 </head>
 <body>
-    <div id="app">
-        <aside>
+    <div id="app" class="dev-app">
+        <aside class="dev-sidebar">
             <div class="brand">
                 <div class="brand-copy">
-                    <div class="brand-name">DragonBoard</div><br />
-                    <div class="brand-edition">DEVELOPER</div>
+                    <div class="brand-name"><span>DragonBoard / Dev</span></div>
                 </div>
             </div>
 
-            <div class="section-label">DEVELOPER TOOLS</div>
-            <button id="dev-tab-commands" class="nav-item"><span>Console commands</span></button>
-            <button id="dev-tab-info" class="nav-item"><span>Game information</span></button>
+            <div class="dev-nav">
+                <button id="dev-tab-commands" class="nav-item"><span>Console commands</span></button>
+                <button id="dev-tab-info" class="nav-item"><span>Game information</span></button>
+            </div>
 
             <div class="sidebar-status developer-status">
-                <div><span class="status-dot warning-dot"></span><span>Developer mode</span></div>
-                <div class="version">Use commands with care</div>
+                <div class="developer-status-line"><span>Developer mode</span></div>
             </div>
         </aside>
 
-        <div class="content-shell">
-            <header>
-                <div class="breadcrumb"><span class="breadcrumb-muted">DragonBoard</span><span class="breadcrumb-slash">/</span><span>Developer</span></div>
-                <button id="dev-close" class="close-button"><span>Close</span><span class="keycap">B</span></button>
+        <div class="content-shell dev-shell">
+            <header class="dev-header">
+                <div class="breadcrumb"><span>Dev</span></div>
+                <button id="dev-close" class="close-button"><span>X</span></button>
             </header>
 
-            <main id="page-scroll">
+            <main id="page-scroll" class="dev-main">
                 <section id="dev-page-commands" class="page dev-page">
-                    <div class="page-eyebrow">TOOLS</div>
-                    <h1>Console commands</h1>
-                    <p class="lead dev-lead">Inspect and execute configured Skyrim console actions.</p>
                     <div class="command-workspace">
                         <div class="command-list-panel">
-                            <div class="subheading">AVAILABLE COMMANDS</div>
+                            <div class="subheading"><span>AVAILABLE COMMANDS</span></div>
                             <div id="dev-command-list" class="command-list"></div>
                         </div>
 
                         <div class="command-details">
-                            <div class="subheading">COMMAND DETAILS</div><br />
-                            <div id="dev-command-title" class="command-title">No command selected</div><br />
-                            <div id="dev-command-description" class="command-description"></div><br />
-                            <div class="console-label">CONSOLE INPUT</div><br />
-                            <div id="dev-command-input" class="console-input"></div><br />
+                            <div class="subheading"><span>COMMAND DETAILS</span></div>
+                            <div id="dev-command-title" class="command-title">No command selected</div>
+                            <div id="dev-command-description" class="command-description"></div>
+                            <div class="console-label"><span>CONSOLE INPUT</span></div>
+                            <div id="dev-command-input" class="console-input"></div>
                             <div id="dev-command-warning" class="warning">
                                 This command closes DragonBoard and runs after a safe delay.
                             </div>
-                            <button id="dev-execute" class="execute-button">Execute command</button>
+                            <div class="command-actions">
+                                <button id="dev-add-command" class="add-command-button"><span>Add command</span></button>
+                                <button id="dev-execute" class="execute-button"><span>Execute command</span></button>
+                            </div>
                         </div>
                     </div>
                 </section>
 
                 <section id="dev-page-info" class="page dev-page">
-                    <div class="page-eyebrow">DIAGNOSTICS</div>
-                    <h1>Game information</h1>
-                    <p class="lead dev-lead">Live runtime and location information.</p>
                     <div class="info-grid">
                         <div class="info-card">
-                            <div class="subheading">PERFORMANCE</div>
+                            <div class="subheading"><span>PERFORMANCE</span></div>
                             <div class="info-row"><span>FPS (Present)</span><span id="dev-fps" class="info-value">0.0</span></div>
                             <div class="info-row"><span>Frame time</span><span id="dev-frame-time" class="info-value">0.00 ms</span></div>
                             <div class="info-row"><span>Panel draw calls</span><span id="dev-draw-calls" class="info-value">0</span></div>
@@ -69,7 +65,7 @@
                         </div>
 
                         <div class="info-card last-info-card">
-                            <div class="subheading">RUNTIME</div>
+                            <div class="subheading"><span>RUNTIME</span></div>
                             <div class="info-row"><span>Panel texture</span><span id="dev-texture-size" class="info-value">1920 x 1080</span></div>
                             <div class="info-row"><span>Panel renderer</span><span class="info-value">RmlUi 6.2</span></div>
                             <div class="info-row"><span>DragonBoardVR</span><span id="dev-version" class="info-value">-</span></div>
@@ -77,8 +73,8 @@
                         </div>
                     </div>
 
-                    <div class="location-card">
-                        <div class="subheading">PLAYER AND LOCATION</div>
+                    <div class="info-card location-card">
+                        <div class="subheading"><span>PLAYER AND LOCATION</span></div>
                         <div class="info-row"><span>Player position</span><span id="dev-player-position" class="info-value">X 0.0   Y 0.0   Z 0.0</span></div>
                         <div class="info-row"><span>Cell</span><span id="dev-cell" class="info-value">&lt;none&gt;</span></div>
                         <div class="info-row"><span>Cell FormID</span><span id="dev-cell-form" class="info-value">00000000</span></div>
@@ -88,8 +84,12 @@
                 </section>
             </main>
 
-            <footer>
-                <div class="footer-spacer"></div>
+            <footer class="dev-footer">
+                <div class="dev-footer-hints">
+                    <span>USE COMMANDS WITH CARE</span>
+                    <span class="dev-hint-divider"></span>
+                    <span>CAN BREAK YOUR SAVE</span>
+                </div>
             </footer>
         </div>
         <div id="vr-cursor"></div>

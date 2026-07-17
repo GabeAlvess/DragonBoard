@@ -5,8 +5,8 @@
     <link type="text/rcss" href="edit.rcss" />
 </head>
 <body>
-    <div id="app">
-        <aside>
+    <div id="app" class="edit-app">
+        <aside class="edit-sidebar">
             <div class="brand">
                 <div class="brand-copy">
                     <div class="brand-name">DragonBoard</div><br />
@@ -15,8 +15,8 @@
             </div>
 
             <div class="item-summary">
-                <div class="summary-label">EDITING</div><br />
-                <div id="edit-item-name" class="summary-name">Item</div><br />
+                <div class="summary-label">EDITING</div>
+                <div id="edit-item-name" class="summary-name">Item</div>
                 <div class="summary-meta"><span id="edit-category">Category</span><span class="meta-separator">/</span><span id="edit-form-id">00000000</span></div>
             </div>
 
@@ -24,7 +24,7 @@
             <button id="edit-tab-position" class="nav-item"><span>Position</span></button>
             <button id="edit-tab-rotation" class="nav-item"><span>Rotation</span></button>
             <button id="edit-tab-scale" class="nav-item"><span>Scale</span></button>
-            <button id="edit-tab-pin" class="nav-item"><span>Pin and label</span></button>
+            <button id="edit-tab-pin" class="nav-item"><span>Pin</span></button>
 
             <div class="sidebar-status">
                 <div><span class="status-dot edit-dot"></span><span>Live item draft</span></div>
@@ -32,75 +32,74 @@
             </div>
         </aside>
 
-        <div class="content-shell">
-            <header>
+        <div class="content-shell edit-shell">
+            <header class="edit-header">
                 <div class="breadcrumb"><span class="breadcrumb-muted">DragonBoard</span><span class="breadcrumb-slash">/</span><span>Item editor</span></div>
-                <button id="edit-close" class="close-button"><span>Close</span><span class="keycap">B</span></button>
+                <button id="edit-close" class="close-button"><span>Close</span></button>
             </header>
 
-            <main class="edit-main">
-                <section id="edit-page-position" class="page edit-page">
-                    <div class="page-eyebrow">LOCAL TRANSFORM</div>
-                    <h1>Position</h1>
-                    <p class="lead">Move the item relative to its container or pin anchor.</p>
-                    <div class="settings-card edit-card">
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">X axis</span><span class="setting-help">Left and right</span></div><input id="editPosX" type="range" class="range" min="-20" max="20" step="0.1" value="0" /><span id="value-editPosX" class="value">0.00</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Y axis</span><span class="setting-help">Near and far</span></div><input id="editPosY" type="range" class="range" min="-20" max="20" step="0.1" value="0" /><span id="value-editPosY" class="value">0.00</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Z axis</span><span class="setting-help">Down and up</span></div><input id="editPosZ" type="range" class="range" min="-20" max="20" step="0.1" value="0" /><span id="value-editPosZ" class="value">0.00</span></div>
+            <div class="editor-workspace">
+                <section class="preview-stage">
+                    <div class="preview-circle">
+                        <div class="preview-horizon"></div>
+                        <div class="preview-center-mark"></div>
                     </div>
                 </section>
 
-                <section id="edit-page-rotation" class="page edit-page">
-                    <div class="page-eyebrow">LOCAL TRANSFORM</div>
-                    <h1>Rotation</h1>
-                    <p class="lead">Orient the item independently on each axis.</p>
-                    <div class="settings-card edit-card">
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">X axis</span><span class="setting-help">Pitch</span></div><input id="editRotX" type="range" class="range" min="-180" max="180" step="1" value="0" /><span id="value-editRotX" class="value">0.0 deg</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Y axis</span><span class="setting-help">Yaw</span></div><input id="editRotY" type="range" class="range" min="-180" max="180" step="1" value="0" /><span id="value-editRotY" class="value">0.0 deg</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Z axis</span><span class="setting-help">Roll</span></div><input id="editRotZ" type="range" class="range" min="-180" max="180" step="1" value="0" /><span id="value-editRotZ" class="value">0.0 deg</span></div>
-                    </div>
-                </section>
-
-                <section id="edit-page-scale" class="page edit-page">
-                    <div class="page-eyebrow">LOCAL TRANSFORM</div>
-                    <h1>Scale</h1>
-                    <p class="lead">Adjust the per-item size override.</p>
-                    <div class="settings-card edit-card single-card">
-                        <div class="setting-row featured"><div class="setting-copy"><span class="setting-label">Item scale</span><span class="setting-help">Allowed range: 0.01 to 5.00</span></div><input id="editScale" type="range" class="range" min="0.01" max="5" step="0.01" value="1" /><span id="value-editScale" class="value">1.00</span></div>
-                    </div>
-                    <div class="hint"><span class="hint-icon">i</span><span>Apply Item affects only this form. Apply Category makes this transform the default for its category.</span></div>
-                </section>
-
-                <section id="edit-page-pin" class="page edit-page">
-                    <div class="page-eyebrow">QUICK ACCESS</div>
-                    <h1>Pin and label</h1>
-                    <p class="lead">Choose where this item appears outside its source container.</p>
-                    <div class="pin-grid">
-                        <div id="edit-pin-dashboard" class="pin-card" tabindex="0">
-                            <span class="pin-title">Pin to dashboard</span>
-                            <span id="edit-pin-dashboard-state" class="pin-description">Attach this item to the dashboard</span>
+                <main class="edit-main">
+                    <section id="edit-page-position" class="page edit-page">
+                        <div class="page-eyebrow">LOCAL TRANSFORM</div>
+                        <h1>Position</h1>
+                        <div class="settings-card edit-card">
+                            <div class="setting-row"><div class="setting-copy"><span class="setting-label">X axis</span><span class="setting-help">Left and right</span></div><input id="editPosX" type="range" class="range" min="-20" max="20" step="0.1" value="0" /><span id="value-editPosX" class="value">0.00</span></div>
+                            <div class="setting-row"><div class="setting-copy"><span class="setting-label">Y axis</span><span class="setting-help">Near and far</span></div><input id="editPosY" type="range" class="range" min="-20" max="20" step="0.1" value="0" /><span id="value-editPosY" class="value">0.00</span></div>
+                            <div class="setting-row"><div class="setting-copy"><span class="setting-label">Z axis</span><span class="setting-help">Down and up</span></div><input id="editPosZ" type="range" class="range" min="-20" max="20" step="0.1" value="0" /><span id="value-editPosZ" class="value">0.00</span></div>
                         </div>
-                        <div id="edit-toggle-label" class="pin-card" tabindex="0">
-                            <span class="pin-title">Pinned label</span>
-                            <span class="pin-description">Current state: <span id="edit-label-state">Visible</span></span>
+                    </section>
+
+                    <section id="edit-page-rotation" class="page edit-page">
+                        <div class="page-eyebrow">LOCAL TRANSFORM</div>
+                        <h1>Rotation</h1>
+                        <div class="settings-card edit-card">
+                            <div class="setting-row"><div class="setting-copy"><span class="setting-label">X axis</span><span class="setting-help">Pitch</span></div><input id="editRotX" type="range" class="range" min="-180" max="180" step="1" value="0" /><span id="value-editRotX" class="value">0.0 deg</span></div>
+                            <div class="setting-row"><div class="setting-copy"><span class="setting-label">Y axis</span><span class="setting-help">Yaw</span></div><input id="editRotY" type="range" class="range" min="-180" max="180" step="1" value="0" /><span id="value-editRotY" class="value">0.0 deg</span></div>
+                            <div class="setting-row"><div class="setting-copy"><span class="setting-label">Z axis</span><span class="setting-help">Roll</span></div><input id="editRotZ" type="range" class="range" min="-180" max="180" step="1" value="0" /><span id="value-editRotZ" class="value">0.0 deg</span></div>
                         </div>
-                    </div>
-                    <div id="edit-magic-pin-actions" class="magic-pin-actions">
-                        <div class="group-label pin-group-label">MAGIC ITEM ANCHORS</div>
+                    </section>
+
+                    <section id="edit-page-scale" class="page edit-page">
+                        <div class="page-eyebrow">LOCAL TRANSFORM</div>
+                        <h1>Scale</h1>
+                        <div class="settings-card edit-card single-card">
+                            <div class="setting-row featured"><div class="setting-copy"><span class="setting-label">Item scale</span><span class="setting-help">0.01 to 5.00</span></div><input id="editScale" type="range" class="range" min="0.01" max="5" step="0.01" value="1" /><span id="value-editScale" class="value">1.00</span></div>
+                        </div>
+                        <div class="hint"><span class="hint-icon">i</span><span>Apply Item changes this form. Apply Category stores the category default.</span></div>
+                    </section>
+
+                    <section id="edit-page-pin" class="page edit-page">
+                        <div class="page-eyebrow">QUICK ACCESS</div>
+                        <h1>Pin and label</h1>
                         <div class="pin-grid">
-                            <div id="edit-pin-left" class="pin-card" tabindex="0"><span class="pin-title">Pin to left hand</span><span class="pin-description">Follow the configured hand anchor</span></div>
-                            <div id="edit-pin-world" class="pin-card" tabindex="0"><span class="pin-title">Pin to world</span><span id="edit-pin-world-state" class="pin-description">Preserve the current world pose</span></div>
+                            <div id="edit-pin-dashboard" class="pin-card" tabindex="0"><span class="pin-title">Pin to dashboard</span><span id="edit-pin-dashboard-state" class="pin-description">Attach this item to the dashboard</span></div>
+                            <div id="edit-toggle-label" class="pin-card" tabindex="0"><span class="pin-title">Pinned label</span><span class="pin-description">Current state: <span id="edit-label-state">Visible</span></span></div>
                         </div>
-                    </div>
-                </section>
-            </main>
+                        <div id="edit-magic-pin-actions" class="magic-pin-actions">
+                            <div class="group-label pin-group-label">MAGIC ITEM ANCHORS</div>
+                            <div class="pin-grid">
+                                <div id="edit-pin-left" class="pin-card" tabindex="0"><span class="pin-title">Pin to left hand</span><span class="pin-description">Follow the configured hand anchor</span></div>
+                                <div id="edit-pin-world" class="pin-card" tabindex="0"><span class="pin-title">Pin to world</span><span id="edit-pin-world-state" class="pin-description">Preserve the current world pose</span></div>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            </div>
 
             <footer class="edit-footer">
-                <button id="edit-back" class="classic-button"><span>Back</span><span class="keycap">B</span></button>
-                <button id="edit-reset" class="reset-button" data-haptic="strong">Reset item</button>
+                <button id="edit-back" class="classic-button"><span>Back</span></button>
                 <div class="footer-spacer"></div>
+                <button id="edit-reset" class="reset-button" data-haptic="strong">Reset item</button>
                 <button id="edit-apply-category" class="category-button">Apply category</button>
-                <button id="edit-apply-item" class="save-button"><span>Apply item</span><span class="keycap light">A</span></button>
+                <button id="edit-apply-item" class="save-button"><span>Apply item</span></button>
             </footer>
         </div>
         <div id="vr-cursor"></div>

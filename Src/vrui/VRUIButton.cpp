@@ -22,6 +22,7 @@
 namespace vrui
 {
     int VRUIButton::s_visualsLoadedThisFrame = 0;
+
     static RE::NiPoint3 rotateVector(const RE::NiMatrix3& mat, const RE::NiPoint3& vec) {
         return mat * vec;
     }
@@ -385,7 +386,15 @@ namespace vrui
                 const bool hasCompass = pathLower.find("compass") != std::string::npos;
                 const bool hasPotion = pathLower.find("potion") != std::string::npos;
 
-                isWorldItem = hasWeapons || hasShield || hasClutter || hasArmor || hasJewelry ||
+                // Only DragonBoard's own UI meshes are safe to treat as flat
+                // planes. Spell inventory-art NIFs frequently live under
+                // paths such as DLC folders that contain none of the keywords
+                // above. Treating those external 3D meshes as UI planes puts
+                // non-uniform scale into the rotation matrix and makes pinned
+                // magic appear stretched after FixedWidgetPresenter rebuilds
+                // it on the dashboard.
+                isWorldItem = !isInternalUiMesh ||
+                              hasWeapons || hasShield || hasClutter || hasArmor || hasJewelry ||
                               hasAlchemy || hasFood || hasClothes || hasBook || hasScroll ||
                               hasKey || hasMisc || hasIngredients || hasIngredient || hasSkooma ||
                               hasFlora || hasPlants || hasFlowers || hasNature || hasLandscape ||
@@ -413,9 +422,24 @@ namespace vrui
                     userMultiplier = 1.0f; 
                 }
 
-                // Apply dynamic scale * user multiplier relative to the 1.0 Normalized object
-                loaded->local.scale *= (buttonTargetSize * userMultiplier);
-                const float referenceVisualScale = loaded->local.scale;
+                // Keep the automatic pivot correction on the loaded NIF itself and
+                // apply all editable transforms to a separate parent.  Applying
+                // position/rotation directly to `loaded` used to overwrite the
+                // translation produced by normalizeAndCenterModel(), so models with
+                // off-centre authoring pivots jumped to different places in a slot.
+                auto visualTransform = RE::NiPointer<RE::NiNode>(RE::NiNode::Create());
+                if (!visualTransform) {
+                    logger::warn("DragonBoardVR: Button '{}' could not create primary visual transform", _label);
+                    return;
+                }
+                visualTransform->name = "PrimaryVisualTransform";
+                visualTransform->AttachChild(loaded.get());
+
+                // The child is normalized to one model-space unit.  The parent
+                // supplies the slot size and remains the node edited/grabbed by the
+                // user, preserving the normalized child's scale and centre offset.
+                visualTransform->local.scale = buttonTargetSize * userMultiplier;
+                const float referenceVisualScale = visualTransform->local.scale;
 
                 // 4. Rotation Logic
                 if (!isWorldItem) {
@@ -423,13 +447,13 @@ namespace vrui
                     constexpr float kMeshRotX = 90.0f  * kDegToRad;
                     constexpr float kMeshRotY =  0.0f  * kDegToRad;
                     constexpr float kMeshRotZ = 180.0f * kDegToRad;
-                    loaded->local.rotate.SetEulerAnglesXYZ(kMeshRotX, kMeshRotY, kMeshRotZ);
+                    visualTransform->local.rotate.SetEulerAnglesXYZ(kMeshRotX, kMeshRotY, kMeshRotZ);
 
                     float scaleX = _width / 2.0f;
                     float scaleZ = _height / 2.0f;
                     for (int i = 0; i < 3; ++i) {
-                        loaded->local.rotate.entry[i][0] *= scaleX;
-                        loaded->local.rotate.entry[i][2] *= scaleZ;
+                        visualTransform->local.rotate.entry[i][0] *= scaleX;
+                        visualTransform->local.rotate.entry[i][2] *= scaleZ;
                     }
                 } else {
                     // World items: default rotation -90/-90/-90 (override per-item with NaN sentinel)
@@ -440,33 +464,33 @@ namespace vrui
 
                     RE::NiMatrix3 baseRot{};
                     baseRot.SetEulerAnglesXYZ(rotX * kDegToRad, rotY * kDegToRad, rotZ * kDegToRad);
-                    loaded->local.rotate = baseRot;
+                    visualTransform->local.rotate = baseRot;
 
                     // Apply per-item scale multiplier (e.g. 0.5 for bows)
                     if (_itemScaleMult != 1.0f) {
-                        loaded->local.scale *= _itemScaleMult;
+                        visualTransform->local.scale *= _itemScaleMult;
                     }
 
                     // Apply per-item position offsets (to separate model from label)
-                    loaded->local.translate.x += _itemXOffset;
-                    loaded->local.translate.y += _itemYOffset;
-                    loaded->local.translate.z += _itemZOffset;
+                    visualTransform->local.translate.x += _itemXOffset;
+                    visualTransform->local.translate.y += _itemYOffset;
+                    visualTransform->local.translate.z += _itemZOffset;
                 }
 
-                loaded->local.translate.x += _visualOffsetX;
-                loaded->local.translate.y += _visualOffsetY;
-                loaded->local.translate.z += _visualOffsetZ;
+                visualTransform->local.translate.x += _visualOffsetX;
+                visualTransform->local.translate.y += _visualOffsetY;
+                visualTransform->local.translate.z += _visualOffsetZ;
                 
-                getVisualParentNode()->AttachChild(loaded.get());
-                _primaryVisualNode = loaded;
+                getVisualParentNode()->AttachChild(visualTransform.get());
+                _primaryVisualNode = visualTransform;
                 _primaryVisualReferenceScale = referenceVisualScale;
 
                 RE::NiUpdateData finalUpdate;
-                loaded->Update(finalUpdate);
+                visualTransform->Update(finalUpdate);
 
                 successfullyLoaded = true;
                 logger::trace("DragonBoardVR: Button '{}' loaded NIF (world={}) finalScale={:.3f}", 
-                    _label, isWorldItem, loaded->local.scale);
+                    _label, isWorldItem, visualTransform->local.scale);
             }
         }
 
@@ -826,6 +850,27 @@ namespace vrui
         }
     }
 
+    bool VRUIButton::getPrimaryVisualTransform(
+        RE::NiPoint3& pos,
+        RE::NiMatrix3& rot,
+        float& scaleMult) const
+    {
+        if (!_primaryVisualNode) {
+            return false;
+        }
+
+        pos = {
+            _primaryVisualNode->local.translate.x - _visualOffsetX,
+            _primaryVisualNode->local.translate.y - _visualOffsetY,
+            _primaryVisualNode->local.translate.z - _visualOffsetZ
+        };
+        rot = _primaryVisualNode->local.rotate;
+        scaleMult = _primaryVisualReferenceScale > 0.0001f ?
+            _primaryVisualNode->local.scale / _primaryVisualReferenceScale :
+            _itemScaleMult;
+        return true;
+    }
+
     void VRUIButton::setWorldLockedToHeadSpace(bool enabled, const RE::NiPoint3& worldPos,
                                                const RE::NiMatrix3& worldRot, float worldScale,
                                                const RE::NiPoint3&)
@@ -1147,7 +1192,7 @@ namespace vrui
         }
 
         // --- HIGGS Dashboard Proximity Equip ---
-        if (_isDashboardPinned && _onPressHandler && _node) {
+        if (_isDashboardPinned && _onPressHandler && _node && isVisible()) {
             bool isDomGripDown = VRMenuManager::get().isDominantGripButtonDown();
             bool isOffGripDown = VRMenuManager::get().isOffhandGripButtonDown();
 
@@ -1731,8 +1776,30 @@ namespace vrui
             _onGrabReleaseHandler(this);
         }
 
-        if (refreshPanelsAfterRelease) {
+        // An owning editor callback keeps its live preview and source state in
+        // sync. Rebuilding all dynamic containers here would immediately
+        // reapply a second transform and make the item jump after release.
+        if (refreshPanelsAfterRelease && !_onGrabReleaseHandler) {
             VRMenuManager::get().refreshActiveDynamicContainers();
+        }
+    }
+
+    void VRUIButton::setDashboardPinned(bool pinned)
+    {
+        if (_isDashboardPinned == pinned) {
+            return;
+        }
+
+        _isDashboardPinned = pinned;
+        _wasInHiggsProximity = false;
+        _higgsProximityIsLeft = false;
+        _wasDominantGripDown = pinned ?
+            VRMenuManager::get().isDominantGripButtonDown() : false;
+        _wasNonDominantGripDown = pinned ?
+            VRMenuManager::get().isOffhandGripButtonDown() : false;
+
+        if (!pinned && _state == ButtonState::Normal && !_isGrabbed) {
+            _targetScale = _baseScale;
         }
     }
 

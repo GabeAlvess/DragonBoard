@@ -8,8 +8,7 @@
         <aside>
             <div class="brand">
                 <div class="brand-copy">
-                    <div class="brand-name">DragonBoard</div><br />
-                    <div class="brand-edition">VR CONFIGURATION</div>
+                    <div class="brand-name">DragonBoard</div>
                 </div>
             </div>
 
@@ -24,12 +23,11 @@
         <div class="content-shell">
             <header>
                 <div class="breadcrumb"><span class="breadcrumb-muted">Configuration</span><span class="breadcrumb-slash">/</span><span>DragonBoard</span></div>
-                <button id="close" class="close-button"><span>Close</span><span class="keycap">B</span></button>
+                <button id="close" class="close-button"><span>Close</span></button>
             </header>
 
             <main id="page-scroll">
                 <section id="page-general" class="page">
-                    <div class="page-eyebrow">BOARD BEHAVIOR</div>
                     <h1>General</h1>
                     <p class="lead">Adjust the overall size and spacing of your board.</p>
                     <div class="settings-card">
@@ -69,7 +67,6 @@
                 </section>
 
                 <section id="page-position" class="page">
-                    <div class="page-eyebrow">HAND ANCHOR</div>
                     <h1>Position</h1>
                     <p class="lead">Place and orient the board relative to your hand.</p>
                     <div class="group-label">POSITION</div>
@@ -87,7 +84,6 @@
                 </section>
 
                 <section id="page-visuals" class="page">
-                    <div class="page-eyebrow">APPEARANCE</div>
                     <h1>Visuals</h1>
                     <p class="lead">Fine-tune the scale of the board's 3D elements.</p>
                     <div class="settings-card">
@@ -99,7 +95,6 @@
                 </section>
 
                 <section id="page-items" class="page">
-                    <div class="page-eyebrow">INVENTORY</div>
                     <h1>Item scale</h1>
                     <p class="lead">Set a comfortable display size for each item category.</p>
                     <div class="settings-card">
@@ -112,7 +107,6 @@
                 </section>
 
                 <section id="page-labels" class="page">
-                    <div class="page-eyebrow">READABILITY</div>
                     <h1>Labels</h1>
                     <p class="lead">Control label size, spacing and local offsets.</p>
                     <div class="settings-card compact">
@@ -131,7 +125,7 @@
             <footer>
                 <div class="footer-spacer"></div>
                 <div class="save-status">Ready to save</div>
-                <button id="save" class="save-button"><span>Save changes</span><span class="keycap light">A</span></button>
+                <button id="save" class="save-button"><span>Save changes</span></button>
             </footer>
         </div>
         <div id="vr-cursor"></div>

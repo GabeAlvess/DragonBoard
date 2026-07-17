@@ -32,8 +32,11 @@ namespace
 
     constexpr int kCanvasWidth = 1920;
     constexpr int kCanvasHeight = 1080;
-    constexpr int kWindowWidth = 1600;
-    constexpr int kWindowHeight = 900;
+    // Keep the client surface identical to the RmlUi canvas. A smaller DXGI
+    // window clips the 1920x1080 back buffer instead of scaling it, hiding the
+    // right and bottom edges from visual-review screenshots.
+    constexpr int kWindowWidth = kCanvasWidth;
+    constexpr int kWindowHeight = kCanvasHeight;
     constexpr const char* kContextName = "dragonboard_rml_preview";
     constexpr UINT kCommandOpen = 1001;
     constexpr UINT kCommandReload = 1002;
@@ -343,6 +346,8 @@ namespace
                 SelectPage(kSettingsPages, "tab-", "page-", id.substr(4));
             } else if (id.starts_with("dev-tab-")) {
                 SelectPage(kDeveloperPages, "dev-tab-", "dev-page-", id.substr(8));
+            } else if (id == "edit-tab-pin") {
+                SetStatus("Action: pin to dashboard");
             } else if (id.starts_with("edit-tab-")) {
                 SelectPage(kItemEditPages, "edit-tab-", "edit-page-", id.substr(9));
             } else if (id.starts_with("dev-command-")) {
@@ -363,6 +368,8 @@ namespace
                 if (auto* state = _document->GetElementById("toggle-edit-state")) {
                     state->SetInnerRML(_editModeEnabled ? "Enabled" : "Disabled");
                 }
+            } else if (id == "dev-add-command") {
+                SetStatus("SteamVR command keyboard opens in game");
             } else if (id == "dev-execute") {
                 SetStatus("Execute: " + std::string(kMockCommands[_selectedMockCommand].command));
             } else {
@@ -513,9 +520,9 @@ namespace
         bool LoadFont()
         {
             constexpr std::array<const char*, 3> candidates{
-                "Data/SKSE/Plugins/DragonBoardVR/DragonBoardVR_Font.ttf",
-                "C:/Windows/Fonts/BarlowCondensed-Regular.ttf",
-                "C:/Windows/Fonts/arial.ttf"
+                "Data/SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf",
+                "SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf",
+                "Assets/ui/rml/assets/DragonBoardVR_Font.ttf"
             };
             for (const auto* path : candidates) {
                 std::ifstream stream(path, std::ios::binary | std::ios::ate);
@@ -589,6 +596,17 @@ namespace
             } else if (fileName == "edit.rml") {
                 PopulateItemEditDocument();
                 SelectPage(kItemEditPages, "edit-tab-", "edit-page-", "position");
+            } else if (fileName == "mods.rml") {
+                if (auto* list = _document->GetElementById("mods-list")) {
+                    list->SetInnerRML(
+                        "<div id=\"mods-card-0\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Campfire</span></div>"
+                        "<div id=\"mods-card-1\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Whirlwind Sprint</span></div>"
+                        "<div id=\"mods-card-2\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Travel Lantern</span></div>");
+                }
+            } else if (fileName == "inventory.rml") {
+                PopulateInventoryDocument();
+            } else if (fileName == "magic.rml") {
+                PopulateMagicDocument();
             }
         }
 
@@ -624,6 +642,87 @@ namespace
             SetText("dev-cell-form", "00018A56");
             SetText("dev-worldspace", "Tamriel");
             SetText("dev-worldspace-form", "0000003C");
+        }
+
+        void PopulateInventoryDocument()
+        {
+            if (auto* list = _document->GetElementById("inventory-item-list")) {
+                list->SetInnerRML(
+                    "<button id=\"inventory-item-0\" class=\"inventory-list-item equipped\"><span class=\"item-state-mark\">[L]</span><span id=\"inventory-item-name-0\" class=\"item-name\"><span id=\"inventory-item-name-track-0\" class=\"item-name-track\">Ebony Sword</span></span><span class=\"item-stack\"></span></button>"
+                    "<button id=\"inventory-item-1\" class=\"inventory-list-item active equipped favorited\"><span class=\"item-state-mark\">[R]</span><span id=\"inventory-item-name-1\" class=\"item-name\"><span id=\"inventory-item-name-track-1\" class=\"item-name-track\">Nordic Bow of the Ancient Dragonborn Champion</span></span><span class=\"item-stack\"></span></button>"
+                    "<button id=\"inventory-item-2\" class=\"inventory-list-item favorited\"><span class=\"item-state-mark\"></span><span id=\"inventory-item-name-2\" class=\"item-name\"><span id=\"inventory-item-name-track-2\" class=\"item-name-track\">Potion of Ultimate Healing</span></span><span class=\"item-stack\">x4</span></button>"
+                    "<button id=\"inventory-item-3\" class=\"inventory-list-item\"><span class=\"item-state-mark\"></span><span id=\"inventory-item-name-3\" class=\"item-name\"><span id=\"inventory-item-name-track-3\" class=\"item-name-track\">Dragonscale Armor</span></span><span class=\"item-stack\"></span></button>"
+                    "<button id=\"inventory-item-4\" class=\"inventory-list-item\"><span class=\"item-state-mark\"></span><span id=\"inventory-item-name-4\" class=\"item-name\"><span id=\"inventory-item-name-track-4\" class=\"item-name-track\">Black Soul Gem</span></span><span class=\"item-stack\">x2</span></button>");
+            }
+            if (auto* filter = _document->GetElementById("inventory-filter-weapons")) {
+                filter->SetClass("active", true);
+            }
+            SetText("inventory-player-name", "Arthas");
+            SetText("inventory-player-level", "42");
+            SetText("inventory-gold", "12.840");
+            SetText("inventory-carry-weight", "218.5 / 420");
+            SetText("inventory-item-count", "47");
+            SetText("inventory-selected-category", "WEAPON");
+            SetText(
+                "inventory-selected-name",
+                "Nordic Bow of the Ancient Dragonborn Champion");
+            if (auto* left = _document->GetElementById("inventory-left-hand-state")) {
+                left->SetClass("active", false);
+            }
+            if (auto* right = _document->GetElementById("inventory-right-hand-state")) {
+                right->SetClass("active", true);
+            }
+            SetText("inventory-attack", "18");
+            SetText("inventory-defense", "--");
+            SetText("inventory-weight", "12.0");
+            SetText("inventory-value", "580");
+            SetText("inventory-count", "1");
+            SetText("inventory-description", "A finely crafted Nordic bow with strong draw weight and excellent range.");
+            SetText("inventory-equip-label", "UNEQUIP");
+        }
+
+        void PopulateMagicDocument()
+        {
+            if (auto* list = _document->GetElementById("magic-spell-list")) {
+                list->SetInnerRML(
+                    "<button id=\"magic-spell-0\" class=\"magic-list-item equipped\"><span class=\"spell-state-mark\">[L]</span><span id=\"magic-spell-name-0\" class=\"spell-name\"><span id=\"magic-spell-name-track-0\" class=\"spell-name-track\">Flames</span></span></button>"
+                    "<button id=\"magic-spell-1\" class=\"magic-list-item active equipped favorited\"><span class=\"spell-state-mark\">[R]</span><span id=\"magic-spell-name-1\" class=\"spell-name\"><span id=\"magic-spell-name-track-1\" class=\"spell-name-track\">Conjure Ancient Dragon Priest Guardian</span></span></button>"
+                    "<button id=\"magic-spell-2\" class=\"magic-list-item favorited\"><span class=\"spell-state-mark\"></span><span id=\"magic-spell-name-2\" class=\"spell-name\"><span id=\"magic-spell-name-track-2\" class=\"spell-name-track\">Fast Healing</span></span></button>"
+                    "<button id=\"magic-spell-3\" class=\"magic-list-item\"><span class=\"spell-state-mark\"></span><span id=\"magic-spell-name-3\" class=\"spell-name\"><span id=\"magic-spell-name-track-3\" class=\"spell-name-track\">Oakflesh</span></span></button>"
+                    "<button id=\"magic-spell-4\" class=\"magic-list-item\"><span class=\"spell-state-mark\"></span><span id=\"magic-spell-name-4\" class=\"spell-name\"><span id=\"magic-spell-name-track-4\" class=\"spell-name-track\">Clairvoyance</span></span></button>");
+            }
+            if (auto* filter = _document->GetElementById("magic-filter-conjuration")) {
+                filter->SetClass("active", true);
+            }
+            SetText("magic-player-name", "Arthas");
+            SetText("magic-player-level", "42");
+            SetText("magic-spell-count", "18");
+            SetText("magic-selected-category", "CONJURATION");
+            SetText("magic-selected-name", "Conjure Ancient Dragon Priest Guardian");
+            SetText("magic-cost", "176");
+            SetText("magic-skill-level", "EXPERT");
+            SetText("magic-cast-type", "FIRE AND FORGET");
+            SetText("magic-target", "AIMED");
+            SetText("magic-duration", "60 SEC");
+            SetText("magic-range", "1000");
+            SetText(
+                "magic-description",
+                "Summons an ancient Dragon Priest guardian for 60 seconds wherever the caster is aiming.");
+            SetText("magic-equip-label", "UNEQUIP");
+            SetText("magic-magicka", "248 / 310");
+            if (auto* left = _document->GetElementById("magic-left-hand-state")) {
+                left->SetClass("active", false);
+            }
+            if (auto* right = _document->GetElementById("magic-right-hand-state")) {
+                right->SetClass("active", true);
+            }
+            if (auto* icon = _document->GetElementById("magic-preview-icon")) {
+                icon->SetAttribute("src", "assets/conjurationicon.png");
+                icon->SetProperty("display", "block");
+            }
+            if (auto* edit = _document->GetElementById("magic-edit")) {
+                edit->SetClass("enabled", true);
+            }
         }
 
         template <std::size_t Size>
@@ -706,7 +805,8 @@ namespace
                 if (error || !entry.is_regular_file()) continue;
                 const auto extension = entry.path().extension().string();
                 if (extension != ".rml" && extension != ".rcss" &&
-                    extension != ".ttf" && extension != ".otf") continue;
+                    extension != ".ttf" && extension != ".otf" &&
+                    extension != ".png" && extension != ".jpeg") continue;
                 latest = std::max(latest, entry.last_write_time(error));
             }
             return latest;

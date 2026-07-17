@@ -1,12 +1,17 @@
 #include "ui/rml/DragonBoardRmlRenderer.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstring>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 #include <Windows.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
+#include <wincodec.h>
 #include <wrl/client.h>
 
 namespace dragonboard::ui::rml
@@ -105,6 +110,45 @@ float4 main(PSInput input) : SV_TARGET
                 return false;
             }
             return true;
+        }
+
+        std::wstring Utf8ToWide(const Rml::String& value)
+        {
+            if (value.empty()) return {};
+            const int length = MultiByteToWideChar(
+                CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
+            if (length <= 0) return {};
+            std::wstring result(static_cast<std::size_t>(length), L'\0');
+            MultiByteToWideChar(
+                CP_UTF8, 0, value.data(), static_cast<int>(value.size()), result.data(), length);
+            return result;
+        }
+
+        std::filesystem::path ResolveTexturePath(const Rml::String& source)
+        {
+            const auto wideSource = Utf8ToWide(source);
+            if (wideSource.empty()) return {};
+
+            const std::filesystem::path requested(wideSource);
+            std::error_code error;
+            if (requested.is_absolute() || std::filesystem::is_regular_file(requested, error)) {
+                return requested;
+            }
+
+            const auto currentDirectory = std::filesystem::current_path(error);
+            if (error) return requested;
+            const std::array<std::filesystem::path, 4> roots{
+                currentDirectory / "Assets" / "ui" / "rml",
+                currentDirectory / "Data" / "SKSE" / "Plugins" / "DragonBoardVR" / "ui",
+                currentDirectory / "SKSE" / "Plugins" / "DragonBoardVR" / "ui",
+                currentDirectory / "install_output" / "SKSE" / "Plugins" / "DragonBoardVR" / "ui"
+            };
+            for (const auto& root : roots) {
+                const auto candidate = root / requested;
+                error.clear();
+                if (std::filesystem::is_regular_file(candidate, error)) return candidate;
+            }
+            return requested;
         }
     }
 
@@ -516,8 +560,77 @@ float4 main(PSInput input) : SV_TARGET
         const Rml::String& source)
     {
         textureDimensions = {};
-        logger::warn("DragonBoardVR: RmlUi image texture is not supported in the first DX11 proof: {}", source);
-        return {};
+        if (!IsReady() || source.empty()) return {};
+
+        const auto imagePath = ResolveTexturePath(source);
+        if (imagePath.empty()) {
+            logger::warn("DragonBoardVR: RmlUi could not decode image path '{}'.", source);
+            return {};
+        }
+
+        const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        const bool releaseCom = SUCCEEDED(comResult);
+        if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE) {
+            logger::warn("DragonBoardVR: COM initialization failed for RmlUi image '{}'.", source);
+            return {};
+        }
+
+        ComPtr<IWICImagingFactory> factory;
+        ComPtr<IWICBitmapDecoder> decoder;
+        ComPtr<IWICBitmapFrameDecode> frame;
+        ComPtr<IWICFormatConverter> converter;
+        UINT width = 0;
+        UINT height = 0;
+        std::vector<Rml::byte> pixels;
+
+        HRESULT result = CoCreateInstance(
+            CLSID_WICImagingFactory,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_PPV_ARGS(factory.GetAddressOf()));
+        if (SUCCEEDED(result)) {
+            result = factory->CreateDecoderFromFilename(
+                imagePath.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf());
+        }
+        if (SUCCEEDED(result)) result = decoder->GetFrame(0, frame.GetAddressOf());
+        if (SUCCEEDED(result)) result = frame->GetSize(&width, &height);
+        if (SUCCEEDED(result)) result = factory->CreateFormatConverter(converter.GetAddressOf());
+        if (SUCCEEDED(result)) {
+            result = converter->Initialize(
+                frame.Get(),
+                GUID_WICPixelFormat32bppRGBA,
+                WICBitmapDitherTypeNone,
+                nullptr,
+                0.0,
+                WICBitmapPaletteTypeCustom);
+        }
+        if (SUCCEEDED(result) && width > 0 && height > 0) {
+            const UINT stride = width * 4;
+            pixels.resize(static_cast<std::size_t>(stride) * height);
+            result = converter->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.size()), pixels.data());
+        }
+
+        Rml::TextureHandle texture{};
+        if (SUCCEEDED(result) && !pixels.empty()) {
+            textureDimensions = {
+                static_cast<int>(width),
+                static_cast<int>(height)
+            };
+            texture = GenerateTexture(pixels, textureDimensions);
+        }
+        if (!texture) {
+            textureDimensions = {};
+            logger::warn(
+                "DragonBoardVR: failed to load RmlUi image texture '{}' (resolved='{}'): 0x{:08X}.",
+                source, imagePath.string(), static_cast<unsigned long>(result));
+        }
+
+        converter.Reset();
+        frame.Reset();
+        decoder.Reset();
+        factory.Reset();
+        if (releaseCom) CoUninitialize();
+        return texture;
     }
 
     Rml::TextureHandle DragonBoardRmlRenderer::GenerateTexture(

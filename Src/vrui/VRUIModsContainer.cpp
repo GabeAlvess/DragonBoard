@@ -33,18 +33,6 @@ namespace vrui {
             const auto& action = actions[i];
             auto btn = std::make_shared<VRUIButton>(action.label, action.iconPath, "textures\\test.dds", 2.0f, 2.0f);
             
-            auto weakSelf = std::weak_ptr<VRUIModsContainer>(
-                std::static_pointer_cast<VRUIModsContainer>(shared_from_this()));
-
-            // Drag-to-delete logic
-            btn->setOnGripDragHandler([i, weakSelf](VRUIButton*, EquipHand) {
-                ModActionManager::get().removeAction(i);
-                // RE::DebugNotification("Mod Action Removed.");
-                if (auto self = weakSelf.lock()) {
-                    self->scheduleRefresh(0.1f);
-                }
-            });
-            
             const auto parsedAction = actions::Parse(action.command);
             if (parsedAction.kind != actions::ActionKind::kUnknown) {
                 btn->setOnPressHandler([parsedAction](VRUIButton*, EquipHand hand) {

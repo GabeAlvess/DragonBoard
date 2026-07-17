@@ -7,6 +7,74 @@
 
 namespace dragonboard::ui::rml
 {
+    namespace
+    {
+        constexpr const char* kDevCommandsIniPath =
+            "Data/SKSE/Plugins/DragonBoardVR_DevCommands.ini";
+
+        std::string TrimDevCommandText(std::string value)
+        {
+            const auto first = value.find_first_not_of(" \t\r\n");
+            if (first == std::string::npos) return {};
+            const auto last = value.find_last_not_of(" \t\r\n");
+            return value.substr(first, last - first + 1);
+        }
+
+        std::string MakeDevCommandLabel(std::string_view command)
+        {
+            std::string label(command);
+            for (auto& character : label) {
+                if (character == '=' || character == '|' ||
+                    character == '\r' || character == '\n') {
+                    character = ' ';
+                }
+            }
+            label = TrimDevCommandText(std::move(label));
+            return label.empty() ? "Custom command" : label;
+        }
+
+        bool AppendDevCommandToIni(
+            std::string_view label,
+            std::string_view command)
+        {
+            const std::filesystem::path iniPath = kDevCommandsIniPath;
+            std::error_code error;
+            if (const auto parent = iniPath.parent_path(); !parent.empty()) {
+                std::filesystem::create_directories(parent, error);
+                if (error) {
+                    logger::error(
+                        "DragonBoardVR: could not create the Dev commands directory '{}': {}.",
+                        parent.string(),
+                        error.message());
+                    return false;
+                }
+            }
+
+            const bool writeHeader =
+                !std::filesystem::exists(iniPath, error) ||
+                (!error && std::filesystem::file_size(iniPath, error) == 0);
+            std::ofstream file(iniPath, std::ios::app);
+            if (!file.is_open()) {
+                logger::error(
+                    "DragonBoardVR: could not open '{}' to save a Dev command.",
+                    iniPath.string());
+                return false;
+            }
+
+            if (writeHeader) {
+                file << "[DevCommands]\n";
+                file << "; Format: Label|Description = ConsoleCommand\n";
+            } else {
+                file << '\n';
+            }
+            file << label
+                 << "|Custom command added from the DragonBoard developer panel. = "
+                 << command << '\n';
+            file.flush();
+            return file.good();
+        }
+    }
+
     void RmlPanelHost::QueueDevCommand(const DevCommandEntry& entry)
     {
         {
@@ -31,7 +99,7 @@ namespace dragonboard::ui::rml
             { "RaceMenu", "showracemenu", "Open the character creation and race menu.", true }
         };
 
-        const std::filesystem::path iniPath = "Data/SKSE/Plugins/DragonBoardVR_DevCommands.ini";
+        const std::filesystem::path iniPath = kDevCommandsIniPath;
         std::ifstream file(iniPath);
         if (file.is_open()) {
             std::vector<DevCommandEntry> configured;
@@ -70,9 +138,56 @@ namespace dragonboard::ui::rml
 
         std::scoped_lock lock(_devMutex);
         _devCommands = std::move(commands);
-        if (_selectedDevCommand >= static_cast<int>(_devCommands.size())) {
-            _selectedDevCommand = _devCommands.empty() ? -1 : 0;
+        _selectedDevCommand = _devCommands.empty() ? -1 :
+            std::clamp(_selectedDevCommand, 0, static_cast<int>(_devCommands.size() - 1));
+    }
+
+    void RmlPanelHost::AddDevCommandGameThread(std::string command)
+    {
+        command = TrimDevCommandText(std::move(command));
+        if (command.empty()) return;
+        for (auto& character : command) {
+            if (character == '\r' || character == '\n') character = ' ';
         }
+
+        DevCommandEntry entry{
+            MakeDevCommandLabel(command),
+            command,
+            "Custom command added from the DragonBoard developer panel.",
+            dragonboard::game::actions::IsDangerousConsoleCommand(command)
+        };
+
+        {
+            std::scoped_lock lock(_devMutex);
+            const auto existing = std::find_if(
+                _devCommands.begin(),
+                _devCommands.end(),
+                [&](const auto& candidate) { return candidate.command == command; });
+            if (existing != _devCommands.end()) {
+                _selectedDevCommand = static_cast<int>(
+                    std::distance(_devCommands.begin(), existing));
+                _rmlDeveloperSyncPending.store(true, std::memory_order_release);
+                logger::info(
+                    "DragonBoardVR: Dev command '{}' is already in the command list.",
+                    command);
+                return;
+            }
+        }
+
+        if (!AppendDevCommandToIni(entry.label, entry.command)) {
+            logger::error(
+                "DragonBoardVR: Dev command '{}' was not added because it could not be saved.",
+                command);
+            return;
+        }
+
+        {
+            std::scoped_lock lock(_devMutex);
+            _devCommands.push_back(std::move(entry));
+            _selectedDevCommand = static_cast<int>(_devCommands.size() - 1);
+        }
+        _rmlDeveloperSyncPending.store(true, std::memory_order_release);
+        logger::info("DragonBoardVR: saved a new Dev command: '{}'.", command);
     }
 
     void RmlPanelHost::CaptureDevGameInfoGameThread()

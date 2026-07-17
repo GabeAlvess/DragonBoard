@@ -12,6 +12,7 @@ namespace dragonboard::ui::input
         void SetOffhandTrigger(bool pressed) { _offhandTrigger = pressed; }
         void SetThumbstick(bool pressed) { _thumbstick = pressed; }
         void SetSecondary(bool pressed) { _secondary = pressed; }
+        void SetDominantSecondary(bool pressed) { _dominantSecondary = pressed; }
         void SetHotkey8(bool pressed) { _hotkey8 = pressed; }
         void SetActivationTrigger(bool pressed) { _activationTrigger = pressed; }
 
@@ -22,6 +23,7 @@ namespace dragonboard::ui::input
         bool OffhandTrigger() const { return _offhandTrigger; }
         bool Thumbstick() const { return _thumbstick; }
         bool Secondary() const { return _secondary; }
+        bool DominantSecondary() const { return _dominantSecondary; }
         bool Hotkey8() const { return _hotkey8; }
         bool ActivationTrigger() const { return _activationTrigger; }
 
@@ -33,6 +35,7 @@ namespace dragonboard::ui::input
         bool _offhandTrigger = false;
         bool _thumbstick = false;
         bool _secondary = false;
+        bool _dominantSecondary = false;
         bool _hotkey8 = false;
         bool _activationTrigger = false;
     };

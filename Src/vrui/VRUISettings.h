@@ -340,6 +340,7 @@ namespace vrui
         // -----------------------------------------------------------------------
         void load(const std::string& iniPath);
         void save(const std::string& iniPath) const;
+        void setUseLeftHandAsMenu(bool useLeftHand);
         static std::string getDefaultIniPath();
         static VRUISettings& get();
 

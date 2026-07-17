@@ -15,7 +15,7 @@ namespace dragonboard::ui::widgets
 {
     namespace
     {
-        constexpr const char* kMainPanelName = "MainPanel";
+        constexpr const char* kPersistentPanelName = "Persistent_Panel";
         constexpr const char* kAlwaysVisiblePanelName = "AlwaysVisiblePanel";
         constexpr const char* kAlwaysVisibleHmdPanelName = "AlwaysVisibleHmdPanel";
         constexpr const char* kDashboardContainerName = "Dashboard";
@@ -98,14 +98,16 @@ namespace dragonboard::ui::widgets
     void FixedWidgetPresenter::Refresh(vrui::VRMenuManager& menuManager)
     {
         auto& settings = vrui::VRUISettings::get();
-        auto mainPanel = menuManager.findPanelByName(kMainPanelName);
+        auto persistentPanel = menuManager.findPanelByName(kPersistentPanelName);
         auto alwaysVisiblePanel = menuManager.findPanelByName(kAlwaysVisiblePanelName);
         auto alwaysVisibleHmdPanel = menuManager.findPanelByName(kAlwaysVisibleHmdPanelName);
-        if (!mainPanel || !alwaysVisiblePanel || !alwaysVisibleHmdPanel) {
+        if (!persistentPanel || !alwaysVisiblePanel || !alwaysVisibleHmdPanel) {
             return;
         }
 
-        auto fixedContainer = FindOrCreateContainer(mainPanel, "FixedWidgetsContainer");
+        // Dashboard pins belong to the persistent board layer so switching to
+        // Mods (or any other content panel) does not cull them with MainPanel.
+        auto fixedContainer = FindOrCreateContainer(persistentPanel, "FixedWidgetsContainer");
         auto worldMagicContainer = FindOrCreateContainer(alwaysVisiblePanel, "AlwaysVisibleWidgetsContainer");
         auto hmdWorldMagicContainer = FindOrCreateContainer(alwaysVisibleHmdPanel, "AlwaysVisibleHmdWidgetsContainer");
 
@@ -219,7 +221,7 @@ namespace dragonboard::ui::widgets
             alwaysVisibleHmdPanel->show();
         }
 
-        mainPanel->recalculateLayout();
+        persistentPanel->recalculateLayout();
         alwaysVisiblePanel->recalculateLayout();
         alwaysVisibleHmdPanel->recalculateLayout();
     }

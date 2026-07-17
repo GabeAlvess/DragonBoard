@@ -96,6 +96,167 @@ namespace dragonboard::ui::rml
             kToggleLabel
         };
 
+        enum class ModsAction : std::uint8_t { kNone, kAdd, kClose, kActivate };
+        enum class InventoryAction : std::uint8_t
+        {
+            kNone,
+            kSelect,
+            kEquip,
+            kDrop,
+            kPin,
+            kFavorite,
+            kClose,
+            kSearch,
+            kClearSearch,
+            kFilterWeapons,
+            kFilterArmor,
+            kFilterConsumables,
+            kFilterQuest,
+            kFilterBooks,
+            kFilterMisc
+        };
+        enum class MagicAction : std::uint8_t
+        {
+            kNone,
+            kSelect,
+            kEquip,
+            kEdit,
+            kPinDashboard,
+            kPinLeftHand,
+            kPinWorld,
+            kToggleLabel,
+            kFavorite,
+            kClose,
+            kSearch,
+            kClearSearch,
+            kFilterDestruction,
+            kFilterConjuration,
+            kFilterRestoration,
+            kFilterIllusion,
+            kFilterAlteration,
+            kFilterPowers,
+            kFilterPassive
+        };
+        enum class JournalAction : std::uint8_t
+        {
+            kNone,
+            kSelectQuest,
+            kToggleTracking,
+            kTrackObjective,
+            kSettings,
+            kClose
+        };
+
+        struct InventoryItemInfo
+        {
+            std::string name;
+            std::string category;
+            std::string description;
+            std::string equipmentMarker;
+            std::string equipmentState;
+            std::uint32_t formID = 0;
+            std::int32_t count = 0;
+            float attack = 0.0f;
+            float defense = 0.0f;
+            float weight = 0.0f;
+            std::int32_t value = 0;
+            bool hasAttack = false;
+            bool hasDefense = false;
+            bool equipped = false;
+            bool equippedLeft = false;
+            bool equippedRight = false;
+            bool favorited = false;
+            bool canEquip = false;
+        };
+
+        struct InventoryInfo
+        {
+            std::vector<InventoryItemInfo> items;
+            std::size_t selectedIndex = 0;
+            std::string playerName;
+            std::uint16_t playerLevel = 1;
+            std::int32_t gold = 0;
+            float currentWeight = 0.0f;
+            float carryWeight = 0.0f;
+            std::string activeFilter;
+            std::string searchQuery;
+        };
+
+        struct MagicItemInfo
+        {
+            std::string name;
+            std::string category;
+            std::string description;
+            std::string iconPath;
+            std::string castingType;
+            std::string delivery;
+            std::string skillLevel;
+            std::string duration;
+            std::string range;
+            std::uint32_t formID = 0;
+            float magickaCost = 0.0f;
+            bool equipped = false;
+            bool equippedLeft = false;
+            bool equippedRight = false;
+            bool favorited = false;
+            bool canEquip = false;
+            bool hasModelPreview = false;
+        };
+
+        struct MagicInfo
+        {
+            std::vector<MagicItemInfo> items;
+            std::size_t selectedIndex = 0;
+            std::string playerName;
+            std::uint16_t playerLevel = 1;
+            float currentMagicka = 0.0f;
+            float maximumMagicka = 0.0f;
+            std::string activeFilter;
+            std::string searchQuery;
+            bool editModeEnabled = false;
+        };
+
+        struct JournalObjectiveInfo
+        {
+            std::uint16_t objectiveID = 0;
+            std::uint32_t instanceID = 0;
+            std::string text;
+            std::string state;
+            bool completed = false;
+            bool failed = false;
+            bool hasTargets = false;
+        };
+
+        struct JournalQuestInfo
+        {
+            std::uint32_t formID = 0;
+            std::uint32_t instanceID = 0;
+            std::string title;
+            std::string summary;
+            std::string type;
+            bool active = false;
+            bool completed = false;
+            bool failed = false;
+            std::vector<JournalObjectiveInfo> objectives;
+        };
+
+        struct JournalStatInfo
+        {
+            std::string label;
+            std::string value;
+        };
+
+        struct JournalInfo
+        {
+            std::vector<JournalQuestInfo> quests;
+            std::size_t selectedIndex = 0;
+            std::string playerName;
+            std::uint16_t playerLevel = 1;
+            std::vector<JournalStatInfo> characterStats;
+            std::vector<JournalStatInfo> skills;
+            std::vector<JournalStatInfo> generalStats;
+        };
+
         struct ItemEditInfo
         {
             std::string category;
@@ -124,9 +285,17 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsSettingsReady() const;
         [[nodiscard]] bool IsDeveloperReady() const;
         [[nodiscard]] bool IsItemEditReady() const;
+        [[nodiscard]] bool IsModsReady() const;
+        [[nodiscard]] bool IsInventoryReady() const;
+        [[nodiscard]] bool IsMagicReady() const;
+        [[nodiscard]] bool IsJournalReady() const;
         bool ShowSettings();
         bool ShowDeveloper();
         bool ShowItemEdit();
+        bool ShowMods();
+        bool ShowInventory();
+        bool ShowMagic();
+        bool ShowJournal();
 
         // Generic document API. These methods are called only on the Present
         // thread; RmlPanelHost owns the cross-thread command queue.
@@ -159,7 +328,8 @@ namespace dragonboard::ui::rml
             float stickX,
             float stickY,
             int width,
-            int height);
+            int height,
+            float deltaTime);
         bool Render(ID3D11RenderTargetView* renderTarget, int width, int height);
 
         [[nodiscard]] bool ConsumeCloseRequested();
@@ -169,12 +339,24 @@ namespace dragonboard::ui::rml
         [[nodiscard]] HapticCue ConsumeHapticCue();
         [[nodiscard]] std::optional<SliderChange> ConsumeSliderChange();
         [[nodiscard]] std::optional<std::size_t> ConsumeDeveloperCommandRequested();
+        [[nodiscard]] bool ConsumeDeveloperAddCommandRequested();
         [[nodiscard]] ItemEditAction ConsumeItemEditAction();
+        [[nodiscard]] std::pair<ModsAction, std::size_t> ConsumeModsAction();
+        [[nodiscard]] std::pair<InventoryAction, std::size_t> ConsumeInventoryAction();
+        [[nodiscard]] std::pair<MagicAction, std::size_t> ConsumeMagicAction();
+        [[nodiscard]] std::pair<JournalAction, std::size_t> ConsumeJournalAction();
+        [[nodiscard]] std::optional<std::size_t> GetHoveredModsIndex() const;
         void SetSliderValue(const char* id, float value);
         void SetItemEditInfo(const ItemEditInfo& info);
+        void SetMods(const std::vector<std::string>& labels);
+        void SetInventory(const InventoryInfo& info);
+        void SetMagic(const MagicInfo& info);
+        void SetJournal(const JournalInfo& info);
         void SetEditModeEnabled(bool enabled);
         void SetDeveloperButtonEnabled(bool enabled);
-        void SetDeveloperCommands(std::vector<DeveloperCommand> commands);
+        void SetDeveloperCommands(
+            std::vector<DeveloperCommand> commands,
+            std::size_t selectedIndex = 0);
         void SetDeveloperInfo(const DeveloperInfo& info);
         [[nodiscard]] int GetLastDrawCallCount() const;
 
@@ -215,6 +397,7 @@ namespace dragonboard::ui::rml
         void SelectSettingsPage(const char* page);
         void SelectDeveloperPage(const char* page);
         void SelectItemEditPage(const char* page);
+        void SelectJournalPage(const char* page);
         void SelectDeveloperCommand(std::size_t index);
         void UpdateDeveloperCommandDetails();
         void UpdateCursor(bool visible, int x, int y);
@@ -228,6 +411,10 @@ namespace dragonboard::ui::rml
         [[nodiscard]] std::uint32_t FindPanelHandle(Rml::ElementDocument* document) const;
         void HideAllDocuments();
         void UpdateCapturedSlider(int pointerX);
+        void UpdateInventoryMarquee(float deltaTime);
+        void ResetInventoryMarquee();
+        void UpdateInventoryLongPress(float deltaTime);
+        void ResetInventoryLongPress();
         void BeginTriggerScrollLock();
         void RestoreTriggerScrollLock();
         void TraceScrollState();
@@ -240,12 +427,19 @@ namespace dragonboard::ui::rml
         Rml::ElementDocument* _settingsDocument = nullptr;
         Rml::ElementDocument* _developerDocument = nullptr;
         Rml::ElementDocument* _itemEditDocument = nullptr;
+        Rml::ElementDocument* _modsDocument = nullptr;
+        Rml::ElementDocument* _inventoryDocument = nullptr;
+        Rml::ElementDocument* _magicDocument = nullptr;
+        Rml::ElementDocument* _journalDocument = nullptr;
         Rml::ElementDocument* _activeDocument = nullptr;
         std::unordered_map<std::uint32_t, RegisteredPanel> _registeredPanels;
         std::deque<PanelEvent> _panelEvents;
         bool _rmlInitialized = false;
         bool _previousTriggerDown = false;
         bool _pointerWasOnPanel = false;
+        bool _pointerSmoothingInitialized = false;
+        float _smoothedPointerX = 0.0f;
+        float _smoothedPointerY = 0.0f;
         bool _currentTriggerDown = false;
         bool _currentGripDown = false;
         Rml::ElementDocument* _observedScrollDocument = nullptr;
@@ -261,6 +455,9 @@ namespace dragonboard::ui::rml
         int _triggerCaptureX = 0;
         int _triggerCaptureY = 0;
         std::string _triggerCapturedSliderId;
+        bool _sliderPointerInitialized = false;
+        int _sliderAcceptedPointerX = 0;
+        float _sliderSmoothedPointerX = 0.0f;
         std::string _triggerCapturedActionId;
         bool _triggerCaptureProgrammatic = false;
         std::vector<InteractiveBinding> _interactiveBindings;
@@ -275,6 +472,15 @@ namespace dragonboard::ui::rml
         bool _developerPanelToggleRequested = false;
         HapticCue _pendingHapticCue = HapticCue::kNone;
         std::string _hoveredElementId;
+        std::string _inventoryMarqueeElementId;
+        std::string _journalQuestListMarkup;
+        std::vector<std::uint64_t> _journalActiveQuestOrder;
+        float _inventoryMarqueeOffset = 0.0f;
+        float _inventoryMarqueePause = 0.0f;
+        bool _inventoryMarqueeAtEnd = false;
+        std::string _inventoryLongPressElementId;
+        float _inventoryLongPressTimer = 0.0f;
+        bool _inventoryLongPressTriggered = false;
         std::chrono::steady_clock::time_point _lastHoverHaptic{};
         std::chrono::steady_clock::time_point _lastSliderHaptic{};
         bool _synchronizingSliderValues = false;
@@ -282,6 +488,15 @@ namespace dragonboard::ui::rml
         std::vector<DeveloperCommand> _developerCommands;
         std::size_t _selectedDeveloperCommand = 0;
         std::optional<std::size_t> _developerCommandRequested;
+        bool _developerAddCommandRequested = false;
         ItemEditAction _itemEditAction = ItemEditAction::kNone;
+        ModsAction _modsAction = ModsAction::kNone;
+        std::size_t _modsActionIndex = 0;
+        InventoryAction _inventoryAction = InventoryAction::kNone;
+        std::size_t _inventoryActionIndex = 0;
+        MagicAction _magicAction = MagicAction::kNone;
+        std::size_t _magicActionIndex = 0;
+        JournalAction _journalAction = JournalAction::kNone;
+        std::size_t _journalActionIndex = 0;
     };
 }

@@ -1,0 +1,40 @@
+<rml>
+<head>
+    <title>DragonBoard Mods</title>
+    <link type="text/rcss" href="settings.rcss" />
+    <link type="text/rcss" href="mods.rcss" />
+</head>
+<body>
+    <div id="app" class="mods-app">
+        <aside class="mods-sidebar">
+            <div class="brand"><div class="brand-copy"><div class="brand-name"><span>DragonBoard / Mods</span></div></div></div>
+            <div class="mods-sidebar-copy">
+                <div class="mods-sidebar-line"><span>Save your actions to</span></div>
+                <div class="mods-sidebar-line"><span>execute them quickly.</span></div>
+                <div class="mods-sidebar-gap"></div>
+                <div class="mods-sidebar-line"><span>Click <strong>Record</strong> and perform the</span></div>
+                <div class="mods-sidebar-line"><span>desired action within 10 seconds.</span></div>
+            </div>
+        </aside>
+        <div class="content-shell mods-shell">
+            <header class="mods-header">
+                <div class="breadcrumb">Mods</div>
+                <button id="mods-close" class="close-button"><span>X</span></button>
+            </header>
+            <main class="mods-main">
+                <div id="mods-list" class="mods-grid"><div class="mods-empty">No mods added yet</div></div>
+            </main>
+            <footer class="mods-footer">
+                <div class="mods-control-hints">
+                    <span>HOLD Y/B TO REMOVE</span>
+                    <span class="mods-hint-divider"></span>
+                    <span>SHORT Y/B OPTIONS</span>
+                </div>
+                <div class="footer-spacer"></div>
+                <div id="mods-add" class="mods-add-button" tabindex="0"><span class="mods-add-label">Record</span></div>
+            </footer>
+        </div>
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

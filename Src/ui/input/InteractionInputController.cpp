@@ -1,5 +1,6 @@
 #include "InteractionInputController.h"
 
+#include "ui/rml/RmlPanelHost.h"
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUISettings.h"
 #include "vrui/VRUIWidget.h"
@@ -82,8 +83,25 @@ namespace dragonboard::ui::input
 
         const auto secondaryEvents = manager._secondaryButtonTracker.Update(
             manager._inputButtons.Secondary(), deltaTime, 0.5f, manager._menuSession.IsOpen());
-        if (secondaryEvents.longPress) {
-            if (auto hovered = manager._interactionFocus.GetHovered()) {
+        const auto dominantSecondaryEvents = manager._dominantSecondaryButtonTracker.Update(
+            manager._inputButtons.DominantSecondary(),
+            deltaTime,
+            0.5f,
+            manager._menuSession.IsOpen());
+        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+        const bool modsRmlActive = rmlHost.IsModsOpen();
+        const bool secondaryOnRightHand = settings.useLeftHandAsMenu;
+        const auto& panelSecondaryEvents = modsRmlActive ?
+            dominantSecondaryEvents : secondaryEvents;
+        if (panelSecondaryEvents.longPress) {
+            if (modsRmlActive) {
+                if (rmlHost.RequestHoveredModRemoval() && settings.hapticOnPress) {
+                    manager.triggerHaptic(
+                        secondaryOnRightHand,
+                        settings.hapticIntensity * 1.5f,
+                        settings.hapticDuration * 2.0f);
+                }
+            } else if (auto hovered = manager._interactionFocus.GetHovered()) {
                 hovered->onSecondaryLongPress();
                 if (settings.hapticOnPress) {
                     manager.triggerHaptic(
@@ -91,9 +109,16 @@ namespace dragonboard::ui::input
                 }
             }
         }
-        if (secondaryEvents.released) {
-            if (secondaryEvents.shortPress && manager._menuSession.IsOpen()) {
-                if (auto hovered = manager._interactionFocus.GetHovered()) {
+        if (panelSecondaryEvents.released) {
+            if (panelSecondaryEvents.shortPress && manager._menuSession.IsOpen()) {
+                if (modsRmlActive) {
+                    if (rmlHost.RequestHoveredModOptions() && settings.hapticOnPress) {
+                        manager.triggerHaptic(
+                            secondaryOnRightHand,
+                            settings.hapticIntensity,
+                            settings.hapticDuration);
+                    }
+                } else if (auto hovered = manager._interactionFocus.GetHovered()) {
                     hovered->onSecondaryPress();
                     if (settings.hapticOnPress) {
                         manager.triggerHaptic(
@@ -101,8 +126,10 @@ namespace dragonboard::ui::input
                     }
                 }
             }
-            if (auto hovered = manager._interactionFocus.GetHovered()) {
-                hovered->onSecondaryRelease();
+            if (!modsRmlActive) {
+                if (auto hovered = manager._interactionFocus.GetHovered()) {
+                    hovered->onSecondaryRelease();
+                }
             }
         }
     }

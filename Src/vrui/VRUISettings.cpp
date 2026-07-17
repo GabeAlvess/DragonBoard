@@ -34,6 +34,15 @@ namespace vrui
         categoryButtons["Btn_Cat_Magic"] = { -6.500000f, -0.250000f, 10.000000f, 10.000000f, 0.000000f, 0.000000f, 0.800000f };
     }
 
+    void VRUISettings::setUseLeftHandAsMenu(bool useLeftHand)
+    {
+        if (useLeftHandAsMenu == useLeftHand) return;
+
+        useLeftHandAsMenu = useLeftHand;
+        menuRotY = -menuRotY;
+        menuRotZ = -menuRotZ;
+    }
+
     std::string VRUISettings::getDefaultIniPath()
     {
         return "Data/SKSE/Plugins/DragonBoardVR.ini";

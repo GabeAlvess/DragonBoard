@@ -1,10 +1,16 @@
-Scriptname DragonBoardVR Native Hidden
+Scriptname DragonBoardVR Hidden
 
 ; Native DragonBoardVR RmlUi panel API for Papyrus-only mods.
 ; The receiver must be an Alias with a script that implements:
 ; Event OnDragonBoardPanelEvent(Int panel, String eventType, String elementId, String value, Float numericValue)
 
 Bool Function IsInstalled() Global Native
+
+Function ToggleMenu() Global
+    ToggleMenuForWheel(SpellWheelVR_PluginScript.GetLastActivatedWheelId())
+EndFunction
+
+Function ToggleMenuForWheel(Int wheelId) Global Native
 
 Int Function RegisterPanel(Alias receiver, String panelId, String documentPath) Global Native
 

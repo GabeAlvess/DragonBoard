@@ -51,6 +51,15 @@ namespace dragonboard::bootstrap
             }
             break;
 
+        case SKSE::MessagingInterface::kInputLoaded:
+            // Skyrim VR does not reliably dispatch kNewGame before controller
+            // input is needed in a fresh game. Register as soon as the input
+            // manager is ready; Register() is idempotent, so the load/new-game
+            // handlers below remain safe fallbacks.
+            logger::info("DragonBoardVR: SKSE input loaded; registering VR input sink.");
+            VRFrameUpdater::Register();
+            break;
+
         case SKSE::MessagingInterface::kDataLoaded: {
             logger::trace("DragonBoardVR: ===== kDataLoaded =====");
             ModActionManager::get().initialize();

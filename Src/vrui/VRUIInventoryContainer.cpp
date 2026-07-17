@@ -6,8 +6,12 @@
 #include "VRUILayoutManager.h"
 #include <RE/P/PlayerCharacter.h>
 #include <RE/T/TESBoundObject.h>
+#include <RE/T/TESDescription.h>
 #include <RE/T/TESObjectBOOK.h>
+#include <RE/B/BSString.h>
+#include <RE/E/EffectSetting.h>
 #include <RE/M/MagicFavorites.h>
+#include <RE/M/MagicItem.h>
 #include <RE/I/InventoryChanges.h>
 #include <RE/I/InventoryEntryData.h>
 #include <RE/E/ExtraDataList.h>
@@ -17,6 +21,10 @@
 #include "VRMenuManager.h"
 #include "higgsinterface001.h"
 #include <SKSE/API.h>
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <sstream>
 
 extern HiggsPluginAPI::IHiggsInterface001* g_higgsInterface;
 
@@ -26,6 +34,278 @@ namespace vrui
     {
         constexpr std::size_t kInitialInventoryBuildCount = 4;
         constexpr std::size_t kInventoryBuildsPerFrame = 3;
+        constexpr RE::FormID kGoldFormID = 0x0000000F;
+
+        bool isSupportedInventoryItem(const RE::TESBoundObject& item)
+        {
+            switch (item.GetFormType()) {
+            case RE::FormType::Weapon:
+            case RE::FormType::Armor:
+            case RE::FormType::Ammo:
+            case RE::FormType::AlchemyItem:
+            case RE::FormType::Ingredient:
+            case RE::FormType::SoulGem:
+            case RE::FormType::Scroll:
+            case RE::FormType::Light:
+            case RE::FormType::KeyMaster:
+            case RE::FormType::Book:
+            case RE::FormType::Misc:
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        std::string resolveInventoryCategory(RE::TESBoundObject* item)
+        {
+            if (!item) return "Item";
+            if (item->Is(RE::FormType::Weapon)) return "Weapon";
+            if (item->Is(RE::FormType::Armor)) return "Armor";
+            if (item->Is(RE::FormType::Ammo)) return "Ammunition";
+            if (item->Is(RE::FormType::AlchemyItem)) {
+                if (auto* alchemy = item->As<RE::AlchemyItem>()) {
+                    if (alchemy->IsPoison()) return "Poison";
+                    if (alchemy->IsFood()) return "Food";
+                }
+                return "Potion";
+            }
+            if (item->Is(RE::FormType::Ingredient)) return "Ingredient";
+            if (item->Is(RE::FormType::SoulGem)) return "Soul Gem";
+            if (item->Is(RE::FormType::Scroll)) return "Scroll";
+            if (item->Is(RE::FormType::Light)) return "Light";
+            if (item->Is(RE::FormType::KeyMaster)) return "Key";
+            if (item->Is(RE::FormType::Book)) return "Book";
+            return "Miscellaneous";
+        }
+
+        std::string cleanInventoryDescription(std::string_view raw)
+        {
+            std::string result;
+            result.reserve(std::min<std::size_t>(raw.size(), 280));
+            bool insideTag = false;
+            bool pendingSpace = false;
+
+            for (const unsigned char character : raw) {
+                if (character == '<') {
+                    insideTag = true;
+                    pendingSpace = !result.empty();
+                    continue;
+                }
+                if (character == '>') {
+                    insideTag = false;
+                    continue;
+                }
+                if (insideTag) continue;
+                if (std::isspace(character)) {
+                    pendingSpace = !result.empty();
+                    continue;
+                }
+                if (pendingSpace) {
+                    result.push_back(' ');
+                    pendingSpace = false;
+                }
+                result.push_back(static_cast<char>(character));
+                if (result.size() >= 280) break;
+            }
+            return result;
+        }
+
+        std::string formatEffectMagnitude(float value)
+        {
+            if (!std::isfinite(value)) return "0";
+            const auto rounded = std::llround(value);
+            if (std::abs(value - static_cast<float>(rounded)) < 0.05f) {
+                return std::to_string(rounded);
+            }
+
+            std::ostringstream stream;
+            stream << std::fixed << std::setprecision(1) << value;
+            return stream.str();
+        }
+
+        void replaceEffectToken(
+            std::string& text,
+            std::string_view token,
+            std::string_view replacement)
+        {
+            std::string lowerToken(token);
+            std::transform(
+                lowerToken.begin(), lowerToken.end(), lowerToken.begin(),
+                [](unsigned char character) {
+                    return static_cast<char>(std::tolower(character));
+                });
+
+            std::size_t searchFrom = 0;
+            while (searchFrom < text.size()) {
+                std::string lowerText(text);
+                std::transform(
+                    lowerText.begin(), lowerText.end(), lowerText.begin(),
+                    [](unsigned char character) {
+                        return static_cast<char>(std::tolower(character));
+                    });
+                const auto position = lowerText.find(lowerToken, searchFrom);
+                if (position == std::string::npos) break;
+                text.replace(position, token.size(), replacement);
+                searchFrom = position + replacement.size();
+            }
+        }
+
+        std::string resolveMagicItemEffectDescription(RE::MagicItem* magicItem)
+        {
+            if (!magicItem) return {};
+
+            std::string description;
+            for (auto* effect : magicItem->effects) {
+                if (!effect || !effect->baseEffect) continue;
+                const auto* baseEffect = effect->baseEffect;
+                if (baseEffect->data.flags.all(
+                        RE::EffectSetting::EffectSettingData::Flag::kHideInUI)) {
+                    continue;
+                }
+
+                const char* rawTemplate = baseEffect->magicItemDescription.c_str();
+                if (!rawTemplate || !*rawTemplate) continue;
+
+                std::string resolved(rawTemplate);
+                replaceEffectToken(
+                    resolved, "<mag>", formatEffectMagnitude(effect->effectItem.magnitude));
+                replaceEffectToken(
+                    resolved, "<dur>", std::to_string(effect->effectItem.duration));
+                replaceEffectToken(
+                    resolved, "<area>", std::to_string(effect->effectItem.area));
+
+                auto cleaned = cleanInventoryDescription(resolved);
+                if (cleaned.empty()) continue;
+                if (!description.empty()) description.push_back(' ');
+                description += cleaned;
+                if (description.size() >= 280) {
+                    description.resize(280);
+                    break;
+                }
+            }
+            return description;
+        }
+
+        std::string fallbackInventoryDescription(RE::TESBoundObject* item)
+        {
+            if (!item) return "No description available.";
+            if (item->Is(RE::FormType::Weapon)) return "A weapon carried in your inventory.";
+            if (item->Is(RE::FormType::Armor)) return "Protective equipment carried in your inventory.";
+            if (item->Is(RE::FormType::Ammo)) return "Ammunition used by ranged weapons.";
+            if (auto* alchemy = item->As<RE::AlchemyItem>()) {
+                if (alchemy->IsPoison()) return "A poison that can be applied to a weapon.";
+                if (alchemy->IsFood()) return "Food that can be consumed.";
+                return "A potion that can be consumed.";
+            }
+            if (item->Is(RE::FormType::Ingredient)) return "An ingredient used in alchemy.";
+            if (item->Is(RE::FormType::SoulGem)) return "A soul gem used for enchanting.";
+            if (item->Is(RE::FormType::Scroll)) return "A scroll that casts a spell when used.";
+            if (item->Is(RE::FormType::Light)) return "A portable light source.";
+            if (item->Is(RE::FormType::KeyMaster)) return "A key carried in your inventory.";
+            if (item->Is(RE::FormType::Book)) return "A book or note.";
+            return "A miscellaneous item.";
+        }
+
+        std::string resolveInventoryDescription(RE::TESBoundObject* item)
+        {
+            if (!item) return fallbackInventoryDescription(item);
+
+            if (item->Is(RE::FormType::AlchemyItem) ||
+                item->Is(RE::FormType::Scroll)) {
+                if (auto* magicItem = item->As<RE::MagicItem>()) {
+                    auto effectDescription =
+                        resolveMagicItemEffectDescription(magicItem);
+                    if (!effectDescription.empty()) return effectDescription;
+                }
+            }
+
+            RE::BSString rawDescription;
+            if (auto* weapon = item->As<RE::TESObjectWEAP>()) {
+                static_cast<RE::TESDescription*>(weapon)->GetDescription(rawDescription, weapon);
+            } else if (auto* armor = item->As<RE::TESObjectARMO>()) {
+                static_cast<RE::TESDescription*>(armor)->GetDescription(rawDescription, armor);
+            } else if (auto* ammo = item->As<RE::TESAmmo>()) {
+                static_cast<RE::TESDescription*>(ammo)->GetDescription(rawDescription, ammo);
+            } else if (auto* book = item->As<RE::TESObjectBOOK>()) {
+                book->itemCardDescription.GetDescription(rawDescription, book, 'MANC');
+            }
+
+            const char* rawText = rawDescription.c_str();
+            if (rawText && *rawText) {
+                auto cleaned = cleanInventoryDescription(rawText);
+                if (!cleaned.empty()) return cleaned;
+            }
+            return fallbackInventoryDescription(item);
+        }
+
+        std::string resolveItemEditCategory(RE::TESBoundObject* item)
+        {
+            if (!item) return "Misc";
+            if (item->Is(RE::FormType::Weapon) || item->Is(RE::FormType::Ammo) ||
+                item->Is(RE::FormType::Light)) {
+                return "Weapons";
+            }
+            if (item->Is(RE::FormType::Armor)) return "Armor";
+            if (item->Is(RE::FormType::Ingredient)) return "Food";
+            if (auto* alchemy = item->As<RE::AlchemyItem>()) {
+                return alchemy->IsFood() ? "Food" : "Potions";
+            }
+            return "Misc";
+        }
+
+        struct InventoryEquipmentInfo
+        {
+            bool equipped = false;
+            bool equippedLeft = false;
+            bool equippedRight = false;
+            std::string marker;
+            std::string state = "NOT EQUIPPED";
+        };
+
+        InventoryEquipmentInfo resolveInventoryEquipment(
+            RE::PlayerCharacter* player,
+            RE::TESBoundObject* item,
+            RE::InventoryEntryData* inventoryEntry)
+        {
+            InventoryEquipmentInfo result;
+            if (!player || !item) return result;
+
+            if (item->Is(RE::FormType::Armor)) {
+                bool worn = inventoryEntry && inventoryEntry->IsWorn();
+                if (!worn) {
+                    auto* armor = item->As<RE::TESObjectARMO>();
+                    auto* equippedArmor =
+                        armor ? player->GetWornArmor(armor->GetSlotMask()) : nullptr;
+                    worn = equippedArmor && equippedArmor->formID == item->formID;
+                }
+                if (worn) {
+                    result.equipped = true;
+                    result.marker = "[W]";
+                    result.state = "EQUIPPED - WORN";
+                }
+                return result;
+            }
+
+            const auto* left = player->GetEquippedObject(true);
+            const auto* right = player->GetEquippedObject(false);
+            const bool leftEquipped = left && left->formID == item->formID;
+            const bool rightEquipped = right && right->formID == item->formID;
+
+            result.equipped = leftEquipped || rightEquipped;
+            result.equippedLeft = leftEquipped;
+            result.equippedRight = rightEquipped;
+            if (leftEquipped && rightEquipped) {
+                result.marker = "[L/R]";
+                result.state = "EQUIPPED - BOTH HANDS";
+            } else if (leftEquipped) {
+                result.marker = "[L]";
+                result.state = "EQUIPPED - LEFT HAND";
+            } else if (rightEquipped) {
+                result.marker = "[R]";
+                result.state = "EQUIPPED - RIGHT HAND";
+            }
+            return result;
+        }
     }
 
     // Helper to safely allocate ExtraDataList without calling the unresolved external constructor
@@ -76,7 +356,8 @@ namespace vrui
             || type == RE::FormType::AlchemyItem  // Potions, poisons
             || type == RE::FormType::Ingredient   // Alchemy ingredients (usable)
             || type == RE::FormType::SoulGem      // Soul gems (usable)
-            || type == RE::FormType::Scroll;      // Scrolls (usable / equippable)
+            || type == RE::FormType::Scroll       // Scrolls (usable / equippable)
+            || type == RE::FormType::Light;       // Torches and portable lights
     }
 
 
@@ -321,6 +602,506 @@ namespace vrui
         _cachedPageItems.clear();
     }
 
+    VRUIInventoryContainer::RmlInventorySnapshot
+    VRUIInventoryContainer::buildRmlInventorySnapshot() const
+    {
+        RmlInventorySnapshot snapshot;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return snapshot;
+
+        const char* playerName = player->GetName();
+        snapshot.playerName =
+            playerName && *playerName ? playerName : "Dragonborn";
+        snapshot.playerLevel = player->GetLevel();
+
+        if (auto* changes = player->GetInventoryChanges()) {
+            snapshot.currentWeight = changes->GetInventoryWeight();
+        } else {
+            snapshot.currentWeight = player->GetActorValue(RE::ActorValue::kInventoryWeight);
+        }
+        snapshot.carryWeight = player->GetActorValue(RE::ActorValue::kCarryWeight);
+
+        auto inventory = player->GetInventory([this](RE::TESBoundObject& item) {
+            return item.formID == kGoldFormID ||
+                (_filter == InventoryFilterMode::QuestItems ? true : isSupportedInventoryItem(item));
+        });
+        snapshot.items.reserve(inventory.size());
+
+        for (auto& [item, data] : inventory) {
+            if (!item || data.first <= 0) continue;
+            if (item->formID == kGoldFormID) {
+                snapshot.gold = data.first;
+                continue;
+            }
+            if (!passesFilter(item, _filter)) continue;
+
+            RmlItemData entry;
+            entry.formID = item->formID;
+            entry.count = data.first;
+            const char* rawName = item->GetName();
+            entry.name = rawName && *rawName ? rawName : "Unknown item";
+            entry.category = resolveInventoryCategory(item);
+            entry.description = resolveInventoryDescription(item);
+            entry.editCategory = resolveItemEditCategory(item);
+            entry.modelPath = ItemUtils::getModelPath(item);
+            entry.weight = item->GetWeight();
+            entry.value = item->GetGoldValue();
+            const auto equipment =
+                resolveInventoryEquipment(player, item, data.second.get());
+            entry.equipped = equipment.equipped;
+            entry.equippedLeft = equipment.equippedLeft;
+            entry.equippedRight = equipment.equippedRight;
+            entry.equipmentMarker = equipment.marker;
+            entry.equipmentState = equipment.state;
+            entry.favorited = data.second && data.second->IsFavorited();
+            entry.canEquip = isEquippableItem(item);
+
+            if (auto* weapon = item->As<RE::TESObjectWEAP>()) {
+                entry.attack = static_cast<float>(weapon->GetAttackDamage());
+                entry.hasAttack = true;
+            }
+            if (auto* armor = item->As<RE::TESObjectARMO>()) {
+                entry.defense = armor->GetArmorRating();
+                entry.hasDefense = true;
+            }
+
+            ItemUtils::getItemOverrides(
+                item,
+                entry.rotX, entry.rotY, entry.rotZ,
+                entry.xOff, entry.yOff, entry.zOff,
+                entry.scaleMult);
+            snapshot.items.push_back(std::move(entry));
+        }
+
+        std::sort(snapshot.items.begin(), snapshot.items.end(),
+            [](const RmlItemData& lhs, const RmlItemData& rhs) {
+                if (lhs.equipped != rhs.equipped) {
+                    return lhs.equipped;
+                }
+                std::string left = lhs.name;
+                std::string right = rhs.name;
+                std::transform(left.begin(), left.end(), left.begin(), [](unsigned char c) {
+                    return static_cast<char>(std::tolower(c));
+                });
+                std::transform(right.begin(), right.end(), right.begin(), [](unsigned char c) {
+                    return static_cast<char>(std::tolower(c));
+                });
+                if (left == right) return lhs.formID < rhs.formID;
+                return left < right;
+            });
+        return snapshot;
+    }
+
+    std::uint64_t VRUIInventoryContainer::buildRmlInventorySignature() const
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return 0;
+
+        auto inventory = player->GetInventory([](RE::TESBoundObject& item) {
+            return item.formID == kGoldFormID ||
+                isSupportedInventoryItem(item) ||
+                (item.formFlags & 0x400u) != 0;
+        });
+
+        std::vector<std::uint64_t> rows;
+        rows.reserve(inventory.size());
+        for (const auto& [item, data] : inventory) {
+            if (!item || data.first <= 0) continue;
+            std::uint64_t row =
+                (static_cast<std::uint64_t>(item->formID) << 32) |
+                static_cast<std::uint32_t>(data.first);
+            if (data.second && data.second->IsWorn()) {
+                row ^= 0x8000000000000000ull;
+            }
+            if (data.second && data.second->IsFavorited()) {
+                row ^= 0x4000000000000000ull;
+            }
+            rows.push_back(row);
+        }
+        std::sort(rows.begin(), rows.end());
+
+        std::uint64_t signature = 1469598103934665603ull;
+        const auto append = [&signature](std::uint64_t value) {
+            for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+                signature ^= value & 0xFFu;
+                signature *= 1099511628211ull;
+                value >>= 8;
+            }
+        };
+        for (const auto row : rows) append(row);
+
+        const auto* left = player->GetEquippedObject(true);
+        const auto* right = player->GetEquippedObject(false);
+        append(0x4C00000000000000ull | (left ? left->formID : 0));
+        append(0x5200000000000000ull | (right ? right->formID : 0));
+
+        float currentWeight = player->GetActorValue(RE::ActorValue::kInventoryWeight);
+        if (auto* changes = player->GetInventoryChanges()) {
+            currentWeight = changes->GetInventoryWeight();
+        }
+        append(static_cast<std::uint64_t>(std::llround(currentWeight * 100.0f)));
+        append(static_cast<std::uint64_t>(std::llround(
+            player->GetActorValue(RE::ActorValue::kCarryWeight) * 100.0f)));
+        append(player->GetLevel());
+        if (const char* playerName = player->GetName()) {
+            for (const unsigned char character : std::string_view(playerName)) {
+                append(character);
+            }
+        }
+        return signature;
+    }
+
+    bool VRUIInventoryContainer::interactWithItem(RE::FormID formID, EquipHand hand)
+    {
+        auto* form = RE::TESForm::LookupByID(formID);
+        auto* item = form ? form->As<RE::TESBoundObject>() : nullptr;
+        if (!item) return false;
+
+        return isEquippableItem(item) ?
+            activateItem(formID, hand) :
+            spawnItemInHand(formID, hand);
+    }
+
+    bool VRUIInventoryContainer::toggleFavorite(RE::FormID formID)
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* form = RE::TESForm::LookupByID(formID);
+        auto* item = form ? form->As<RE::TESBoundObject>() : nullptr;
+        if (!player || !item) return false;
+
+        auto* changes = player->GetInventoryChanges();
+        if (!changes || !changes->entryList) return false;
+
+        RE::InventoryEntryData* entry = nullptr;
+        for (auto* candidate : *changes->entryList) {
+            if (candidate && candidate->object == item) {
+                entry = candidate;
+                break;
+            }
+        }
+        if (!entry) return false;
+
+        const bool wasFavorited = entry->IsFavorited();
+        if (!wasFavorited) {
+            RE::ExtraDataList* extraList =
+                entry->extraLists && !entry->extraLists->empty() ?
+                entry->extraLists->front() : nullptr;
+            if (!extraList) {
+                extraList = createExtraDataList();
+                if (!entry->extraLists) {
+                    entry->extraLists =
+                        new RE::BSSimpleList<RE::ExtraDataList*>();
+                }
+                if (extraList) {
+                    entry->extraLists->push_front(extraList);
+                }
+            }
+            if (!extraList) return false;
+            changes->SetFavorite(entry, extraList);
+        } else {
+            RE::ExtraDataList* favoriteList = nullptr;
+            if (entry->extraLists) {
+                for (auto* extraList : *entry->extraLists) {
+                    if (extraList &&
+                        extraList->HasType(RE::ExtraDataType::kHotkey)) {
+                        favoriteList = extraList;
+                        break;
+                    }
+                }
+            }
+            if (!favoriteList) return false;
+            changes->RemoveFavorite(entry, favoriteList);
+        }
+
+        invalidateRefreshCache();
+        scheduleRefresh(0.05f);
+        logger::info(
+            "DragonBoardVR: {} inventory favorite {:08X} '{}'.",
+            wasFavorited ? "removed" : "added",
+            formID,
+            item->GetName());
+        return true;
+    }
+
+    bool VRUIInventoryContainer::activateItem(RE::FormID formID, EquipHand hand)
+    {
+        if (!VRMenuManager::get().canEquip()) return false;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* form = RE::TESForm::LookupByID(formID);
+        auto* item = form ? form->As<RE::TESBoundObject>() : nullptr;
+        if (!player || !item || !isEquippableItem(item)) return false;
+
+        auto liveInventory = player->GetInventory(
+            [formID](RE::TESBoundObject& object) { return object.formID == formID; });
+        const auto inventoryIt = liveInventory.find(item);
+        if (inventoryIt == liveInventory.end() || inventoryIt->second.first <= 0) {
+            logger::warn(
+                "DragonBoardVR: Item {:08X} ({}) no longer in inventory. Skipping activation.",
+                formID, item->GetName());
+            scheduleRefresh(0.05f);
+            return false;
+        }
+
+        if (!player->Get3D() || !player->Is3DLoaded()) {
+            logger::warn("DragonBoardVR: Player 3D not loaded, skipping inventory activation.");
+            return false;
+        }
+
+        auto* equipManager = RE::ActorEquipManager::GetSingleton();
+        if (!equipManager) return false;
+
+        const bool isLeft = hand == EquipHand::kLeft;
+        const bool isArmor = item->Is(RE::FormType::Armor);
+        const bool isWeapon = item->Is(RE::FormType::Weapon);
+        const bool isSpell = item->Is(RE::FormType::Spell) || item->Is(RE::FormType::Scroll);
+        const bool isLight = item->Is(RE::FormType::Light);
+        const std::int32_t count = inventoryIt->second.first;
+        auto* inventoryEntry = inventoryIt->second.second.get();
+
+        bool equipped = false;
+        if (isArmor) {
+            equipped = inventoryEntry && inventoryEntry->IsWorn();
+            if (!equipped) {
+                auto* armor = item->As<RE::TESObjectARMO>();
+                auto* worn = armor ? player->GetWornArmor(armor->GetSlotMask()) : nullptr;
+                equipped = worn && worn->formID == formID;
+            }
+        } else if (isWeapon || isSpell || isLight) {
+            auto* current = player->GetEquippedObject(isLeft);
+            equipped = current && current->formID == formID;
+        }
+
+        RE::ExtraDataList* extraList = nullptr;
+        auto* changes = player->GetInventoryChanges();
+        if (changes && changes->entryList) {
+            for (auto* entry : *changes->entryList) {
+                if (entry && entry->object == item) {
+                    if (entry->extraLists && !entry->extraLists->empty()) {
+                        extraList = entry->extraLists->front();
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (equipped) {
+            if (isArmor) {
+                VRMenuManager::get().performArmorChangeSafely([player, item, extraList]() {
+                    if (auto* manager = RE::ActorEquipManager::GetSingleton()) {
+                        manager->UnequipObject(player, item, extraList, 1, nullptr);
+                        VRMenuManager::get().notifyEquip();
+                        VRMenuManager::get().scheduleEquipRefresh(0.15f);
+                    }
+                });
+                return true;
+            }
+            if (isSpell) {
+                ItemUtils::PapyrusUnequipSpell(
+                    player, item->As<RE::SpellItem>(), isLeft ? 0 : 1);
+            } else {
+                const auto slotFormID = isLeft ? 0x13F43 : 0x13F42;
+                auto* slot = (isWeapon || isLight) ?
+                    RE::TESForm::LookupByID<RE::BGSEquipSlot>(slotFormID) : nullptr;
+                equipManager->UnequipObject(player, item, extraList, 1, slot);
+            }
+            VRMenuManager::get().notifyEquip();
+            VRMenuManager::get().scheduleEquipRefresh(0.15f);
+            logger::trace("DragonBoardVR: Unequipped from RmlUi inventory: {}", item->GetName());
+            return true;
+        }
+
+        if (count < 2 && isWeapon) {
+            auto* equippedOther = player->GetEquippedObject(!isLeft);
+            if (equippedOther && equippedOther->formID == formID) {
+                auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(
+                    !isLeft ? 0x13F43 : 0x13F42);
+                equipManager->UnequipObject(player, item, nullptr, 1, otherSlot);
+            }
+        }
+
+        const auto slotFormID = isLeft ? 0x13F43 : 0x13F42;
+        auto* slot = (isWeapon || isSpell || isLight) ?
+            RE::TESForm::LookupByID<RE::BGSEquipSlot>(slotFormID) : nullptr;
+        if (isArmor) {
+            VRMenuManager::get().performArmorChangeSafely([player, item, extraList]() {
+                if (auto* manager = RE::ActorEquipManager::GetSingleton()) {
+                    manager->EquipObject(player, item, extraList, 1, nullptr);
+                    if (!player->IsOnMount()) player->DrawWeaponMagicHands(true);
+                    VRMenuManager::get().notifyEquip();
+                    VRMenuManager::get().scheduleEquipRefresh(0.15f);
+                }
+            });
+            return true;
+        }
+
+        equipManager->EquipObject(player, item, extraList, 1, slot);
+        if (isWeapon || isSpell || isLight) {
+            if (!player->IsOnMount()) player->DrawWeaponMagicHands(true);
+        }
+        VRMenuManager::get().notifyEquip();
+        VRMenuManager::get().scheduleEquipRefresh(0.15f);
+        logger::trace("DragonBoardVR: Activated from RmlUi inventory: {}", item->GetName());
+        return true;
+    }
+
+    bool VRUIInventoryContainer::spawnItemInHand(RE::FormID formID, EquipHand hand)
+    {
+        auto& menuManager = VRMenuManager::get();
+        if (!menuManager.canEquip()) return false;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* form = RE::TESForm::LookupByID(formID);
+        auto* item = form ? form->As<RE::TESBoundObject>() : nullptr;
+        if (!player || !item) return false;
+        if ((item->formFlags & 0x400u) != 0) {
+            logger::warn(
+                "DragonBoardVR: Quest item {:08X} ({}) cannot be spawned into a HIGGS hand.",
+                formID, item->GetName());
+            return false;
+        }
+
+        auto inventory = player->GetInventory(
+            [formID](RE::TESBoundObject& object) { return object.formID == formID; });
+        const auto inventoryIt = inventory.find(item);
+        if (inventoryIt == inventory.end() || inventoryIt->second.first <= 0) {
+            logger::warn(
+                "DragonBoardVR: Item {:08X} ({}) no longer in inventory. Skipping HIGGS interaction.",
+                formID, item->GetName());
+            scheduleRefresh(0.05f);
+            return false;
+        }
+
+        auto* taskInterface = SKSE::GetTaskInterface();
+        if (!taskInterface) return false;
+
+        taskInterface->AddTask([formID, hand]() {
+            auto* livePlayer = RE::PlayerCharacter::GetSingleton();
+            auto* liveForm = RE::TESForm::LookupByID(formID);
+            auto* liveItem = liveForm ? liveForm->As<RE::TESBoundObject>() : nullptr;
+            if (!livePlayer || !liveItem) return;
+
+            const auto countBefore = livePlayer->GetItemCount(liveItem);
+            if (countBefore <= 0) return;
+
+            if (auto* book = liveItem->As<RE::TESObjectBOOK>();
+                book && (book->TeachesSpell() || book->TeachesSkill())) {
+                if (auto* spell = book->GetSpell()) {
+                    livePlayer->AddSpell(spell);
+                    const std::string message = "Learned: " + std::string(spell->GetName());
+                    RE::DebugNotification(message.c_str());
+                    if (auto* learnSound =
+                            RE::TESForm::LookupByID<RE::BGSSoundDescriptorForm>(0x01ADC3)) {
+                        RE::BSSoundHandle handle;
+                        if (RE::BSAudioManager::GetSingleton()->BuildSoundDataFromDescriptor(
+                                handle, learnSound)) {
+                            handle.Play();
+                        }
+                    }
+                    livePlayer->RemoveItem(
+                        book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                } else if (book->TeachesSkill()) {
+                    book->Read(livePlayer);
+                    livePlayer->RemoveItem(
+                        book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                }
+                return;
+            }
+
+            livePlayer->RemoveItem(
+                liveItem, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+            if (livePlayer->GetItemCount(liveItem) >= countBefore) {
+                logger::warn(
+                    "DragonBoardVR: Skyrim rejected removal of {:08X} ({}); no world reference was spawned.",
+                    formID, liveItem->GetName());
+                return;
+            }
+
+            auto reference = livePlayer->PlaceObjectAtMe(liveItem, false);
+            if (!reference) {
+                livePlayer->AddObjectToContainer(liveItem, nullptr, 1, nullptr);
+                logger::warn(
+                    "DragonBoardVR: Failed to spawn {:08X} ({}) for HIGGS; item returned to inventory.",
+                    formID, liveItem->GetName());
+                return;
+            }
+
+            const bool isLeft = hand == EquipHand::kLeft;
+            RE::NiNode* handNode = nullptr;
+            auto* root = livePlayer->Get3D(false);
+            if (!root) root = livePlayer->Get3D(true);
+            if (root) {
+                const std::array<const char*, 3> nodeNames = isLeft ?
+                    std::array{
+                        "NPC L MagicNode [LMag]",
+                        "NPC L Hand [LHnd]",
+                        "Left Wand Node" } :
+                    std::array{
+                        "NPC R MagicNode [RMag]",
+                        "NPC R Hand [RHnd]",
+                        "Right Wand Node" };
+                for (const auto* nodeName : nodeNames) {
+                    if (auto* object = root->GetObjectByName(nodeName)) {
+                        handNode = object->AsNode();
+                        if (handNode) break;
+                    }
+                }
+            }
+
+            if (handNode) {
+                float pitch = 0.0f;
+                float yaw = 0.0f;
+                float roll = 0.0f;
+                VRUILayoutManager::getMatrixEuler(
+                    handNode->world.rotate, pitch, yaw, roll);
+                (void)dragonboard::runtime::vr::SetReferenceTransform(
+                    reference.get(),
+                    handNode->world.translate,
+                    { pitch, yaw, roll });
+            }
+
+            if (g_higgsInterface) {
+                SKSE::GetTaskInterface()->AddTask([reference, isLeft, formID]() {
+                    if (!reference || !g_higgsInterface) return;
+
+                    auto* rawReference = reference.get();
+                    if (g_higgsInterface->CanGrabObject(rawReference, isLeft)) {
+                        g_higgsInterface->GrabObject(rawReference, isLeft);
+                        logger::info(
+                            "DragonBoardVR: Inventory item {:08X} spawned and grabbed with HIGGS.",
+                            formID);
+                    } else {
+                        logger::warn(
+                            "DragonBoardVR: HIGGS could not grab spawned inventory item {:08X}.",
+                            formID);
+                    }
+                });
+            }
+        });
+
+        menuManager.notifyEquip();
+        scheduleRefresh(0.15f);
+        return true;
+    }
+
+    bool VRUIInventoryContainer::dropItem(RE::FormID formID)
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* form = RE::TESForm::LookupByID(formID);
+        auto* item = form ? form->As<RE::TESBoundObject>() : nullptr;
+        if (!player || !item) return false;
+
+        auto inventory = player->GetInventory(
+            [formID](RE::TESBoundObject& object) { return object.formID == formID; });
+        const auto it = inventory.find(item);
+        if (it == inventory.end() || it->second.first <= 0) return false;
+
+        player->DropObject(item, nullptr, 1, nullptr, nullptr);
+        scheduleRefresh(0.1f);
+        logger::trace("DragonBoardVR: Dropped from RmlUi inventory: {}", item->GetName());
+        return true;
+    }
+
     void VRUIInventoryContainer::appendInventoryButton(const PendingInventoryItem& pending)
     {
         auto* form = RE::TESForm::LookupByID(pending.formID);
@@ -375,8 +1156,6 @@ namespace vrui
         const float yOff = pending.yOff;
         const float zOff = pending.zOff;
         const float scaleMult = pending.scaleMult;
-        const int count = pending.count;
-
         button->setOnSecondaryPressHandler([label, modelPath, fID, rotX, rotY, rotZ, xOff, yOff, zOff, scaleMult](VRUIButton*, EquipHand) {
             auto& settings = VRUISettings::get();
             if (!settings.editModeEnabled) return;
@@ -397,237 +1176,21 @@ namespace vrui
             }
         });
 
-        const bool isBookOrMisc = item->Is(RE::FormType::Book) || item->Is(RE::FormType::Misc);
-        if (isBookOrMisc) {
-            button->setOnPressHandler([item](VRUIButton*, EquipHand hand) {
-                auto* p = RE::PlayerCharacter::GetSingleton();
-                if (!p || !item) return;
-
-                auto liveInv = p->GetInventory([&](RE::TESBoundObject& obj) { return obj.formID == item->formID; });
-                auto liveIt = liveInv.find(item);
-                if (liveIt == liveInv.end() || liveIt->second.first <= 0) {
-                    logger::warn("DragonBoardVR: Item {:X} ({}) no longer in inventory.", item->formID, item->GetName());
-                    return;
-                }
-
-                auto* book = item->As<RE::TESObjectBOOK>();
-                auto* ti = SKSE::GetTaskInterface();
-                if (!ti) return;
-
-                const bool isTome = book ? (book->TeachesSpell() || book->TeachesSkill()) : false;
-                ti->AddTask([item, book, p, isTome, hand]() {
-                    if (isTome) {
-                        if (auto* spell = book->GetSpell()) {
-                            p->AddSpell(spell);
-                            std::string msg = "Learned: " + std::string(spell->GetName());
-                            RE::DebugNotification(msg.c_str());
-                            auto* learnSound = RE::TESForm::LookupByID<RE::BGSSoundDescriptorForm>(0x01ADC3);
-                            if (learnSound) {
-                                RE::BSSoundHandle handle;
-                                if (RE::BSAudioManager::GetSingleton()->BuildSoundDataFromDescriptor(handle, learnSound))
-                                    handle.Play();
-                            }
-                            p->RemoveItem(book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
-                        } else if (book->TeachesSkill()) {
-                            book->Read(p);
-                            p->RemoveItem(book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
-                        }
-                        return;
-                    }
-
-                    p->RemoveItem(item, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
-                    auto refPointer = p->PlaceObjectAtMe(item, false);
-                    if (refPointer) {
-                        auto* ref = refPointer.get();
-                        RE::NiNode* handNode = nullptr;
-                        auto* root = p->Get3D(false);
-                        if (!root) root = p->Get3D(true);
-                        if (root) {
-                            bool isLeft = (hand == vrui::EquipHand::kLeft);
-                            auto* obj = root->GetObjectByName(isLeft ? "NPC L MagicNode [LMag]" : "NPC R MagicNode [RMag]");
-                            if (!obj) obj = root->GetObjectByName(isLeft ? "NPC L Hand [LHnd]" : "NPC R Hand [RHnd]");
-                            if (obj) handNode = obj->AsNode();
-                        }
-                        if (handNode) {
-                            float pr, yr, rr;
-                            vrui::VRUILayoutManager::getMatrixEuler(handNode->world.rotate, pr, yr, rr);
-                            (void)dragonboard::runtime::vr::SetReferenceTransform(
-                                ref,
-                                handNode->world.translate,
-                                { pr, yr, rr });
-                        }
-                        if (g_higgsInterface) {
-                            SKSE::GetTaskInterface()->AddTask([refPointer, hand]() {
-                                if (refPointer && g_higgsInterface) {
-                                    bool isLeft = (hand == vrui::EquipHand::kLeft);
-                                    if (g_higgsInterface->CanGrabObject(refPointer.get(), isLeft))
-                                        g_higgsInterface->GrabObject(refPointer.get(), isLeft);
-                                }
-                            });
-                        }
-                    }
-                });
-            });
-        } else {
-            button->setOnPressHandler([item, count, weakSelf](VRUIButton*, EquipHand hand) {
-                if (!VRMenuManager::get().canEquip()) return;
-
-                auto* p = RE::PlayerCharacter::GetSingleton();
-                if (p && item) {
-                    auto liveInv = p->GetInventory([&](RE::TESBoundObject& obj) { return obj.formID == item->formID; });
-                    auto it = liveInv.find(item);
-                    if (it == liveInv.end() || it->second.first <= 0) {
-                        logger::warn("DragonBoardVR: Item {:X} ({}) no longer in inventory. Skipping equip.", item->formID, item->GetName());
-                        if (auto self = weakSelf.lock()) self->scheduleRefresh();
-                        return;
-                    }
-
-                    if (!p->Get3D() || !p->Is3DLoaded()) {
-                        logger::warn("DragonBoardVR: Player 3D not loaded, skipping equip.");
-                        return;
-                    }
-
-                    auto* actorEquipManager = RE::ActorEquipManager::GetSingleton();
-                    if (actorEquipManager) {
-                        bool isLeft = (hand == EquipHand::kLeft);
-                        bool isArmor = item->Is(RE::FormType::Armor);
-                        bool isWeapon = item->Is(RE::FormType::Weapon);
-                        bool isSpell = item->Is(RE::FormType::Spell) || item->Is(RE::FormType::Scroll);
-                        bool isLight = item->Is(RE::FormType::Light);
-
-                        bool isActuallyEquipped = false;
-                        if (isArmor) {
-                            auto* worn = p->GetWornArmor(item->As<RE::TESObjectARMO>()->GetSlotMask());
-                            if (worn && worn->formID == item->formID) isActuallyEquipped = true;
-                        } else if (isWeapon || isSpell || isLight) {
-                            auto* alreadyEquipped = p->GetEquippedObject(isLeft);
-                            if (alreadyEquipped && alreadyEquipped->formID == item->formID) isActuallyEquipped = true;
-                        }
-
-                        RE::ExtraDataList* xList = nullptr;
-                        auto* changes = p->GetInventoryChanges();
-                        if (changes && changes->entryList) {
-                            for (auto* ed : *changes->entryList) {
-                                if (ed && ed->object == item) {
-                                    if (ed->extraLists && !ed->extraLists->empty()) {
-                                        xList = ed->extraLists->front();
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (isActuallyEquipped) {
-                            if (isArmor) {
-                                VRMenuManager::get().performArmorChangeSafely([p, item, xList]() {
-                                    if (auto* mgr = RE::ActorEquipManager::GetSingleton()) {
-                                        mgr->UnequipObject(p, item, xList, 1, nullptr);
-                                        VRMenuManager::get().notifyEquip();
-                                        VRMenuManager::get().scheduleEquipRefresh(0.15f);
-                                    }
-                                });
-                                return;
-                            }
-                            if (isSpell) {
-                                ItemUtils::PapyrusUnequipSpell(p, item->As<RE::SpellItem>(), isLeft ? 0 : 1);
-                            } else {
-                                auto slotFormID = isLeft ? 0x13F43 : 0x13F42;
-                                auto slot = (isWeapon || isSpell || isLight) ? RE::TESForm::LookupByID<RE::BGSEquipSlot>(slotFormID) : nullptr;
-                                actorEquipManager->UnequipObject(p, item, xList, 1, slot);
-                            }
-                            VRMenuManager::get().notifyEquip();
-                            logger::trace("DragonBoardVR: Unequipped: {}", item->GetName());
-                            VRMenuManager::get().scheduleEquipRefresh(0.15f);
-                            return;
-                        }
-
-                        if (count < 2 && isWeapon) {
-                            auto* equippedOther = p->GetEquippedObject(!isLeft);
-                            if (equippedOther && equippedOther->formID == item->formID) {
-                                auto otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(!isLeft ? 0x13F43 : 0x13F42);
-                                actorEquipManager->UnequipObject(p, item, nullptr, 1, otherSlot);
-                            }
-                        }
-
-                        auto slotFormID = isLeft ? 0x13F43 : 0x13F42;
-                        auto slot = (isWeapon || isSpell || isLight) ? RE::TESForm::LookupByID<RE::BGSEquipSlot>(slotFormID) : nullptr;
-                        if (isArmor) {
-                            VRMenuManager::get().performArmorChangeSafely([p, item, xList]() {
-                                if (auto* mgr = RE::ActorEquipManager::GetSingleton()) {
-                                    mgr->EquipObject(p, item, xList, 1, nullptr);
-                                    if (!p->IsOnMount()) p->DrawWeaponMagicHands(true);
-                                    VRMenuManager::get().notifyEquip();
-                                    VRMenuManager::get().scheduleEquipRefresh(0.15f);
-                                }
-                            });
-                            return;
-                        }
-                        actorEquipManager->EquipObject(p, item, xList, 1, slot);
-
-                        if (isWeapon || isSpell || isArmor || isLight) {
-                            if (!p->IsOnMount()) {
-                                p->DrawWeaponMagicHands(true);
-                            }
-                        }
-
-                        VRMenuManager::get().notifyEquip();
-                        logger::trace("DragonBoardVR: Equipped: {}", item->GetName());
-                        VRMenuManager::get().scheduleEquipRefresh(0.15f);
-                    }
-                }
-            });
-        }
-
-        button->setOnGripDragHandler([item, weakSelf](VRUIButton*, EquipHand) {
-            auto* p = RE::PlayerCharacter::GetSingleton();
-            if (p && item) {
-                p->DropObject(item, nullptr, 1, nullptr, nullptr);
-                if (auto self = weakSelf.lock()) {
-                    self->scheduleRefresh(0.1f);
-                }
+        button->setOnPressHandler([fID, weakSelf](VRUIButton*, EquipHand hand) {
+            if (auto self = weakSelf.lock()) {
+                self->interactWithItem(fID, hand);
             }
         });
 
-        button->setOnLongPressHandler([item](VRUIButton* btn, EquipHand) {
-            auto* p = RE::PlayerCharacter::GetSingleton();
-            if (!p || !item) return;
-
-            auto* changes = p->GetInventoryChanges();
-            if (!changes || !changes->entryList) return;
-
-            RE::InventoryEntryData* theEntry = nullptr;
-            for (auto* ed : *changes->entryList) {
-                if (ed && ed->object == item) { theEntry = ed; break; }
+        button->setOnGripDragHandler([fID, weakSelf](VRUIButton*, EquipHand) {
+            if (auto self = weakSelf.lock()) {
+                self->dropItem(fID);
             }
-            if (!theEntry) return;
+        });
 
-            const bool wasFavorited = theEntry->IsFavorited();
-            if (!wasFavorited) {
-                RE::ExtraDataList* xList = (theEntry->extraLists && !theEntry->extraLists->empty())
-                    ? theEntry->extraLists->front() : nullptr;
-
-                if (!xList) {
-                    xList = createExtraDataList();
-                    if (!theEntry->extraLists) {
-                        theEntry->extraLists = new RE::BSSimpleList<RE::ExtraDataList*>();
-                    }
-                    theEntry->extraLists->push_front(xList);
-                }
-
-                if (xList) {
-                    changes->SetFavorite(theEntry, xList);
-                    if (btn) btn->setLabel(std::string("* ") + item->GetName());
-                }
-            } else {
-                if (theEntry->extraLists) {
-                    for (auto* xList : *theEntry->extraLists) {
-                        if (xList && xList->HasType(RE::ExtraDataType::kHotkey)) {
-                            changes->RemoveFavorite(theEntry, xList);
-                            break;
-                        }
-                    }
-                }
-                if (btn) btn->setLabel(item->GetName());
+        button->setOnLongPressHandler([fID, weakSelf](VRUIButton*, EquipHand) {
+            if (auto self = weakSelf.lock()) {
+                self->toggleFavorite(fID);
             }
         });
 
