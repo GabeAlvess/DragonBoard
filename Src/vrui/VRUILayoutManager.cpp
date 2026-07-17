@@ -152,6 +152,7 @@ namespace vrui {
                             elem.hideLabel = el.value("hideLabel", false);
                             elem.pinToWorld = el.value("pinToWorld", false);
                             elem.pinToHmdWorld = el.value("pinToHmdWorld", false);
+                            elem.visualTransformComposed = el.value("visualTransformComposed", false);
 
                             if (el.contains("transform")) {
                                 auto& t = el["transform"];
@@ -233,6 +234,7 @@ namespace vrui {
                     je["hideLabel"] = e.hideLabel;
                     je["pinToWorld"] = e.pinToWorld;
                     je["pinToHmdWorld"] = e.pinToHmdWorld;
+                    je["visualTransformComposed"] = e.visualTransformComposed;
 
                     nlohmann::json jte;
                     jte["position"] = { {"x", e.transform.px}, {"y", e.transform.py}, {"z", e.transform.pz} };
@@ -263,7 +265,10 @@ namespace vrui {
 
             root["containers"] = containersArray;
 
-            std::ofstream file(_filePath);
+            // Keep layout persistence ordered with the in-memory mutations.
+            // Pin operations are batched, so this is now one bounded write
+            // instead of three full-file writes for a single action.
+            std::ofstream file(_filePath, std::ios::binary | std::ios::trunc);
             file << root.dump(4);
             logger::trace("DragonBoardVR: Successfully saved JSON layout.");
         } catch (const std::exception& e) {
@@ -334,7 +339,10 @@ namespace vrui {
     void VRUILayoutManager::updateElementTransformAnywhere(const std::string& elementId,
                                                            const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale,
                                                            const std::string& nifPath, const std::string& category, uint32_t formID,
-                                                           const std::string& actionFunc, const std::string& label) {
+                                                           const std::string& actionFunc, const std::string& label,
+                                                           std::optional<bool> pinToWorld,
+                                                           std::optional<bool> pinToHmdWorld,
+                                                           std::optional<bool> visualTransformComposed) {
         bool found = false;
 
         bool isBow = false;
@@ -357,6 +365,9 @@ namespace vrui {
                     if (formID != 0) e.formID = formID;
                     if (!actionFunc.empty()) e.actionFunc = actionFunc;
                     if (!label.empty()) e.label = label;
+                    if (pinToWorld) e.pinToWorld = *pinToWorld;
+                    if (pinToHmdWorld) e.pinToHmdWorld = *pinToHmdWorld;
+                    if (visualTransformComposed) e.visualTransformComposed = *visualTransformComposed;
                     found = true;
                     break;
                 }
@@ -373,6 +384,9 @@ namespace vrui {
             ne.formID = formID;
             ne.actionFunc = actionFunc;
             ne.label = label;
+            if (pinToWorld) ne.pinToWorld = *pinToWorld;
+            if (pinToHmdWorld) ne.pinToHmdWorld = *pinToHmdWorld;
+            if (visualTransformComposed) ne.visualTransformComposed = *visualTransformComposed;
 
             const std::string targetContainerId = getDefaultContainerIdForElement(elementId);
             bool containerFound = false;
@@ -398,7 +412,10 @@ namespace vrui {
     void VRUILayoutManager::updateElementTransformAnywhereDirect(const std::string& elementId,
                                                                  const RE::NiPoint3& pos, float rotX, float rotY, float rotZ, float scale,
                                                                  const std::string& nifPath, const std::string& category, uint32_t formID,
-                                                                 const std::string& actionFunc, const std::string& label) {
+                                                                 const std::string& actionFunc, const std::string& label,
+                                                                 std::optional<bool> pinToWorld,
+                                                                 std::optional<bool> pinToHmdWorld,
+                                                                 std::optional<bool> visualTransformComposed) {
         bool found = false;
 
         for (auto& c : _containers) {
@@ -410,6 +427,9 @@ namespace vrui {
                     if (formID != 0) e.formID = formID;
                     if (!actionFunc.empty()) e.actionFunc = actionFunc;
                     if (!label.empty()) e.label = label;
+                    if (pinToWorld) e.pinToWorld = *pinToWorld;
+                    if (pinToHmdWorld) e.pinToHmdWorld = *pinToHmdWorld;
+                    if (visualTransformComposed) e.visualTransformComposed = *visualTransformComposed;
                     found = true;
                     break;
                 }
@@ -426,6 +446,9 @@ namespace vrui {
             ne.formID = formID;
             ne.actionFunc = actionFunc;
             ne.label = label;
+            if (pinToWorld) ne.pinToWorld = *pinToWorld;
+            if (pinToHmdWorld) ne.pinToHmdWorld = *pinToHmdWorld;
+            if (visualTransformComposed) ne.visualTransformComposed = *visualTransformComposed;
 
             const std::string targetContainerId = getDefaultContainerIdForElement(elementId);
             bool containerFound = false;

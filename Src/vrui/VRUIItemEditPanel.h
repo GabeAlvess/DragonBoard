@@ -53,6 +53,10 @@ namespace vrui
         void updatePreview();
         void setRmlPreviewMode(bool enabled);
         void setRmlPreviewLayout(RmlPreviewLayout layout);
+        [[nodiscard]] std::shared_ptr<class VRUIButton> getPreviewWidget() const
+        {
+            return _previewWidget;
+        }
         void setInventoryPreviewInteractionHandler(
             InventoryPreviewInteractionHandler handler);
         void setWorkingTransformChangedHandler(
@@ -77,6 +81,12 @@ namespace vrui
 
     private:
         void saveOffsets();
+        void syncWorkingTransformFromPreview();
+        bool getPreviewVisualWorldTransform(
+            RE::NiPoint3& position, RE::NiMatrix3& rotation, float& scale) const;
+        bool getPreviewVisualTransformRelativeTo(
+            RE::NiNode* parent,
+            RE::NiPoint3& position, RE::NiMatrix3& rotation, float& scale) const;
         void syncRotationFromPreviewGrab(const RE::NiMatrix3& localRotation);
         void updateInventoryPreviewInteraction();
 
@@ -91,6 +101,7 @@ namespace vrui
         float _baseScaleMult = 4.0f;
         float _normalizedScale = 1.0f;
         bool _rmlPreviewMode = false;
+        bool _previewRootTransformConfigured = false;
         RmlPreviewLayout _rmlPreviewLayout = RmlPreviewLayout::ItemEditor;
         InventoryPreviewInteractionHandler _inventoryPreviewInteractionHandler;
         WorkingTransformChangedHandler _workingTransformChangedHandler;

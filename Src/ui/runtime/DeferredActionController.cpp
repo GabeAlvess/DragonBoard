@@ -30,7 +30,12 @@ namespace dragonboard::ui::runtime
         manager._settingsSaveScheduler.Reset();
         const bool verbosePerf = vrui::VRUISettings::get().verboseLogging;
         const auto saveStart = verbosePerf ? PerfClock::now() : PerfClock::time_point{};
-        vrui::VRUISettings::get().save(vrui::VRUISettings::getDefaultIniPath());
+        const auto iniPath = vrui::VRUISettings::getDefaultIniPath();
+        vrui::VRUISettings::get().save(iniPath);
+        // This write came from DragonBoard itself. Advance the watcher baseline
+        // immediately so the next poll does not mistake it for an external edit
+        // and request a global refresh that rebuilds every pinned widget.
+        manager._iniChangeWatcher.Track(iniPath);
         if (verbosePerf) {
             const double saveMs = ElapsedMs(saveStart, PerfClock::now());
             if (saveMs >= 0.5) {

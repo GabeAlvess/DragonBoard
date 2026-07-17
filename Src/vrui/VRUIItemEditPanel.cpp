@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "VRUIItemEditPanel.h"
+#include "ui/widgets/FixedWidgetPresenter.h"
 #include "VRUIButton.h"
 #include "VRUISlider.h"
 #include "VRMenuManager.h"
@@ -89,6 +90,27 @@ namespace vrui
                 return runtimeRotX;
             }
             return runtimeRotZ;
+        }
+
+        void extractLayoutEulerForSetXYZ(
+            const RE::NiMatrix3& matrix,
+            float& x,
+            float& y,
+            float& z)
+        {
+            const float m02 = std::clamp(matrix.entry[0][2], -1.0f, 1.0f);
+            const float rawY = -std::asin(m02);
+            const float cosY = std::cos(rawY);
+            if (std::abs(cosY) > 1e-5f) {
+                x = std::atan2(matrix.entry[1][2], matrix.entry[2][2]);
+                z = std::atan2(matrix.entry[0][1], matrix.entry[0][0]);
+            } else {
+                x = std::atan2(-matrix.entry[2][1], matrix.entry[1][1]);
+                z = 0.0f;
+            }
+
+            // VRUILayoutManager::setMatrixEuler() applies SetEulerAnglesXYZ(x, -y, z).
+            y = -rawY;
         }
 
         void refreshLabelsRecursive(VRUIWidget* widget)
@@ -234,6 +256,7 @@ namespace vrui
     void VRUIItemEditPanel::setRmlPreviewMode(bool enabled)
     {
         _rmlPreviewMode = enabled;
+        updateInventoryPreviewInteraction();
         for (const auto& child : getChildren()) {
             if (child) {
                 child->setVisible(!enabled || child == _previewWidget);
@@ -247,6 +270,9 @@ namespace vrui
 
     void VRUIItemEditPanel::setRmlPreviewLayout(RmlPreviewLayout layout)
     {
+        if (_rmlPreviewLayout != layout) {
+            _previewRootTransformConfigured = false;
+        }
         _rmlPreviewLayout = layout;
         updateInventoryPreviewInteraction();
         if (_previewWidget) {
@@ -270,6 +296,11 @@ namespace vrui
              _rmlPreviewLayout == RmlPreviewLayout::Magic) &&
             _targetFormID != 0 &&
             static_cast<bool>(_inventoryPreviewInteractionHandler);
+        const bool zoneDrivenHover =
+            _rmlPreviewMode &&
+            (_rmlPreviewLayout == RmlPreviewLayout::Inventory ||
+             _rmlPreviewLayout == RmlPreviewLayout::Magic);
+        _previewWidget->setPointerHitTestEnabled(!zoneDrivenHover);
         _previewWidget->setDashboardPinned(enabled);
         if (enabled) {
             _previewWidget->setOnPressHandler([this](VRUIButton*, EquipHand hand) {
@@ -335,17 +366,28 @@ namespace vrui
                 static_cast<std::uint32_t>(_targetFormID), _targetItemName);
             return false;
         }
+        syncWorkingTransformFromPreview();
         const auto elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
-        VRUILayoutManager::updateElementTransformAnywhereDirect(
+        RE::NiPoint3 position{ _posX, _posY, _posZ };
+        RE::NiMatrix3 rotation;
+        VRUILayoutManager::setMatrixEuler(
+            rotation,
+            editorRotXToRuntime(_rotX, _rotZ, _targetModelPath) * kDegToRad,
+            editorRotYToRuntime(_rotY, _targetModelPath) * kDegToRad,
+            editorRotZToRuntime(_rotX, _rotZ, _targetModelPath) * kDegToRad);
+        float scale = _scale;
+        if (const auto panel = VRMenuManager::get().findPanelByName("Persistent_Panel")) {
+            if (auto* target = panel->findWidgetByName("FixedWidgetsContainer")) {
+                getPreviewVisualTransformRelativeTo(target->getNode(), position, rotation, scale);
+            }
+        }
+        VRUILayoutManager::updateElementTransformAnywhere(
             elementId,
-            { _posX, _posY, _posZ },
-            editorRotXToRuntime(_rotX, _rotZ, _targetModelPath),
-            editorRotYToRuntime(_rotY, _targetModelPath),
-            editorRotZToRuntime(_rotX, _rotZ, _targetModelPath),
-            _scale, _targetModelPath, _targetCategory, _targetFormID, _targetActionFunc);
-        VRUILayoutManager::setElementPinToWorld(elementId, false);
-        VRUILayoutManager::setElementPinToHmdWorld(elementId, false);
-        VRMenuManager::get().refreshFixedWidgets();
+            position, rotation, scale,
+            _targetModelPath, _targetCategory, _targetFormID,
+            _targetActionFunc, "", false, false, true);
+        dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+            VRMenuManager::get(), elementId);
         logger::info(
             "DragonBoardVR: item {:08X} '{}' pinned to dashboard as '{}'.",
             static_cast<std::uint32_t>(_targetFormID), _targetItemName, elementId);
@@ -355,34 +397,51 @@ namespace vrui
     bool VRUIItemEditPanel::pinToLeftHand()
     {
         if (_targetCategory != "Magic") return false;
+        syncWorkingTransformFromPreview();
         const auto elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
-        VRUILayoutManager::updateElementTransformAnywhereDirect(
+        RE::NiPoint3 position{ _posX, _posY, _posZ };
+        RE::NiMatrix3 rotation;
+        VRUILayoutManager::setMatrixEuler(
+            rotation,
+            editorRotXToRuntime(_rotX, _rotZ, _targetModelPath) * kDegToRad,
+            editorRotYToRuntime(_rotY, _targetModelPath) * kDegToRad,
+            editorRotZToRuntime(_rotX, _rotZ, _targetModelPath) * kDegToRad);
+        float scale = _scale;
+        // The left-hand panel uses the same board-local coordinate system as
+        // the persistent layer, even before its own panel has been attached.
+        if (const auto panel = VRMenuManager::get().findPanelByName("Persistent_Panel")) {
+            if (auto* target = panel->findWidgetByName("FixedWidgetsContainer")) {
+                getPreviewVisualTransformRelativeTo(target->getNode(), position, rotation, scale);
+            }
+        }
+        VRUILayoutManager::updateElementTransformAnywhere(
             elementId,
-            { _posX, _posY, _posZ },
-            editorRotXToRuntime(_rotX, _rotZ, _targetModelPath),
-            editorRotYToRuntime(_rotY, _targetModelPath),
-            editorRotZToRuntime(_rotX, _rotZ, _targetModelPath),
-            _scale, _targetModelPath, _targetCategory, _targetFormID, _targetActionFunc);
-        VRUILayoutManager::setElementPinToWorld(elementId, true);
-        VRUILayoutManager::setElementPinToHmdWorld(elementId, false);
-        VRMenuManager::get().refreshFixedWidgets();
+            position, rotation, scale,
+            _targetModelPath, _targetCategory, _targetFormID,
+            _targetActionFunc, "", true, false, true);
+        dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+            VRMenuManager::get(), elementId);
         return true;
     }
 
     bool VRUIItemEditPanel::pinToWorld()
     {
         if (_targetCategory != "Magic" || !_previewWidget || !_previewWidget->getNode()) return false;
+        syncWorkingTransformFromPreview();
         const auto elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
-        const auto* previewNode = _previewWidget->getNode();
+        RE::NiPoint3 worldPosition;
+        RE::NiMatrix3 worldRotation;
+        float worldScale = 1.0f;
+        if (!getPreviewVisualWorldTransform(worldPosition, worldRotation, worldScale)) return false;
         VRUILayoutManager::updateElementTransformAnywhere(
             elementId,
-            previewNode->world.translate,
-            previewNode->world.rotate,
-            previewNode->world.scale,
-            _targetModelPath, _targetCategory, _targetFormID, _targetActionFunc);
-        VRUILayoutManager::setElementPinToHmdWorld(elementId, true);
-        VRUILayoutManager::setElementPinToWorld(elementId, false);
-        VRMenuManager::get().refreshFixedWidgets();
+            worldPosition,
+            worldRotation,
+            worldScale,
+            _targetModelPath, _targetCategory, _targetFormID,
+            _targetActionFunc, "", false, true, true);
+        dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+            VRMenuManager::get(), elementId);
         return true;
     }
 
@@ -392,8 +451,72 @@ namespace vrui
         const auto existing = VRUILayoutManager::findElementAnywhere(elementId);
         const bool hideLabel = existing ? !existing->hideLabel : true;
         VRUILayoutManager::setElementHideLabel(elementId, hideLabel);
-        VRMenuManager::get().refreshFixedWidgets();
+        dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+            VRMenuManager::get(), elementId);
         return hideLabel;
+    }
+
+    void VRUIItemEditPanel::syncWorkingTransformFromPreview()
+    {
+        if (!_previewWidget) return;
+
+        RE::NiPoint3 position;
+        RE::NiMatrix3 rotation;
+        float scale = 1.0f;
+        if (!_previewWidget->getPrimaryVisualTransform(position, rotation, scale)) return;
+
+        _posX = std::clamp(position.x, -20.0f, 20.0f);
+        _posY = std::clamp(position.y, -20.0f, 20.0f);
+        _posZ = std::clamp(position.z, -20.0f, 20.0f);
+        _scale = std::max(0.01f, scale);
+        syncRotationFromPreviewGrab(rotation);
+    }
+
+    bool VRUIItemEditPanel::getPreviewVisualWorldTransform(
+        RE::NiPoint3& position, RE::NiMatrix3& rotation, float& scale) const
+    {
+        if (!_previewWidget || !_previewWidget->getNode()) return false;
+        const auto* root = _previewWidget->getNode();
+        const auto* visual = _previewWidget->getPrimaryVisualNode();
+        if (!visual) return false;
+
+        const float currentRootLocalScale =
+            std::abs(root->local.scale) > 0.0001f ? root->local.scale : 1.0f;
+        const float parentWorldScale = root->world.scale / currentRootLocalScale;
+        const bool listPanelLayout =
+            _rmlPreviewLayout == RmlPreviewLayout::Inventory ||
+            _rmlPreviewLayout == RmlPreviewLayout::Magic;
+        const float previewMultiplier = listPanelLayout ? kInventoryPreviewScaleMultiplier : 1.0f;
+        const float desiredRootWorldScale =
+            parentWorldScale * _normalizedScale * _baseScaleMult * previewMultiplier;
+
+        position = root->world.translate +
+            (root->world.rotate * visual->local.translate) * desiredRootWorldScale;
+        rotation = root->world.rotate * visual->local.rotate;
+        scale = desiredRootWorldScale * visual->local.scale;
+        return true;
+    }
+
+    bool VRUIItemEditPanel::getPreviewVisualTransformRelativeTo(
+        RE::NiNode* parent,
+        RE::NiPoint3& position, RE::NiMatrix3& rotation, float& scale) const
+    {
+        if (!parent) return false;
+        RE::NiPoint3 worldPosition;
+        RE::NiMatrix3 worldRotation;
+        float worldScale = 1.0f;
+        if (!getPreviewVisualWorldTransform(worldPosition, worldRotation, worldScale)) return false;
+
+        const float parentScale =
+            std::abs(parent->world.scale) > 0.0001f ? parent->world.scale : 1.0f;
+        const auto inverseParentRotation = parent->world.rotate.Transpose();
+        position = inverseParentRotation * (worldPosition - parent->world.translate);
+        position.x /= parentScale;
+        position.y /= parentScale;
+        position.z /= parentScale;
+        rotation = inverseParentRotation * worldRotation;
+        scale = worldScale / parentScale;
+        return true;
     }
 
     void VRUIItemEditPanel::syncRotationFromPreviewGrab(const RE::NiMatrix3& localRotation)
@@ -401,7 +524,8 @@ namespace vrui
         float runtimeRotX = 0.0f;
         float runtimeRotY = 0.0f;
         float runtimeRotZ = 0.0f;
-        VRUILayoutManager::getMatrixEuler(localRotation, runtimeRotX, runtimeRotY, runtimeRotZ);
+        extractLayoutEulerForSetXYZ(
+            localRotation, runtimeRotX, runtimeRotY, runtimeRotZ);
 
         runtimeRotX /= kDegToRad;
         runtimeRotY /= kDegToRad;
@@ -430,13 +554,19 @@ namespace vrui
                 editorRotZToRuntime(_rotX, _rotZ, _targetModelPath) * 0.017453292f
             );
             
-            _previewWidget->setLocalRotation(RE::NiMatrix3());
-            _previewWidget->setLocalPosition({
-                anchorX,
-                anchorY,
-                anchorZ
-            });
-            _previewWidget->setLocalScale(_normalizedScale * _baseScaleMult * previewScale);
+            // The root anchor is layout state, not item-edit state. Configure it
+            // once instead of updating the same full scene tree for every axis
+            // step; only PrimaryVisualTransform changes while editing.
+            if (!_previewRootTransformConfigured) {
+                _previewWidget->setLocalRotation(RE::NiMatrix3());
+                _previewWidget->setLocalPosition({
+                    anchorX,
+                    anchorY,
+                    anchorZ
+                });
+                _previewWidget->setLocalScale(_normalizedScale * _baseScaleMult * previewScale);
+                _previewRootTransformConfigured = true;
+            }
             _previewWidget->setPrimaryVisualTransform({ _posX, _posY, _posZ }, rot, _scale);
         }
     }
@@ -501,6 +631,7 @@ namespace vrui
         if (_previewWidget) {
             removeChild(_previewWidget);
             _previewWidget = nullptr;
+            _previewRootTransformConfigured = false;
         }
 
         if (!_targetModelPath.empty()) {
@@ -513,6 +644,16 @@ namespace vrui
                 editorRotYToRuntime(_rotY, _targetModelPath),
                 editorRotZToRuntime(_rotX, _rotZ, _targetModelPath),
                 _posX, _posY, _posZ, _scale, false, transformSource);
+            _previewRootTransformConfigured = false;
+
+            // World-item visuals are normalized to a one-unit projected box under
+            // PrimaryVisualTransform. Use that exact transform for hover so the
+            // interaction area follows item/category scale and player overrides.
+            // Keep it tighter than the conservative normalized geometry bounds.
+            constexpr float kPreviewHitBoxScale = 0.50f;
+            _previewWidget->setVisualHitTestBounds(
+                _previewWidget->getPrimaryVisualNode(),
+                kPreviewHitBoxScale, kPreviewHitBoxScale);
 
             // For untouched items, synchronize the editor with the automatic
             // baseline (including a NIF inventory marker if one was used).
@@ -534,6 +675,9 @@ namespace vrui
             
             if (_previewWidget) {
                 _previewWidget->setItemRotationPersistence(_targetFormID, _posX, _posY, _posZ, _scale);
+                // updatePreview() applies rotations through VRUILayoutManager,
+                // whose Y convention must also be used when persisting a grab.
+                _previewWidget->setItemRotationUsesLayoutEuler(true);
                 _previewWidget->setOnGrabReleaseHandler([this](VRUIButton* btn) {
                     if (!btn) {
                         return;
@@ -553,6 +697,15 @@ namespace vrui
                     // slider's ordinary range.
                     _scale = std::max(0.01f, scale);
                     syncRotationFromPreviewGrab(rotation);
+
+                    // Inventory and Magic use this editor as their live
+                    // one-item preview. A grab in those panels is an explicit
+                    // per-item correction, so commit it immediately instead
+                    // of leaving it only in the transient preview instance.
+                    if (_rmlPreviewLayout == RmlPreviewLayout::Inventory ||
+                        _rmlPreviewLayout == RmlPreviewLayout::Magic) {
+                        applyItemOffsets();
+                    }
 
                     // Keep the exact released scene transform visible. The
                     // RmlUi draft and sliders are synchronized separately,
@@ -612,12 +765,14 @@ namespace vrui
                 _targetModelPath,
                 _targetCategory,
                 _targetFormID,
-                _targetActionFunc);
-            VRUILayoutManager::setElementPinToWorld(elementId, false);
-            VRUILayoutManager::setElementPinToHmdWorld(elementId, false);
+                _targetActionFunc,
+                "",
+                false,
+                false);
             
             // Refresh HUD to show new pin from JSON
-            VRMenuManager::get().refreshFixedWidgets();
+            dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+                VRMenuManager::get(), elementId);
         });
         pagePin->addElement(pinBtn);
 
@@ -636,10 +791,12 @@ namespace vrui
                     _targetModelPath,
                     _targetCategory,
                     _targetFormID,
-                    _targetActionFunc);
-                VRUILayoutManager::setElementPinToWorld(elementId, true);
-                VRUILayoutManager::setElementPinToHmdWorld(elementId, false);
-                VRMenuManager::get().refreshFixedWidgets();
+                    _targetActionFunc,
+                    "",
+                    true,
+                    false);
+                dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+                    VRMenuManager::get(), elementId);
             });
             pagePin->addElement(pinWorldBtn);
 
@@ -662,10 +819,12 @@ namespace vrui
                     _targetModelPath,
                     _targetCategory,
                     _targetFormID,
-                    _targetActionFunc);
-                VRUILayoutManager::setElementPinToHmdWorld(elementId, true);
-                VRUILayoutManager::setElementPinToWorld(elementId, false);
-                VRMenuManager::get().refreshFixedWidgets();
+                    _targetActionFunc,
+                    "",
+                    false,
+                    true);
+                dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+                    VRMenuManager::get(), elementId);
             });
             pagePin->addElement(pinHmdWorldBtn);
         }
@@ -685,7 +844,8 @@ namespace vrui
                 bool newHide = existing ? !existing->hideLabel : true;
                 VRUILayoutManager::setElementHideLabel(elemId, newHide);
                 labelToggleBtn->setLabel(newHide ? "LABEL: OCULTO" : "LABEL: VISIVEL");
-                VRMenuManager::get().refreshFixedWidgets();
+                dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+                    VRMenuManager::get(), elemId);
             });
             pagePin->addElement(labelToggleBtn);
         }

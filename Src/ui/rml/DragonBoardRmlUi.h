@@ -346,6 +346,10 @@ namespace dragonboard::ui::rml
         [[nodiscard]] std::pair<MagicAction, std::size_t> ConsumeMagicAction();
         [[nodiscard]] std::pair<JournalAction, std::size_t> ConsumeJournalAction();
         [[nodiscard]] std::optional<std::size_t> GetHoveredModsIndex() const;
+        [[nodiscard]] bool IsPreviewInteractionZoneHovered() const
+        {
+            return _previewInteractionZoneHovered;
+        }
         void SetSliderValue(const char* id, float value);
         void SetItemEditInfo(const ItemEditInfo& info);
         void SetMods(const std::vector<std::string>& labels);
@@ -437,6 +441,7 @@ namespace dragonboard::ui::rml
         bool _rmlInitialized = false;
         bool _previousTriggerDown = false;
         bool _pointerWasOnPanel = false;
+        bool _previewInteractionZoneHovered = false;
         bool _pointerSmoothingInitialized = false;
         float _smoothedPointerX = 0.0f;
         float _smoothedPointerY = 0.0f;
@@ -472,7 +477,15 @@ namespace dragonboard::ui::rml
         bool _developerPanelToggleRequested = false;
         HapticCue _pendingHapticCue = HapticCue::kNone;
         std::string _hoveredElementId;
+        std::string _modsListMarkup;
+        std::string _developerCommandListMarkup;
         std::string _inventoryMarqueeElementId;
+        std::string _inventoryListMarkup;
+        std::string _magicListMarkup;
+        std::size_t _inventoryListSelectedIndex = static_cast<std::size_t>(-1);
+        std::size_t _magicListSelectedIndex = static_cast<std::size_t>(-1);
+        bool _inventoryListInitialized = false;
+        bool _magicListInitialized = false;
         std::string _journalQuestListMarkup;
         std::vector<std::uint64_t> _journalActiveQuestOrder;
         float _inventoryMarqueeOffset = 0.0f;

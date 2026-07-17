@@ -5,6 +5,7 @@
 #include "vrui/VRUIPanel.h"
 #include "vrui/VRUIRaycaster.h"
 #include "vrui/VRUISettings.h"
+#include "ui/rml/RmlPanelHost.h"
 #include "ui/pointer/PointerVisualController.h"
 
 #include <cmath>
@@ -103,6 +104,11 @@ namespace dragonboard::ui::input
 
         const bool hitSomething = raycastResult.hitSomething;
         std::shared_ptr<vrui::VRUIWidget> touchedWidget = raycastResult.touchedWidget;
+        if (auto previewTarget =
+                dragonboard::ui::rml::RmlPanelHost::GetSingleton()
+                    .GetPreviewInteractionTarget()) {
+            touchedWidget = std::move(previewTarget);
+        }
         const std::shared_ptr<vrui::VRUIPanel> visualSurface = ResolveVisualSurface(
             raycastResult.closestPanel,
             manager._panelRegistry.GetPanels(),

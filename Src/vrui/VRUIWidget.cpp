@@ -12,6 +12,7 @@
 #include <RE/B/BSGeometry.h>
 #include <RE/N/NiSmartPointer.h>
 #include <RE/N/NiColor.h>
+#include <algorithm>
 
 namespace vrui
 {
@@ -220,9 +221,21 @@ namespace vrui
 
     bool VRUIWidget::hitTest(const RE::NiPoint3& rayOriginWorld, const RE::NiPoint3& rayDirWorld, float& outDistance) const
     {
-        if (!_node) return false;
+        if (!_node || !_pointerHitTestEnabled) return false;
 
-        const auto& t = _node->world;
+        const bool useVisualBounds =
+            _visualHitTestNode &&
+            _visualHitTestWidth > 0.001f &&
+            _visualHitTestHeight > 0.001f &&
+            _visualHitTestDepth > 0.001f;
+        const auto* hitNode = useVisualBounds ? _visualHitTestNode.get() : _node.get();
+        RE::NiTransform t = hitNode->world;
+        if (useVisualBounds && hitNode->worldBound.radius > 0.001f) {
+            // A child mesh can remain offset from its transform origin even after
+            // pivot normalization (especially modded/skinned NIFs). The rendered
+            // world bound tracks the geometry centre that the player actually sees.
+            t.translate = hitNode->worldBound.center;
+        }
         float wScale = (t.scale > 0.001f) ? t.scale : 1.0f;
 
         // 1. Transform ray Origin to Node Local Space
@@ -247,15 +260,37 @@ namespace vrui
         localDir.y = t.rotate.entry[0][1]*rayDirWorld.x + t.rotate.entry[1][1]*rayDirWorld.y + t.rotate.entry[2][1]*rayDirWorld.z;
         localDir.z = t.rotate.entry[0][2]*rayDirWorld.x + t.rotate.entry[1][2]*rayDirWorld.y + t.rotate.entry[2][2]*rayDirWorld.z;
 
-        // 3. AABB test in local space (logical button dimensions, Y = depth tolerance)
+        // 3. AABB test in local space (X/Z = screen plane, Y = depth tolerance)
         AABB localAABB;
-        
-        // COLLISION FIX: To keep the collision box world-size independent of local scale,
-        // we divide the local dimensions by the node's local scale.
-        float localS = _node->local.scale > 0.001f ? _node->local.scale : 1.0f;
-        float halfW = (_width * 0.5f) / localS;
-        float halfH = (_height * 0.5f) / localS;
-        float halfD = 0.4f / localS; // Normalize depth too!
+
+        float halfW = 0.0f;
+        float halfH = 0.0f;
+        float halfD = 0.0f;
+        if (useVisualBounds) {
+            // A normalized 3D preview is centred below this node. Let the hit box
+            // inherit that node's transform so hover follows the visible item. Cap
+            // its world size at the widget's original logical collision dimensions;
+            // large Settings multipliers must not cover neighbouring controls.
+            const float widgetLocalScale =
+                _node->local.scale > 0.001f ? _node->local.scale : 1.0f;
+            const float parentWorldScale = _node->world.scale / widgetLocalScale;
+            const float requestedWidthWorld = _visualHitTestWidth * wScale;
+            const float requestedHeightWorld = _visualHitTestHeight * wScale;
+            const float requestedDepthWorld = _visualHitTestDepth * wScale;
+            const float maxWidthWorld = _width * parentWorldScale;
+            const float maxHeightWorld = _height * parentWorldScale;
+            const float maxDepthWorld = 0.8f * parentWorldScale;
+
+            halfW = (std::min)(requestedWidthWorld, maxWidthWorld) / (2.0f * wScale);
+            halfH = (std::min)(requestedHeightWorld, maxHeightWorld) / (2.0f * wScale);
+            halfD = (std::min)(requestedDepthWorld, maxDepthWorld) / (2.0f * wScale);
+        } else {
+            // Keep ordinary UI button collision world-size independent of hover scale.
+            const float localS = _node->local.scale > 0.001f ? _node->local.scale : 1.0f;
+            halfW = (_width * 0.5f) / localS;
+            halfH = (_height * 0.5f) / localS;
+            halfD = 0.4f / localS;
+        }
         
         // Depth (Y) set to 0.4f (total 0.8f thickness) to be tighter than the previous 2.0f
         localAABB.min = { -halfW, -halfD, -halfH };
@@ -270,6 +305,22 @@ namespace vrui
         // the world distance = localDist * wScale.
         outDistance = localDist * wScale;
         return outDistance >= 0.0f;
+    }
+
+    void VRUIWidget::setVisualHitTestBounds(RE::NiNode* node, float width, float height, float depth)
+    {
+        _visualHitTestNode = RE::NiPointer<RE::NiNode>(node);
+        _visualHitTestWidth = width;
+        _visualHitTestHeight = height;
+        _visualHitTestDepth = depth;
+    }
+
+    void VRUIWidget::clearVisualHitTestBounds()
+    {
+        _visualHitTestNode = nullptr;
+        _visualHitTestWidth = 0.0f;
+        _visualHitTestHeight = 0.0f;
+        _visualHitTestDepth = 0.0f;
     }
 
     void VRUIWidget::update(float deltaTime)

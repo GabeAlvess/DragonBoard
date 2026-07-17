@@ -73,6 +73,7 @@
                 <div class="preview-stage">
                     <img id="magic-preview-icon" class="preview-icon" src="assets/destructionicon.png" />
                     <div class="preview-reticle"></div>
+                    <div id="magic-preview-hit-zone" class="preview-interaction-zone"></div>
                 </div>
             </section>
 

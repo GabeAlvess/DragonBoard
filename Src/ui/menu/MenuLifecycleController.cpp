@@ -1,14 +1,12 @@
 #include "MenuLifecycleController.h"
 
 #include "MenuPanelPresenter.h"
-#include "MenuComposition.h"
-#include "MenuInitializationController.h"
 #include "MenuStartupFlow.h"
 #include "runtime/vr/GameMenuActions.h"
 #include "ui/pointer/PointerVisualController.h"
+#include "ui/rml/RmlPanelHost.h"
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUISettings.h"
-#include "vrui/VRUIWidget.h"
 
 #include <chrono>
 
@@ -80,19 +78,11 @@ namespace dragonboard::ui::menu
                 pinnedAttachNode,
                 panelOffset);
         } else {
-            MenuPanelPresenter::DetachAll(manager._panelRegistry.GetPanels());
-            vrui::VRUIWidget::clearNifCache();
-            MenuInitializationController::Initialize(manager);
-            Recreate();
-
-            MenuPanelPresenter::PresentClosed(
-                manager._panelRegistry.GetPanels(),
-                manager._boardPinState.IsPinned(),
-                manager.getMenuHandNode(),
-                manager.resolvePinnedAttachNode(manager.getPlayerSkeletonRoot()),
-                manager.getHeadNode(),
-                manager.getPanelOffset());
-
+            // Release transient input/RmlUi references, but keep the existing
+            // scene graph. Rebuilding the whole menu here detached and recreated
+            // hand/HMD-pinned widgets, producing a visible blink on every close.
+            auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+            rmlHost.Close();
             if (auto hovered = manager._interactionFocus.GetHovered()) {
                 hovered->onRayExit();
                 if (manager._dominantTriggerTracker.IsPressed()) {
@@ -100,7 +90,18 @@ namespace dragonboard::ui::menu
                 }
             }
             manager._interactionFocus.ClearHover();
+            manager._interactionFocus.ClearGrabbed();
             manager._dominantTriggerTracker.Reset();
+
+            // PresentClosed detaches ordinary board panels while deliberately
+            // preserving AlwaysVisiblePanel and AlwaysVisibleHmdPanel in place.
+            MenuPanelPresenter::PresentClosed(
+                manager._panelRegistry.GetPanels(),
+                manager._boardPinState.IsPinned(),
+                manager.getMenuHandNode(),
+                manager.resolvePinnedAttachNode(manager.getPlayerSkeletonRoot()),
+                manager.getHeadNode(),
+                manager.getPanelOffset());
             dragonboard::ui::pointer::PointerVisualController::Hide(manager);
         }
 

@@ -35,6 +35,7 @@ namespace vrui {
         bool hideLabel = false;
         bool pinToWorld = false;
         bool pinToHmdWorld = false;
+        bool visualTransformComposed = false;
         UIJSONTransform transform;
         UIJSONVisuals visuals;
     };
@@ -63,12 +64,18 @@ namespace vrui {
         static void updateElementTransformAnywhere(const std::string& elementId,
                                                    const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale,
                                                    const std::string& nifPath = "", const std::string& category = "", uint32_t formID = 0,
-                                                   const std::string& actionFunc = "", const std::string& label = "");
+                                                   const std::string& actionFunc = "", const std::string& label = "",
+                                                   std::optional<bool> pinToWorld = std::nullopt,
+                                                   std::optional<bool> pinToHmdWorld = std::nullopt,
+                                                   std::optional<bool> visualTransformComposed = std::nullopt);
 
         static void updateElementTransformAnywhereDirect(const std::string& elementId,
                                                          const RE::NiPoint3& pos, float rotX, float rotY, float rotZ, float scale,
                                                          const std::string& nifPath = "", const std::string& category = "", uint32_t formID = 0,
-                                                         const std::string& actionFunc = "", const std::string& label = "");
+                                                         const std::string& actionFunc = "", const std::string& label = "",
+                                                         std::optional<bool> pinToWorld = std::nullopt,
+                                                         std::optional<bool> pinToHmdWorld = std::nullopt,
+                                                         std::optional<bool> visualTransformComposed = std::nullopt);
 
         static void setElementHideLabel(const std::string& elementId, bool hide);
         static void setElementPinToWorld(const std::string& elementId, bool pinToWorld);

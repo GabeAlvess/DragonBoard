@@ -163,7 +163,12 @@ namespace vrui
             _persistItemBaseRotZ = baseRotZ;
         }
         bool persistsItemRotationOnGrab() const { return _persistItemRotationOnGrab; }
+        void setItemRotationUsesLayoutEuler(bool enabled)
+        {
+            _persistItemRotationUsesLayoutEuler = enabled;
+        }
         RE::NiNode* getPrimaryVisualNode() const { return _primaryVisualNode.get(); }
+        void setPrimaryVisualIdentityOnLoad(bool enabled);
         void setPrimaryVisualTransform(const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scaleMult);
         bool getPrimaryVisualTransform(
             RE::NiPoint3& pos,
@@ -220,6 +225,7 @@ namespace vrui
 
         bool _isVisualsInitialized = true;
         float _deferInitTimer = 0.0f;
+        bool _primaryVisualIdentityOnLoad = false;
         bool _noPopAnimation = false;
 
         float _grabTimer = 0.0f;
@@ -275,6 +281,7 @@ namespace vrui
         bool _wasDominantGripDown = false;
         bool _wasNonDominantGripDown = false;
         bool _persistItemRotationOnGrab = false;
+        bool _persistItemRotationUsesLayoutEuler = false;
         uint32_t _itemOverrideFormID = 0;
         float _persistItemPosX = 0.0f;
         float _persistItemPosY = 0.0f;

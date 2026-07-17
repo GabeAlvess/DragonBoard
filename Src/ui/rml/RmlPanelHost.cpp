@@ -6,6 +6,7 @@
 #include "vrui/VRUIItemEditPanel.h"
 #include "vrui/VRUIInventoryContainer.h"
 #include "vrui/VRUIMagicContainer.h"
+#include "vrui/VRUIItemUtils.h"
 #include "vrui/VRUISettings.h"
 #include "vrui/ModActionManager.h"
 #include "game/actions/ActionExecutor.h"
@@ -604,6 +605,7 @@ namespace dragonboard::ui::rml
         _presentFrameMs = 0.0f;
         _localPanelMode.store(LocalPanelMode::kDeveloper);
         _rmlDeveloperSyncPending.store(true);
+        _rmlDeveloperInfoSyncPending.store(true);
         _visible.store(true);
         return true;
     }
@@ -896,9 +898,43 @@ namespace dragonboard::ui::rml
         return true;
     }
 
+    std::shared_ptr<vrui::VRUIWidget> RmlPanelHost::GetPreviewInteractionTarget()
+    {
+        if (!_visible.load(std::memory_order_acquire)) {
+            return nullptr;
+        }
+        if (!_previewInteractionZoneHovered.load(std::memory_order_acquire)) {
+            return nullptr;
+        }
+
+        const auto mode = _localPanelMode.load(std::memory_order_acquire);
+        if (mode == LocalPanelMode::kInventory) {
+            std::scoped_lock lock(_inventoryMutex);
+            return _inventoryPreviewBackend ?
+                _inventoryPreviewBackend->getPreviewWidget() : nullptr;
+        } else if (mode == LocalPanelMode::kMagic) {
+            std::scoped_lock lock(_magicMutex);
+            return _magicPreviewBackend ?
+                _magicPreviewBackend->getPreviewWidget() : nullptr;
+        }
+
+        return nullptr;
+    }
+
     void RmlPanelHost::Close()
     {
+        // Menu recreation destroys the native inventory/magic panels. Clear
+        // their non-owning backends while holding the same locks used by the
+        // per-frame preview lookup, so the pointer cannot outlive its panel.
+        {
+            std::scoped_lock lock(_inventoryMutex, _magicMutex);
+            _inventoryBackend = nullptr;
+            _inventoryPreviewBackend = nullptr;
+            _magicBackend = nullptr;
+            _magicPreviewBackend = nullptr;
+        }
         ResetPanelInput();
+        _previewInteractionZoneHovered.store(false, std::memory_order_release);
         _developerKeyboardCloseRequested.store(true, std::memory_order_release);
         _inventoryKeyboardCloseRequested.store(true, std::memory_order_release);
         _magicKeyboardCloseRequested.store(true, std::memory_order_release);
@@ -1606,6 +1642,7 @@ namespace dragonboard::ui::rml
         }
         if (_rendererReady.load(std::memory_order_acquire) && !_visible.load()) {
             ApplyRenderCommandsPresentThread();
+            AdvanceRmlPrewarmPresentThread();
         }
         if (_visible.load()) {
             RenderPanel(deltaTime);
@@ -1668,15 +1705,90 @@ namespace dragonboard::ui::rml
         _panelRenderTexture = texture;
         _panelRenderTarget = rtv;
         _panelShaderResource = srv;
+        _rmlPrewarmStep = 0;
+        _rmlPrewarmTotalMs = 0;
+        _rmlPrewarmComplete = false;
         _rendererReady.store(true);
         logger::info("DragonBoardVR: RmlUi panel host initialized at 1920x1080.");
         return true;
+    }
+
+    void RmlPanelHost::AdvanceRmlPrewarmPresentThread()
+    {
+        if (_rmlPrewarmComplete || !_rmlUi || !_panelRenderTarget || _visible.load()) {
+            return;
+        }
+
+        using RmlUi = dragonboard::ui::rml::DragonBoardRmlUi;
+        using ShowDocument = bool (RmlUi::*)();
+        struct PrewarmDocument
+        {
+            const char* name;
+            ShowDocument show;
+        };
+        static constexpr std::array<PrewarmDocument, 7> kDocuments{ {
+            { "Settings", &RmlUi::ShowSettings },
+            { "Developer", &RmlUi::ShowDeveloper },
+            { "Mods", &RmlUi::ShowMods },
+            { "Inventory", &RmlUi::ShowInventory },
+            { "Magic", &RmlUi::ShowMagic },
+            { "Journal", &RmlUi::ShowJournal },
+            { "ItemEdit", &RmlUi::ShowItemEdit }
+        } };
+
+        if (_rmlPrewarmStep >= kDocuments.size()) {
+            _rmlPrewarmComplete = true;
+            return;
+        }
+
+        const auto& document = kDocuments[_rmlPrewarmStep];
+        const auto started = std::chrono::steady_clock::now();
+        bool shown = false;
+        bool rendered = false;
+        try {
+            shown = (_rmlUi.get()->*document.show)();
+            if (shown) {
+                rendered = _rmlUi->Render(
+                    _panelRenderTarget,
+                    static_cast<int>(kPanelWidth),
+                    static_cast<int>(kPanelHeight));
+            }
+        } catch (const std::exception& error) {
+            logger::warn(
+                "DragonBoardVR: RmlUi prewarm for {} raised an exception: {}.",
+                document.name,
+                error.what());
+        } catch (...) {
+            logger::warn(
+                "DragonBoardVR: RmlUi prewarm for {} raised an unknown exception.",
+                document.name);
+        }
+
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started).count();
+        _rmlPrewarmTotalMs += elapsedMs;
+        logger::info(
+            "DragonBoardVR: RmlUi prewarmed {} in {} ms (shown={}, rendered={}).",
+            document.name,
+            elapsedMs,
+            shown,
+            rendered);
+
+        ++_rmlPrewarmStep;
+        if (_rmlPrewarmStep >= kDocuments.size()) {
+            _rmlPrewarmComplete = true;
+            logger::info(
+                "DragonBoardVR: RmlUi full prewarm completed across {} Present frames ({} ms total work).",
+                kDocuments.size(),
+                _rmlPrewarmTotalMs);
+        }
     }
 
     void RmlPanelHost::RenderPanel(float deltaTime)
     {
         if (!_visible.load() || !InitializeRenderer()) return;
         ApplyRenderCommandsPresentThread();
+        _previewInteractionZoneHovered.store(false, std::memory_order_release);
 
         const auto panelMode = _localPanelMode.load();
         const bool settingsRmlActive = panelMode == LocalPanelMode::kSettings &&
@@ -1706,7 +1818,12 @@ namespace dragonboard::ui::rml
             } else if (developerRmlActive) {
                 _rmlUi->ShowDeveloper();
                 if (_rmlDeveloperSyncPending.exchange(false)) SyncRmlDeveloperCommands();
-                SyncRmlDeveloperInfo();
+                _developerInfoPresentAccumulator += std::clamp(deltaTime, 0.0f, 0.1f);
+                if (_rmlDeveloperInfoSyncPending.exchange(false) ||
+                    _developerInfoPresentAccumulator >= 0.25f) {
+                    _developerInfoPresentAccumulator = 0.0f;
+                    SyncRmlDeveloperInfo();
+                }
             } else if (itemEditRmlActive) {
                 _rmlUi->ShowItemEdit();
                 if (_rmlItemEditSyncPending.exchange(false)) SyncRmlItemEdit();
@@ -1736,6 +1853,11 @@ namespace dragonboard::ui::rml
                 static_cast<int>(kPanelWidth),
                 static_cast<int>(kPanelHeight),
                 deltaTime);
+            if (inventoryRmlActive || magicRmlActive) {
+                _previewInteractionZoneHovered.store(
+                    _rmlUi->IsPreviewInteractionZoneHovered(),
+                    std::memory_order_release);
+            }
 
             if (modsRmlActive) {
                 const auto hovered = _rmlUi->GetHoveredModsIndex();
@@ -3159,6 +3281,29 @@ namespace dragonboard::ui::rml
         if (!backend) return;
 
         const auto stateSignature = backend->buildRmlInventorySignature();
+        const auto activeFilter = InventoryFilterId(backend->getFilter());
+        bool reusedSnapshot = false;
+        {
+            std::scoped_lock lock(_inventoryMutex);
+            reusedSnapshot =
+                _inventorySnapshotValid &&
+                _inventoryStateSignature == stateSignature &&
+                _inventoryActiveFilter == activeFilter;
+            if (reusedSnapshot && !preserveSelection) {
+                _inventorySelectedIndex = 0;
+                _inventorySelectedFormID = _inventoryItems.empty() ?
+                    0 : _inventoryItems.front().formID;
+                ReconcileInventorySelectionForSearchLocked();
+            }
+        }
+        if (reusedSnapshot) {
+            logger::trace(
+                "DragonBoardVR: reused unchanged RmlUi inventory snapshot.");
+            UpdateInventoryPreviewGameThread();
+            _rmlInventorySyncPending.store(true, std::memory_order_release);
+            return;
+        }
+
         auto snapshot = backend->buildRmlInventorySnapshot();
         std::vector<InventoryEntry> entries;
         entries.reserve(snapshot.items.size());
@@ -3216,13 +3361,14 @@ namespace dragonboard::ui::rml
             _inventorySelectedFormID = _inventoryItems.empty() ?
                 0 : _inventoryItems[_inventorySelectedIndex].formID;
             _inventoryVisibleIndices.clear();
-            _inventoryActiveFilter = InventoryFilterId(backend->getFilter());
+            _inventoryActiveFilter = activeFilter;
             _inventoryPlayerName = std::move(snapshot.playerName);
             _inventoryPlayerLevel = snapshot.playerLevel;
             _inventoryGold = snapshot.gold;
             _inventoryCurrentWeight = snapshot.currentWeight;
             _inventoryCarryWeight = snapshot.carryWeight;
             _inventoryStateSignature = stateSignature;
+            _inventorySnapshotValid = true;
             ReconcileInventorySelectionForSearchLocked();
         }
         UpdateInventoryPreviewGameThread();
@@ -3249,18 +3395,26 @@ namespace dragonboard::ui::rml
                 0.0f, 0.0f, 0.0f, 1.0f,
                 "InventoryPanel");
         } else {
+            float rotX = selected->rotX;
+            float rotY = selected->rotY;
+            float rotZ = selected->rotZ;
+            float posX = selected->xOff;
+            float posY = selected->yOff;
+            float posZ = selected->zOff;
+            float scale = selected->scaleMult;
+            vrui::ItemUtils::getItemOverrides(
+                RE::TESForm::LookupByID(selected->formID),
+                rotX, rotY, rotZ,
+                posX, posY, posZ,
+                scale);
             preview->setTargetItem(
                 selected->editCategory,
                 selected->name,
                 selected->modelPath,
                 selected->formID,
-                selected->rotX,
-                selected->rotY,
-                selected->rotZ,
-                selected->xOff,
-                selected->yOff,
-                selected->zOff,
-                selected->scaleMult,
+                rotX, rotY, rotZ,
+                posX, posY, posZ,
+                scale,
                 "InventoryPanel");
         }
         preview->setRmlPreviewLayout(vrui::VRUIItemEditPanel::RmlPreviewLayout::Inventory);
@@ -3318,6 +3472,10 @@ namespace dragonboard::ui::rml
                     succeeded ?
                         dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kStrong :
                         dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+                if (succeeded) {
+                    Close();
+                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                }
             }
             return;
         case InventoryAction::kFavorite:
@@ -3381,6 +3539,28 @@ namespace dragonboard::ui::rml
         if (!backend) return;
 
         const auto stateSignature = backend->buildRmlMagicSignature();
+        const auto activeFilter = MagicFilterId(backend->getFilter());
+        bool reusedSnapshot = false;
+        {
+            std::scoped_lock lock(_magicMutex);
+            reusedSnapshot =
+                _magicSnapshotValid &&
+                _magicStateSignature == stateSignature &&
+                _magicActiveFilter == activeFilter;
+            if (reusedSnapshot && !preserveSelection) {
+                _magicSelectedIndex = 0;
+                _magicSelectedFormID = _magicItems.empty() ?
+                    0 : _magicItems.front().formID;
+                ReconcileMagicSelectionForSearchLocked();
+            }
+        }
+        if (reusedSnapshot) {
+            logger::trace("DragonBoardVR: reused unchanged RmlUi magic snapshot.");
+            UpdateMagicPreviewGameThread();
+            _rmlMagicSyncPending.store(true, std::memory_order_release);
+            return;
+        }
+
         auto snapshot = backend->buildRmlMagicSnapshot();
         std::vector<MagicEntry> entries;
         entries.reserve(snapshot.items.size());
@@ -3435,12 +3615,13 @@ namespace dragonboard::ui::rml
             _magicSelectedFormID = _magicItems.empty() ?
                 0 : _magicItems[_magicSelectedIndex].formID;
             _magicVisibleIndices.clear();
-            _magicActiveFilter = MagicFilterId(backend->getFilter());
+            _magicActiveFilter = activeFilter;
             _magicPlayerName = std::move(snapshot.playerName);
             _magicPlayerLevel = snapshot.playerLevel;
             _magicCurrentMagicka = snapshot.currentMagicka;
             _magicMaximumMagicka = snapshot.maximumMagicka;
             _magicStateSignature = stateSignature;
+            _magicSnapshotValid = true;
             ReconcileMagicSelectionForSearchLocked();
         }
         UpdateMagicPreviewGameThread();
@@ -3467,18 +3648,26 @@ namespace dragonboard::ui::rml
                 0.0f, 0.0f, 0.0f, 1.0f,
                 "MagicPanel");
         } else {
+            float rotX = selected->rotX;
+            float rotY = selected->rotY;
+            float rotZ = selected->rotZ;
+            float posX = selected->xOff;
+            float posY = selected->yOff;
+            float posZ = selected->zOff;
+            float scale = selected->scaleMult;
+            vrui::ItemUtils::getItemOverrides(
+                RE::TESForm::LookupByID(selected->formID),
+                rotX, rotY, rotZ,
+                posX, posY, posZ,
+                scale);
             preview->setTargetItem(
                 "Magic",
                 selected->name,
                 selected->modelPath,
                 selected->formID,
-                selected->rotX,
-                selected->rotY,
-                selected->rotZ,
-                selected->xOff,
-                selected->yOff,
-                selected->zOff,
-                selected->scaleMult,
+                rotX, rotY, rotZ,
+                posX, posY, posZ,
+                scale,
                 "MagicPanel");
         }
         preview->setRmlPreviewLayout(vrui::VRUIItemEditPanel::RmlPreviewLayout::Magic);
@@ -3550,13 +3739,34 @@ namespace dragonboard::ui::rml
             }
             return;
         case MagicAction::kPinDashboard:
-            queuePinHaptic(preview && hasSelection && preview->pinToDashboard());
+            {
+                const bool succeeded = preview && hasSelection && preview->pinToDashboard();
+                queuePinHaptic(succeeded);
+                if (succeeded) {
+                    Close();
+                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                }
+            }
             return;
         case MagicAction::kPinLeftHand:
-            queuePinHaptic(preview && hasSelection && preview->pinToLeftHand());
+            {
+                const bool succeeded = preview && hasSelection && preview->pinToLeftHand();
+                queuePinHaptic(succeeded);
+                if (succeeded) {
+                    Close();
+                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                }
+            }
             return;
         case MagicAction::kPinWorld:
-            queuePinHaptic(preview && hasSelection && preview->pinToWorld());
+            {
+                const bool succeeded = preview && hasSelection && preview->pinToWorld();
+                queuePinHaptic(succeeded);
+                if (succeeded) {
+                    Close();
+                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                }
+            }
             return;
         case MagicAction::kToggleLabel:
             queuePinHaptic(preview && hasSelection && preview->togglePinnedLabel());
@@ -3718,6 +3928,18 @@ namespace dragonboard::ui::rml
             }
             break;
         case ItemEditAction::kNone:
+            return;
+        }
+
+        const bool pinAction =
+            action == ItemEditAction::kPinDashboard ||
+            action == ItemEditAction::kPinLeftHand ||
+            action == ItemEditAction::kPinWorld;
+        if (pinAction && succeeded) {
+            _pendingRmlHapticCue.store(static_cast<std::uint8_t>(
+                dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kStrong));
+            Close();
+            vrui::VRMenuManager::get().switchToPanel("MainPanel");
             return;
         }
 

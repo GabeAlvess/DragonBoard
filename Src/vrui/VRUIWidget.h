@@ -67,6 +67,9 @@ namespace vrui
         // --- Hit Testing ---
         AABB getWorldAABB() const;
         bool hitTest(const RE::NiPoint3& rayOriginWorld, const RE::NiPoint3& rayDirWorld, float& outDistance) const;
+        void setVisualHitTestBounds(RE::NiNode* node, float width, float height, float depth = 0.8f);
+        void clearVisualHitTestBounds();
+        void setPointerHitTestEnabled(bool enabled) { _pointerHitTestEnabled = enabled; }
 
         virtual RE::NiPoint2 calculateLogicalDimensions() const;
 
@@ -137,6 +140,11 @@ namespace vrui
         float _animDelayTimer = 0.0f;
 
         RE::NiPointer<RE::NiNode> _node;
+        RE::NiPointer<RE::NiNode> _visualHitTestNode;
+        float _visualHitTestWidth = 0.0f;
+        float _visualHitTestHeight = 0.0f;
+        float _visualHitTestDepth = 0.0f;
+        bool _pointerHitTestEnabled = true;
         std::string _layoutId;
  
         static std::map<std::string, RE::NiPointer<RE::NiNode>> _nifCache;

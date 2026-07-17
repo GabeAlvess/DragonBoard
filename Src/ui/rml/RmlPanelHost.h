@@ -24,6 +24,7 @@ struct ID3D11Texture2D;
 namespace vrui
 {
     class VRUIItemEditPanel;
+    class VRUIWidget;
     class VRUIInventoryContainer;
     class VRUIMagicContainer;
 }
@@ -57,6 +58,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsModsOpen() const;
         [[nodiscard]] bool RequestHoveredModOptions();
         [[nodiscard]] bool RequestHoveredModRemoval();
+        [[nodiscard]] std::shared_ptr<vrui::VRUIWidget> GetPreviewInteractionTarget();
         void UpdateGameThread(float deltaTime);
         void RenderPresentThread(float deltaTime);
 
@@ -365,6 +367,7 @@ namespace dragonboard::ui::rml
         // Render thread and physical DragonBoard host.
         bool EnsurePresentHookInstalled();
         bool InitializeRenderer();
+        void AdvanceRmlPrewarmPresentThread();
         void RenderPanel(float deltaTime);
         void SyncRmlSettingsFromDraft();
         void ApplyRmlSliderChange(std::string_view id, float value);
@@ -451,14 +454,19 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _rendererReady{ false };
         std::atomic<bool> _rmlWarmupRequested{ false };
         std::atomic<bool> _rmlWarmupAttempted{ false };
+        std::size_t _rmlPrewarmStep = 0;
+        std::int64_t _rmlPrewarmTotalMs = 0;
+        bool _rmlPrewarmComplete = false;
         std::unique_ptr<dragonboard::ui::rml::DragonBoardRmlUi> _rmlUi;
         std::atomic<bool> _rmlSettingsSyncPending{ true };
         std::atomic<bool> _rmlDeveloperSyncPending{ true };
+        std::atomic<bool> _rmlDeveloperInfoSyncPending{ true };
         std::atomic<bool> _rmlItemEditSyncPending{ true };
         std::atomic<bool> _rmlModsSyncPending{ true };
         std::atomic<bool> _rmlInventorySyncPending{ true };
         std::atomic<bool> _rmlMagicSyncPending{ true };
         std::atomic<bool> _rmlJournalSyncPending{ true };
+        std::atomic<bool> _previewInteractionZoneHovered{ false };
         std::atomic<std::uint8_t> _pendingRmlHapticCue{ 0 };
 
         std::atomic<bool> _visible{ false };
@@ -521,6 +529,7 @@ namespace dragonboard::ui::rml
         float _inventoryRefreshDelay = -1.0f;
         float _inventoryPollAccumulator = 0.0f;
         std::uint64_t _inventoryStateSignature = 0;
+        bool _inventorySnapshotValid = false;
         std::mutex _magicMutex;
         std::vector<MagicEntry> _magicItems;
         std::vector<std::size_t> _magicVisibleIndices;
@@ -544,6 +553,7 @@ namespace dragonboard::ui::rml
         float _magicRefreshDelay = -1.0f;
         float _magicPollAccumulator = 0.0f;
         std::uint64_t _magicStateSignature = 0;
+        bool _magicSnapshotValid = false;
         std::mutex _journalMutex;
         std::vector<JournalQuestEntry> _journalQuests;
         std::vector<JournalStatEntry> _journalCharacterStats;
@@ -564,6 +574,7 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _itemEditApplyPending{ false };
         std::atomic<ItemEditAction> _itemEditActionPending{ ItemEditAction::kNone };
         float _devInfoRefreshAccumulator = 0.0f;
+        float _developerInfoPresentAccumulator = 0.0f;
         int _selectedDevCommand = 0;
         std::array<float, 20> _presentFrameTimeHistory{};
         std::size_t _presentFrameTimeHistoryIndex = 0;

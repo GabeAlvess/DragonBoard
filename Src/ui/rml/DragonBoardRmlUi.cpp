@@ -482,6 +482,14 @@ namespace dragonboard::ui::rml
         _magicDocument = nullptr;
         _journalDocument = nullptr;
         _activeDocument = nullptr;
+        _modsListMarkup.clear();
+        _developerCommandListMarkup.clear();
+        _inventoryListMarkup.clear();
+        _magicListMarkup.clear();
+        _inventoryListSelectedIndex = static_cast<std::size_t>(-1);
+        _magicListSelectedIndex = static_cast<std::size_t>(-1);
+        _inventoryListInitialized = false;
+        _magicListInitialized = false;
         _journalQuestListMarkup.clear();
         _journalActiveQuestOrder.clear();
         _registeredPanels.clear();
@@ -817,6 +825,19 @@ namespace dragonboard::ui::rml
             _context->ProcessMouseMove(submittedPointerX, submittedPointerY, 0);
             RestoreTriggerScrollLock();
             auto* hovered = _context->GetHoverElement();
+            _previewInteractionZoneHovered = false;
+            for (auto* candidate = hovered;
+                 candidate && candidate != _activeDocument;
+                 candidate = candidate->GetParentNode()) {
+                const std::string_view id(candidate->GetId());
+                if ((_activeDocument == _inventoryDocument &&
+                     id == "inventory-preview-hit-zone") ||
+                    (_activeDocument == _magicDocument &&
+                     id == "magic-preview-hit-zone")) {
+                    _previewInteractionZoneHovered = true;
+                    break;
+                }
+            }
             while (hovered && hovered != _activeDocument &&
                    hovered->GetTagName() != "button" &&
                    hovered->GetTagName() != "input" &&
@@ -834,7 +855,10 @@ namespace dragonboard::ui::rml
             _context->ProcessMouseLeave();
             UpdateCursor(false, 0, 0);
             _pointerWasOnPanel = false;
+            _previewInteractionZoneHovered = false;
             _hoveredElementId.clear();
+        } else if (!pointerOnPanel) {
+            _previewInteractionZoneHovered = false;
         }
         UpdateInventoryMarquee(deltaTime);
 
@@ -1502,10 +1526,13 @@ namespace dragonboard::ui::rml
                     EscapeRml(labels[i]) + "</span></div>";
             }
         }
-        list->SetInnerRML(markup);
-        _hoveredElementId.clear();
-        for (std::size_t i = 0; i < labels.size(); ++i) {
-            BindClick(_modsDocument, ("mods-card-" + std::to_string(i)).c_str());
+        if (markup != _modsListMarkup) {
+            list->SetInnerRML(markup);
+            _modsListMarkup = std::move(markup);
+            _hoveredElementId.clear();
+            for (std::size_t i = 0; i < labels.size(); ++i) {
+                BindClick(_modsDocument, ("mods-card-" + std::to_string(i)).c_str());
+            }
         }
     }
 
@@ -1554,7 +1581,6 @@ namespace dragonboard::ui::rml
         }
 
         if (auto* list = _inventoryDocument->GetElementById("inventory-item-list")) {
-            ResetInventoryMarquee();
             std::string markup;
             if (info.items.empty()) {
                 markup = info.searchQuery.empty() ?
@@ -1564,7 +1590,6 @@ namespace dragonboard::ui::rml
                 for (std::size_t index = 0; index < info.items.size(); ++index) {
                     const auto& item = info.items[index];
                     std::string classes = "inventory-list-item";
-                    if (index == info.selectedIndex) classes += " active";
                     if (item.equipped) classes += " equipped";
                     if (item.favorited) classes += " favorited";
                     markup += "<button id=\"inventory-item-" + std::to_string(index) +
@@ -1581,11 +1606,40 @@ namespace dragonboard::ui::rml
                         "</span></button>";
                 }
             }
-            list->SetInnerRML(markup);
-            for (std::size_t index = 0; index < info.items.size(); ++index) {
-                BindClick(
-                    _inventoryDocument,
-                    ("inventory-item-" + std::to_string(index)).c_str());
+
+            const bool rebuildList =
+                !_inventoryListInitialized || markup != _inventoryListMarkup;
+            if (rebuildList) {
+                ResetInventoryMarquee();
+                list->SetInnerRML(markup);
+                for (std::size_t index = 0; index < info.items.size(); ++index) {
+                    BindClick(
+                        _inventoryDocument,
+                        ("inventory-item-" + std::to_string(index)).c_str());
+                }
+                _inventoryListMarkup = std::move(markup);
+                _inventoryListInitialized = true;
+                _inventoryListSelectedIndex = static_cast<std::size_t>(-1);
+            }
+
+            const auto selectedIndex = info.items.empty() ?
+                static_cast<std::size_t>(-1) :
+                std::min(info.selectedIndex, info.items.size() - 1);
+            if (_inventoryListSelectedIndex != selectedIndex) {
+                if (_inventoryListSelectedIndex != static_cast<std::size_t>(-1)) {
+                    if (auto* previous = _inventoryDocument->GetElementById(
+                            ("inventory-item-" +
+                             std::to_string(_inventoryListSelectedIndex)).c_str())) {
+                        previous->SetClass("active", false);
+                    }
+                }
+                if (selectedIndex != static_cast<std::size_t>(-1)) {
+                    if (auto* selected = _inventoryDocument->GetElementById(
+                            ("inventory-item-" + std::to_string(selectedIndex)).c_str())) {
+                        selected->SetClass("active", true);
+                    }
+                }
+                _inventoryListSelectedIndex = selectedIndex;
             }
         }
 
@@ -1694,7 +1748,6 @@ namespace dragonboard::ui::rml
         }
 
         if (auto* list = _magicDocument->GetElementById("magic-spell-list")) {
-            ResetInventoryMarquee();
             std::string markup;
             if (info.items.empty()) {
                 markup = info.searchQuery.empty() ?
@@ -1704,7 +1757,6 @@ namespace dragonboard::ui::rml
                 for (std::size_t index = 0; index < info.items.size(); ++index) {
                     const auto& item = info.items[index];
                     std::string classes = "magic-list-item";
-                    if (index == info.selectedIndex) classes += " active";
                     if (item.equipped) classes += " equipped";
                     if (item.favorited) classes += " favorited";
                     std::string marker;
@@ -1722,11 +1774,39 @@ namespace dragonboard::ui::rml
                         "</span></span></button>";
                 }
             }
-            list->SetInnerRML(markup);
-            for (std::size_t index = 0; index < info.items.size(); ++index) {
-                BindClick(
-                    _magicDocument,
-                    ("magic-spell-" + std::to_string(index)).c_str());
+
+            const bool rebuildList = !_magicListInitialized || markup != _magicListMarkup;
+            if (rebuildList) {
+                ResetInventoryMarquee();
+                list->SetInnerRML(markup);
+                for (std::size_t index = 0; index < info.items.size(); ++index) {
+                    BindClick(
+                        _magicDocument,
+                        ("magic-spell-" + std::to_string(index)).c_str());
+                }
+                _magicListMarkup = std::move(markup);
+                _magicListInitialized = true;
+                _magicListSelectedIndex = static_cast<std::size_t>(-1);
+            }
+
+            const auto selectedIndex = info.items.empty() ?
+                static_cast<std::size_t>(-1) :
+                std::min(info.selectedIndex, info.items.size() - 1);
+            if (_magicListSelectedIndex != selectedIndex) {
+                if (_magicListSelectedIndex != static_cast<std::size_t>(-1)) {
+                    if (auto* previous = _magicDocument->GetElementById(
+                            ("magic-spell-" +
+                             std::to_string(_magicListSelectedIndex)).c_str())) {
+                        previous->SetClass("active", false);
+                    }
+                }
+                if (selectedIndex != static_cast<std::size_t>(-1)) {
+                    if (auto* selected = _magicDocument->GetElementById(
+                            ("magic-spell-" + std::to_string(selectedIndex)).c_str())) {
+                        selected->SetClass("active", true);
+                    }
+                }
+                _magicListSelectedIndex = selectedIndex;
             }
         }
 
@@ -1997,6 +2077,16 @@ namespace dragonboard::ui::rml
         auto* element = document->GetElementById(id);
         if (!element) return;
 
+        try {
+            const auto currentText = element->GetAttribute<Rml::String>("value", "");
+            if (!currentText.empty() &&
+                std::abs(std::stof(currentText) - value) <= 0.00001f) {
+                return;
+            }
+        } catch (...) {
+            // Invalid or missing markup value: overwrite it with the runtime value.
+        }
+
         _synchronizingSliderValues = true;
         element->SetAttribute("value", Rml::CreateString("%.6f", value));
         _synchronizingSliderValues = false;
@@ -2088,10 +2178,13 @@ namespace dragonboard::ui::rml
                 "\" class=\"command-item\">" + EscapeRml(_developerCommands[index].label) + "</button><br />";
         }
         if (markup.empty()) markup = "<div class=\"empty-state\">No commands configured.</div>";
-        list->SetInnerRML(markup);
-        for (std::size_t index = 0; index < _developerCommands.size(); ++index) {
-            const std::string id = "dev-command-" + std::to_string(index);
-            BindClick(_developerDocument, id.c_str());
+        if (markup != _developerCommandListMarkup) {
+            list->SetInnerRML(markup);
+            _developerCommandListMarkup = std::move(markup);
+            for (std::size_t index = 0; index < _developerCommands.size(); ++index) {
+                const std::string id = "dev-command-" + std::to_string(index);
+                BindClick(_developerDocument, id.c_str());
+            }
         }
         SelectDeveloperCommand(_selectedDeveloperCommand);
     }
@@ -2101,7 +2194,10 @@ namespace dragonboard::ui::rml
         if (!_developerDocument) return;
         const auto setText = [this](const char* id, std::string value) {
             if (auto* element = _developerDocument->GetElementById(id)) {
-                element->SetInnerRML(EscapeRml(value));
+                auto escaped = EscapeRml(value);
+                if (element->GetInnerRML() != escaped) {
+                    element->SetInnerRML(std::move(escaped));
+                }
             }
         };
 

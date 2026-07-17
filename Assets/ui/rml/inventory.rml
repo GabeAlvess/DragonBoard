@@ -71,6 +71,7 @@
                 </div>
                 <div class="preview-stage">
                     <div class="preview-reticle"></div>
+                    <div id="inventory-preview-hit-zone" class="preview-interaction-zone"></div>
                 </div>
             </section>
 

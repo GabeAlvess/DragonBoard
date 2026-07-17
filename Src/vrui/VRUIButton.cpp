@@ -520,6 +520,12 @@ namespace vrui
                 _primaryVisualNode = visualTransform;
                 _primaryVisualReferenceScale = referenceVisualScale;
 
+                if (_primaryVisualIdentityOnLoad) {
+                    _primaryVisualNode->local.translate = { 0.0f, 0.0f, 0.0f };
+                    _primaryVisualNode->local.rotate = RE::NiMatrix3{};
+                    _primaryVisualNode->local.scale = 1.0f;
+                }
+
                 RE::NiUpdateData finalUpdate;
                 visualTransform->Update(finalUpdate);
 
@@ -881,12 +887,27 @@ namespace vrui
 
         RE::NiUpdateData updateData;
         updateData.flags = RE::NiUpdateData::Flag::kDirty;
-        _primaryVisualNode->Update(updateData);
-        _primaryVisualNode->UpdateWorldBound();
+        // The preview contains a single item now. Updating the widget root once
+        // propagates the edited child transform without repeatedly rebuilding
+        // bounds for the whole NIF hierarchy on every slider tick.
         if (_node) {
             _node->Update(updateData);
-            _node->UpdateWorldBound();
+        } else {
+            _primaryVisualNode->Update(updateData);
         }
+    }
+
+    void VRUIButton::setPrimaryVisualIdentityOnLoad(bool enabled)
+    {
+        _primaryVisualIdentityOnLoad = enabled;
+        if (!enabled || !_primaryVisualNode) return;
+
+        _primaryVisualNode->local.translate = { 0.0f, 0.0f, 0.0f };
+        _primaryVisualNode->local.rotate = RE::NiMatrix3{};
+        _primaryVisualNode->local.scale = 1.0f;
+        RE::NiUpdateData updateData;
+        updateData.flags = RE::NiUpdateData::Flag::kDirty;
+        if (_node) _node->Update(updateData);
     }
 
     bool VRUIButton::getPrimaryVisualTransform(
@@ -1193,7 +1214,9 @@ namespace vrui
                         RE::NiUpdateData grabUpdateData;
                         grabUpdateData.flags = RE::NiUpdateData::Flag::kDirty;
                         editableNode->Update(grabUpdateData);
-                        editableNode->UpdateWorldBound();
+                        // Bounds are not needed while the RmlUi interaction zone
+                        // owns hover. Complex armor and modded NIFs can make a
+                        // per-frame UpdateWorldBound() stall the game thread.
                     }
                 }
             } else {
@@ -1532,8 +1555,6 @@ namespace vrui
         if (!_isGrabbed) return;
         _grabTimer = 0.0f;
         _isTwoHandScaling = false;
-        bool refreshPanelsAfterRelease = false;
-        
         VRMenuManager::get().triggerHaptic(true, 1.0f, 0.2f);
         
         if (_node) {
@@ -1632,10 +1653,27 @@ namespace vrui
             float effectiveRx = 0.0f;
             float effectiveRy = 0.0f;
             float effectiveRz = 0.0f;
-            extractItemEulerForSetXYZ(effectiveRot, effectiveRx, effectiveRy, effectiveRz);
+            if (_persistItemRotationUsesLayoutEuler) {
+                // ToEulerAnglesXYZ() does not round-trip SetEulerAnglesXYZ() with
+                // Skyrim VR's matrix convention. Extract the raw NiMatrix angles
+                // explicitly, then convert raw Y to the layout's inverted Y.
+                float rawY = 0.0f;
+                extractItemEulerForSetXYZ(
+                    effectiveRot, effectiveRx, rawY, effectiveRz);
+                effectiveRy = -rawY;
+            } else {
+                extractItemEulerForSetXYZ(
+                    effectiveRot, effectiveRx, effectiveRy, effectiveRz);
+            }
 
             RE::NiMatrix3 reconstructedRot{};
-            reconstructedRot.SetEulerAnglesXYZ(effectiveRx, effectiveRy, effectiveRz);
+            if (_persistItemRotationUsesLayoutEuler) {
+                VRUILayoutManager::setMatrixEuler(
+                    reconstructedRot, effectiveRx, effectiveRy, effectiveRz);
+            } else {
+                reconstructedRot.SetEulerAnglesXYZ(
+                    effectiveRx, effectiveRy, effectiveRz);
+            }
 
             RE::NiPoint3 localDelta = _primaryVisualNode->local.translate - _grabInitialEditableLocalPos;
             float scaleRatio = (_grabInitialEditableLocalScale > 0.0001f)
@@ -1688,8 +1726,11 @@ namespace vrui
             _itemRotOverrideX = data.rotX;
             _itemRotOverrideY = data.rotY;
             _itemRotOverrideZ = data.rotZ;
-            VRMenuManager::get().saveSettingsNow();
-            refreshPanelsAfterRelease = true;
+            // Persist through the existing debounce instead of blocking the
+            // release frame with synchronous file I/O. The current one-item
+            // preview already displays the final transform, so no grid refresh
+            // is required here.
+            VRMenuManager::get().requestSettingsSave();
         }
         else if (_slotIndex == -1) {
             bool changed = true;
@@ -1818,9 +1859,6 @@ namespace vrui
         // An owning editor callback keeps its live preview and source state in
         // sync. Rebuilding all dynamic containers here would immediately
         // reapply a second transform and make the item jump after release.
-        if (refreshPanelsAfterRelease && !_onGrabReleaseHandler) {
-            VRMenuManager::get().refreshActiveDynamicContainers();
-        }
     }
 
     void VRUIButton::setDashboardPinned(bool pinned)
