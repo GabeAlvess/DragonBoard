@@ -154,14 +154,13 @@ namespace vrui
 
         // Calculate the exact _baseScaleMult equivalent to a 3.0f width UI Inventory button
         auto& settings = VRUISettings::get();
-        float specificMult = 1.0f;
-        if (!settings.normalizeItemVisuals) {
-            specificMult = settings.itemMiscScale;
-            if (_targetCategory == "Weapons") specificMult = settings.itemWeaponScale;
-            else if (_targetCategory == "Armor") specificMult = settings.itemArmorScale;
-            else if (_targetCategory == "Potions") specificMult = settings.itemPotionScale;
-            else if (_targetCategory == "Food") specificMult = settings.itemFoodScale;
-        }
+        // Match the dynamic item button: category scale is applied after the
+        // normalized base size, including while automatic fitting is enabled.
+        float specificMult = settings.itemMiscScale;
+        if (_targetCategory == "Weapons") specificMult = settings.itemWeaponScale;
+        else if (_targetCategory == "Armor") specificMult = settings.itemArmorScale;
+        else if (_targetCategory == "Potions") specificMult = settings.itemPotionScale;
+        else if (_targetCategory == "Food") specificMult = settings.itemFoodScale;
 
         float userMultiplier = settings.itemMeshScale * specificMult;
         if (userMultiplier < 0.1f) {

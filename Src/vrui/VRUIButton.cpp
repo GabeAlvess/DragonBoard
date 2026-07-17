@@ -439,18 +439,18 @@ namespace vrui
 
                 if (isWorldItem) {
                     loadedWorldItemVisual = true;
-                    float specificMult = 1.0f;
-                    if (!settings.normalizeItemVisuals) {
-                        specificMult = settings.itemMiscScale;
-                        if (hasWeapons || hasShield) {
-                            specificMult = settings.itemWeaponScale;
-                        } else if (hasArmor || hasClothes || hasJewelry) {
-                            specificMult = settings.itemArmorScale;
-                        } else if (hasAlchemy || hasPotion || hasSkooma) {
-                            specificMult = settings.itemPotionScale;
-                        } else if (hasFood || hasIngredient || hasIngredients) {
-                            specificMult = settings.itemFoodScale;
-                        }
+                    // Normalization establishes a consistent visible base size.
+                    // The Settings category scale is a player-authored total
+                    // multiplier applied on top of that normalized result.
+                    float specificMult = settings.itemMiscScale;
+                    if (hasWeapons || hasShield) {
+                        specificMult = settings.itemWeaponScale;
+                    } else if (hasArmor || hasClothes || hasJewelry) {
+                        specificMult = settings.itemArmorScale;
+                    } else if (hasAlchemy || hasPotion || hasSkooma) {
+                        specificMult = settings.itemPotionScale;
+                    } else if (hasFood || hasIngredient || hasIngredients) {
+                        specificMult = settings.itemFoodScale;
                     }
                     userMultiplier = settings.itemMeshScale * specificMult;
                 }
@@ -496,8 +496,9 @@ namespace vrui
                 } else {
                     visualTransform->local.rotate = presentationRotation;
 
-                    // With automatic fitting, old type/category compensations
-                    // are ignored. Explicit INI corrections remain final.
+                    // With automatic fitting, legacy per-type transform
+                    // compensations are ignored. Explicit INI item/category
+                    // corrections remain final and multiply the Settings scale.
                     const bool applyStoredCorrection =
                         ItemUtils::isExplicitOverride(_itemTransformSource) ||
                         !settings.normalizeItemVisuals;
