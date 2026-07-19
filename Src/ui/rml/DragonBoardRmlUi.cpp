@@ -1473,12 +1473,17 @@ namespace dragonboard::ui::rml
         }
     }
 
-    bool DragonBoardRmlUi::Render(ID3D11RenderTargetView* renderTarget, int width, int height)
+    bool DragonBoardRmlUi::Render(
+        ID3D11RenderTargetView* renderTarget,
+        int renderWidth,
+        int renderHeight,
+        int logicalWidth,
+        int logicalHeight)
     {
         if (!IsReady()) return false;
         _lastRenderTiming = {};
-        _lastRenderTiming.width = width;
-        _lastRenderTiming.height = height;
+        _lastRenderTiming.width = renderWidth;
+        _lastRenderTiming.height = renderHeight;
         if (_activeDocument == _settingsDocument) _lastRenderTiming.activeDocument = "Settings";
         else if (_activeDocument == _developerDocument) _lastRenderTiming.activeDocument = "Developer";
         else if (_activeDocument == _itemEditDocument) _lastRenderTiming.activeDocument = "Item Editor";
@@ -1495,7 +1500,7 @@ namespace dragonboard::ui::rml
             _lastRenderTiming.activeDocument = "<none>";
         }
 
-        const Rml::Vector2i dimensions(width, height);
+        const Rml::Vector2i dimensions(logicalWidth, logicalHeight);
         if (_context->GetDimensions() != dimensions) {
             _context->SetDimensions(dimensions);
         }
@@ -1521,7 +1526,12 @@ namespace dragonboard::ui::rml
         _lastRenderTiming.domElements = _lastDomElementCount;
 
         const auto beginStarted = std::chrono::steady_clock::now();
-        const bool beganFrame = _renderer->BeginFrame(renderTarget, width, height);
+        const bool beganFrame = _renderer->BeginFrame(
+            renderTarget,
+            renderWidth,
+            renderHeight,
+            logicalWidth,
+            logicalHeight);
         const auto beginEnded = std::chrono::steady_clock::now();
         _lastRenderTiming.beginFrameMs = Milliseconds(beginStarted, beginEnded);
         if (!beganFrame) {

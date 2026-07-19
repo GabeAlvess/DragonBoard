@@ -19,6 +19,12 @@ namespace dragonboard::ui::rml
         bool Initialize(ID3D11Device* device, ID3D11DeviceContext* context);
         void Shutdown();
         bool BeginFrame(ID3D11RenderTargetView* renderTarget, int width, int height);
+        bool BeginFrame(
+            ID3D11RenderTargetView* renderTarget,
+            int renderWidth,
+            int renderHeight,
+            int logicalWidth,
+            int logicalHeight);
         void EndFrame();
         [[nodiscard]] bool IsReady() const;
         [[nodiscard]] int GetDrawCallCount() const;

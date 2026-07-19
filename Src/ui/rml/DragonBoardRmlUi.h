@@ -387,7 +387,12 @@ namespace dragonboard::ui::rml
             int height,
             float deltaTime);
         [[nodiscard]] bool RequiresContinuousRendering() const;
-        bool Render(ID3D11RenderTargetView* renderTarget, int width, int height);
+        bool Render(
+            ID3D11RenderTargetView* renderTarget,
+            int renderWidth,
+            int renderHeight,
+            int logicalWidth,
+            int logicalHeight);
 
         [[nodiscard]] bool ConsumeCloseRequested();
         [[nodiscard]] bool ConsumeSaveRequested();

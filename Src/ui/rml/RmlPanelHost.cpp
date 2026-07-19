@@ -31,6 +31,10 @@ namespace dragonboard::ui::rml
     {
         constexpr float kSceneScreenSizeScale = 0.85f;
         constexpr float kScenePlaneExtent = 170.666656f;
+        // Keep CSS layout and pointer coordinates stable while allowing the
+        // backing texture to render at a lower physical resolution.
+        constexpr int kPanelLogicalWidth = 1920;
+        constexpr int kPanelLogicalHeight = 1080;
         constexpr const char* kInventoryKeyboardOverlayKey =
             "dragonboardvr.inventory.search.keyboard";
         constexpr const char* kInventoryKeyboardOverlayName =
@@ -2038,7 +2042,9 @@ namespace dragonboard::ui::rml
                 rendered = _rmlUi->Render(
                     _panelRenderTarget,
                     static_cast<int>(_panelWidth),
-                    static_cast<int>(_panelHeight));
+                    static_cast<int>(_panelHeight),
+                    kPanelLogicalWidth,
+                    kPanelLogicalHeight);
             }
         } catch (const std::exception& error) {
             logger::warn(
@@ -2189,8 +2195,8 @@ namespace dragonboard::ui::rml
             const float stickY = _stickY.load();
             const bool pointerChanged = !_rmlInputStateInitialized ||
                 pointerOnPanel != _lastRmlPointerOnPanel ||
-                std::abs(pointerU - _lastRmlPointerU) >= (0.5f / static_cast<float>(_panelWidth)) ||
-                std::abs(pointerV - _lastRmlPointerV) >= (0.5f / static_cast<float>(_panelHeight)) ||
+                std::abs(pointerU - _lastRmlPointerU) >= (0.5f / static_cast<float>(kPanelLogicalWidth)) ||
+                std::abs(pointerV - _lastRmlPointerV) >= (0.5f / static_cast<float>(kPanelLogicalHeight)) ||
                 triggerDown != _lastRmlTriggerDown;
             const bool scrollChanged = !_rmlInputStateInitialized ||
                 gripDown != _lastRmlGripDown ||
@@ -2214,8 +2220,8 @@ namespace dragonboard::ui::rml
                 gripDown,
                 stickX,
                 stickY,
-                static_cast<int>(_panelWidth),
-                static_cast<int>(_panelHeight),
+                kPanelLogicalWidth,
+                kPanelLogicalHeight,
                 deltaTime);
             if (inventoryRmlActive || magicRmlActive) {
                 _previewInteractionZoneHovered.store(
@@ -2519,7 +2525,9 @@ namespace dragonboard::ui::rml
             const bool rendered = _rmlUi->Render(
                 _panelRenderTarget,
                 static_cast<int>(_panelWidth),
-                static_cast<int>(_panelHeight));
+                static_cast<int>(_panelHeight),
+                kPanelLogicalWidth,
+                kPanelLogicalHeight);
             if (rendered) {
                 _renderScheduler.OnRendered();
                 _rmlDirtyReason = _renderScheduler.DescribeLastRenderedReasons();

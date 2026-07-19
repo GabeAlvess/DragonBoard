@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
@@ -172,8 +173,10 @@ float4 main(PSInput input) : SV_TARGET
         ComPtr<ID3D11SamplerState> sampler;
         TextureData whiteTexture;
 
-        int width = 0;
-        int height = 0;
+        int renderWidth = 0;
+        int renderHeight = 0;
+        int logicalWidth = 0;
+        int logicalHeight = 0;
         bool scissorEnabled = false;
         int drawCallCount = 0;
         Rml::Rectanglei scissorRegion{};
@@ -368,12 +371,27 @@ float4 main(PSInput input) : SV_TARGET
     bool DragonBoardRmlRenderer::BeginFrame(
         ID3D11RenderTargetView* renderTarget, int width, int height)
     {
-        if (!IsReady() || !renderTarget || width <= 0 || height <= 0 || _impl->frameActive) return false;
+        return BeginFrame(renderTarget, width, height, width, height);
+    }
+
+    bool DragonBoardRmlRenderer::BeginFrame(
+        ID3D11RenderTargetView* renderTarget,
+        int renderWidth,
+        int renderHeight,
+        int logicalWidth,
+        int logicalHeight)
+    {
+        if (!IsReady() || !renderTarget || renderWidth <= 0 || renderHeight <= 0 ||
+            logicalWidth <= 0 || logicalHeight <= 0 || _impl->frameActive) {
+            return false;
+        }
         _impl->drawCallCount = 0;
 
         auto* context = _impl->context.Get();
-        _impl->width = width;
-        _impl->height = height;
+        _impl->renderWidth = renderWidth;
+        _impl->renderHeight = renderHeight;
+        _impl->logicalWidth = logicalWidth;
+        _impl->logicalHeight = logicalHeight;
         _impl->frameActive = true;
 
         context->OMGetRenderTargets(1, _impl->oldRtv.GetAddressOf(), _impl->oldDsv.GetAddressOf());
@@ -405,8 +423,8 @@ float4 main(PSInput input) : SV_TARGET
         context->ClearRenderTargetView(renderTarget, clear);
 
         D3D11_VIEWPORT viewport{};
-        viewport.Width = static_cast<float>(width);
-        viewport.Height = static_cast<float>(height);
+        viewport.Width = static_cast<float>(renderWidth);
+        viewport.Height = static_cast<float>(renderHeight);
         viewport.MinDepth = 0.0f;
         viewport.MaxDepth = 1.0f;
         context->RSSetViewports(1, &viewport);
@@ -520,7 +538,7 @@ float4 main(PSInput input) : SV_TARGET
         auto* texture = textureHandle ? reinterpret_cast<TextureData*>(textureHandle) : nullptr;
 
         Impl::Constants constants{
-            { static_cast<float>(_impl->width), static_cast<float>(_impl->height) },
+            { static_cast<float>(_impl->logicalWidth), static_cast<float>(_impl->logicalHeight) },
             { translation.x, translation.y }
         };
         _impl->context->UpdateSubresource(_impl->constants.Get(), 0, nullptr, &constants, 0, 0);
@@ -535,15 +553,29 @@ float4 main(PSInput input) : SV_TARGET
 
         D3D11_RECT scissor{};
         if (_impl->scissorEnabled) {
-            scissor.left = std::clamp(_impl->scissorRegion.Left(), 0, _impl->width);
-            scissor.top = std::clamp(_impl->scissorRegion.Top(), 0, _impl->height);
+            const float scaleX = static_cast<float>(_impl->renderWidth) /
+                static_cast<float>(_impl->logicalWidth);
+            const float scaleY = static_cast<float>(_impl->renderHeight) /
+                static_cast<float>(_impl->logicalHeight);
+            scissor.left = std::clamp(
+                static_cast<LONG>(std::floor(_impl->scissorRegion.Left() * scaleX)),
+                0L,
+                static_cast<LONG>(_impl->renderWidth));
+            scissor.top = std::clamp(
+                static_cast<LONG>(std::floor(_impl->scissorRegion.Top() * scaleY)),
+                0L,
+                static_cast<LONG>(_impl->renderHeight));
             scissor.right = std::clamp<LONG>(
-                _impl->scissorRegion.Right(), scissor.left, static_cast<LONG>(_impl->width));
+                static_cast<LONG>(std::ceil(_impl->scissorRegion.Right() * scaleX)),
+                scissor.left,
+                static_cast<LONG>(_impl->renderWidth));
             scissor.bottom = std::clamp<LONG>(
-                _impl->scissorRegion.Bottom(), scissor.top, static_cast<LONG>(_impl->height));
+                static_cast<LONG>(std::ceil(_impl->scissorRegion.Bottom() * scaleY)),
+                scissor.top,
+                static_cast<LONG>(_impl->renderHeight));
         } else {
-            scissor.right = _impl->width;
-            scissor.bottom = _impl->height;
+            scissor.right = _impl->renderWidth;
+            scissor.bottom = _impl->renderHeight;
         }
         _impl->context->RSSetScissorRects(1, &scissor);
         _impl->context->DrawIndexed(geometry->indexCount, 0, 0);
