@@ -81,6 +81,15 @@ namespace dragonboard::ui::rml
             std::uint32_t cellFormId = 0;
             std::string worldspaceName;
             std::uint32_t worldspaceFormId = 0;
+            std::array<std::string, 5> mapCalibrationStatus{};
+            std::string mapCalibrationSummary;
+        };
+
+        struct MapCalibrationRequest
+        {
+            std::size_t cityIndex = 0;
+            float pointerU = 0.0f;
+            float pointerV = 0.0f;
         };
 
         enum class ItemEditAction : std::uint8_t
@@ -145,6 +154,15 @@ namespace dragonboard::ui::rml
             kTrackObjective,
             kSettings,
             kClose
+        };
+
+        struct JournalActionRequest
+        {
+            JournalAction action = JournalAction::kNone;
+            std::uint32_t formID = 0;
+            std::uint32_t instanceID = 0;
+            std::uint32_t objectiveInstanceID = 0;
+            std::uint16_t objectiveID = 0;
         };
 
         struct InventoryItemInfo
@@ -280,6 +298,8 @@ namespace dragonboard::ui::rml
         ~DragonBoardRmlUi();
 
         bool Initialize(ID3D11Device* device, ID3D11DeviceContext* context);
+        bool LoadNextBuiltinDocument();
+        [[nodiscard]] bool AreBuiltinDocumentsLoaded() const;
         void Shutdown();
         [[nodiscard]] bool IsReady() const;
         [[nodiscard]] bool IsSettingsReady() const;
@@ -340,11 +360,13 @@ namespace dragonboard::ui::rml
         [[nodiscard]] std::optional<SliderChange> ConsumeSliderChange();
         [[nodiscard]] std::optional<std::size_t> ConsumeDeveloperCommandRequested();
         [[nodiscard]] bool ConsumeDeveloperAddCommandRequested();
+        [[nodiscard]] std::optional<MapCalibrationRequest> ConsumeMapCalibrationRequest();
+        [[nodiscard]] bool ConsumeMapCalibrationResetRequested();
         [[nodiscard]] ItemEditAction ConsumeItemEditAction();
         [[nodiscard]] std::pair<ModsAction, std::size_t> ConsumeModsAction();
         [[nodiscard]] std::pair<InventoryAction, std::size_t> ConsumeInventoryAction();
         [[nodiscard]] std::pair<MagicAction, std::size_t> ConsumeMagicAction();
-        [[nodiscard]] std::pair<JournalAction, std::size_t> ConsumeJournalAction();
+        [[nodiscard]] JournalActionRequest ConsumeJournalAction();
         [[nodiscard]] std::optional<std::size_t> GetHoveredModsIndex() const;
         [[nodiscard]] bool IsPreviewInteractionZoneHovered() const
         {
@@ -438,13 +460,21 @@ namespace dragonboard::ui::rml
         Rml::ElementDocument* _activeDocument = nullptr;
         std::unordered_map<std::uint32_t, RegisteredPanel> _registeredPanels;
         std::deque<PanelEvent> _panelEvents;
+        std::optional<MapCalibrationRequest> _mapCalibrationRequest;
+        bool _mapCalibrationResetRequested = false;
         bool _rmlInitialized = false;
+        std::size_t _builtinDocumentLoadStep = 0;
         bool _previousTriggerDown = false;
         bool _pointerWasOnPanel = false;
         bool _previewInteractionZoneHovered = false;
         bool _pointerSmoothingInitialized = false;
         float _smoothedPointerX = 0.0f;
         float _smoothedPointerY = 0.0f;
+        int _latestPointerX = 0;
+        int _latestPointerY = 0;
+        int _inputWidth = 1920;
+        int _inputHeight = 1080;
+        std::size_t _selectedMapCalibrationCity = 0;
         bool _currentTriggerDown = false;
         bool _currentGripDown = false;
         Rml::ElementDocument* _observedScrollDocument = nullptr;
@@ -510,6 +540,11 @@ namespace dragonboard::ui::rml
         MagicAction _magicAction = MagicAction::kNone;
         std::size_t _magicActionIndex = 0;
         JournalAction _journalAction = JournalAction::kNone;
-        std::size_t _journalActionIndex = 0;
+        std::uint32_t _journalActionFormID = 0;
+        std::uint32_t _journalActionInstanceID = 0;
+        std::uint32_t _journalActionObjectiveInstanceID = 0;
+        std::uint16_t _journalActionObjectiveID = 0;
+        std::uint32_t _journalSelectedFormID = 0;
+        std::uint32_t _journalSelectedInstanceID = 0;
     };
 }

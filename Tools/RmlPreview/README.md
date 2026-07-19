@@ -1,6 +1,6 @@
-# DragonBoard RmlUi Preview
+# DragonBoard RmlUi Editor
 
-Standalone Windows previewer for any RmlUi document. It renders at the same
+Standalone Windows editor and live preview for any RmlUi document. It renders at the same
 logical resolution used in Skyrim VR (1920x1080) and reuses the production
 D3D11 RmlUi renderer, but it does not load SKSE, CommonLib, Skyrim, the Present
 hook or ImGui.
@@ -38,7 +38,28 @@ repository assets are available. Otherwise it displays the file picker.
 - `F5`: force a full RML/RCSS reload
 - `F8`: toggle the RmlUi debugger
 - `F9`: show or hide the visual inspector
+- `F10`: show or hide the source editor
 - `Esc`: close the previewer
+
+The source editor opens automatically. It shows the active `.rml` document and
+all `.rcss` files beside it. Edits update the preview from memory after 350 ms
+without changing files on disk. Only the `Save` button writes changes. `Ctrl+Z`
+undoes source edits or the last visual move, while `Reset` restores the last
+saved version. If a partially typed document cannot be parsed, the last valid
+preview stays visible until the markup becomes valid again.
+
+The editor uses a dark, monospaced syntax-highlighted view for RML and RCSS.
+Clicking an element in the preview switches back to the active RML document,
+finds its `id` (or its first class/tag as a fallback), selects the corresponding
+source line and scrolls it into view.
+
+`Move mode` is enabled by default in the editor. Drag an element in the preview
+to reposition it live. Releasing the mouse stages `position`, `left` and `top`
+in the document's `.editor-overrides.rcss` source and opens that generated rule
+without writing it to disk. Turn Move mode off when testing sliders and other
+controls normally. Direct moves participate in the inspector's Undo/Redo history.
+Hold `Shift` while dragging to lock the movement to the first dominant axis,
+keeping the element precisely aligned horizontally or vertically.
 
 Changes to RML, RCSS and font files under the current document folder are
 detected automatically. The document is reloaded without rebuilding or

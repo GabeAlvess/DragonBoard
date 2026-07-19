@@ -12,7 +12,6 @@ namespace dragonboard::ui::panels
         constexpr const char* kPersistentPanelName = "Persistent_Panel";
         constexpr const char* kAlwaysVisiblePanelName = "AlwaysVisiblePanel";
         constexpr const char* kAlwaysVisibleHmdPanelName = "AlwaysVisibleHmdPanel";
-        constexpr const char* kFavoritesPanelName = "FavoritesPanel";
 
         bool IsPersistentPanel(const std::string& name)
         {
@@ -66,10 +65,6 @@ namespace dragonboard::ui::panels
             targetPanel.get(), dynamicContainers);
         for (auto* container : dynamicContainers) {
             if (container) {
-                if (panelName == kFavoritesPanelName) {
-                    // Favorites historically returns to its first page.
-                    container->resetPage();
-                }
                 // Defer content discovery/build until the panel is actually
                 // selected instead of blocking the DragonBoard open path.
                 container->scheduleRefresh(0.0f);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DragonBoardVR_API.h"
+#include "vrui/MapCalibration.h"
 
 #include <RE/Skyrim.h>
 #include <array>
@@ -85,7 +86,10 @@ namespace dragonboard::ui::rml
             bool enabled) noexcept;
 
         [[nodiscard]] bool IsOpen() const { return _visible.load(); }
+        [[nodiscard]] bool IsSettingsOpen() const;
         [[nodiscard]] bool IsDeveloperOpen() const;
+        [[nodiscard]] bool IsJournalOpen() const;
+        void RequestQuestMarkerRestore();
 
     private:
         void ResetPanelInput();
@@ -217,6 +221,7 @@ namespace dragonboard::ui::rml
             float playerX = 0.0f;
             float playerY = 0.0f;
             float playerZ = 0.0f;
+            std::array<vrui::MapCalibrationPoint, vrui::kMapCalibrationPointCount> mapCalibrationPoints{};
         };
 
         struct SettingsDraft
@@ -419,8 +424,19 @@ namespace dragonboard::ui::rml
         void CaptureJournalGameThread(bool preserveSelection);
         void ExecuteJournalActionGameThread(
             JournalAction action,
-            std::size_t index);
+            std::uint32_t formID,
+            std::uint32_t instanceID,
+            std::uint32_t objectiveInstanceID,
+            std::uint16_t objectiveID);
         bool SetQuestTrackedGameThread(std::uint32_t formID, bool tracked);
+        bool CacheQuestObjectiveTargetGameThread(
+            std::uint32_t formID,
+            std::uint32_t instanceID,
+            std::uint16_t objectiveID);
+        void RefreshTrackedQuestObjectiveGameThread();
+        void RefreshMovingQuestTargetGameThread();
+        bool RestoreQuestMarkerGameThread();
+        void PersistQuestMarkerSelectionGameThread();
         void ApplyRenderCommandsPresentThread();
         void CollectExternalEventsPresentThread();
         void DispatchExternalEventsGameThread();
@@ -438,6 +454,9 @@ namespace dragonboard::ui::rml
 
         // Built-in Developer adapter.
         void CaptureDevGameInfoGameThread();
+        void CaptureMapCalibrationGameThread(std::size_t cityIndex, float pointerU, float pointerV);
+        [[nodiscard]] bool PanelUvToMapMarkerLocal(
+            float pointerU, float pointerV, float& panelX, float& panelY) const;
         void LoadDevCommandsGameThread();
         void AddDevCommandGameThread(std::string command);
         void QueueDevCommand(const DevCommandEntry& entry);
@@ -455,6 +474,7 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _rmlWarmupRequested{ false };
         std::atomic<bool> _rmlWarmupAttempted{ false };
         std::size_t _rmlPrewarmStep = 0;
+        std::size_t _rmlPrewarmFrameCount = 0;
         std::int64_t _rmlPrewarmTotalMs = 0;
         bool _rmlPrewarmComplete = false;
         std::unique_ptr<dragonboard::ui::rml::DragonBoardRmlUi> _rmlUi;
@@ -491,6 +511,10 @@ namespace dragonboard::ui::rml
         std::string _pendingDevCommandLabel;
         bool _pendingDevCommandDangerous = false;
         std::atomic<bool> _devCommandPending{ false };
+        std::atomic<std::size_t> _mapCalibrationCityPending{ static_cast<std::size_t>(-1) };
+        std::atomic<float> _mapCalibrationPointerU{ 0.0f };
+        std::atomic<float> _mapCalibrationPointerV{ 0.0f };
+        std::atomic<bool> _mapCalibrationResetPending{ false };
         std::string _pendingDevCommandAddition;
         std::atomic<bool> _devCommandAdditionPending{ false };
         std::atomic<bool> _developerKeyboardCloseRequested{ false };
@@ -565,9 +589,26 @@ namespace dragonboard::ui::rml
         std::string _journalPlayerName;
         std::uint16_t _journalPlayerLevel = 1;
         std::atomic<JournalAction> _journalActionPending{ JournalAction::kNone };
-        std::atomic<std::size_t> _journalActionIndex{ 0 };
+        std::atomic<std::uint32_t> _journalActionFormID{ 0 };
+        std::atomic<std::uint32_t> _journalActionInstanceID{ 0 };
+        std::atomic<std::uint32_t> _journalActionObjectiveInstanceID{ 0 };
+        std::atomic<std::uint16_t> _journalActionObjectiveID{ 0 };
         float _journalPollAccumulator = 0.0f;
         std::uint64_t _journalStateSignature = 0;
+        float _questTargetResolveDelay = -1.0f;
+        std::uint32_t _questTargetResolveFormID = 0;
+        std::uint32_t _questTargetResolveInstanceID = 0;
+        std::uint16_t _questTargetResolveObjectiveID = 0;
+        std::uint8_t _questTargetResolveAttempts = 0;
+        float _questMarkerPollAccumulator = 0.0f;
+        std::uint32_t _questMarkerWatchFormID = 0;
+        std::uint32_t _questMarkerWatchQuestInstanceID = 0;
+        std::uint32_t _questMarkerWatchObjectiveInstanceID = 0;
+        std::uint16_t _questMarkerWatchObjectiveID = 0;
+        float _questMovingTargetPollAccumulator = 0.0f;
+        RE::ObjectRefHandle _questMovingTargetHandle{};
+        float _questMarkerRestoreDelay = -1.0f;
+        std::uint8_t _questMarkerRestoreAttempts = 0;
         std::mutex _itemEditMutex;
         ItemEditDraft _itemEditDraft;
         vrui::VRUIItemEditPanel* _itemEditBackend = nullptr;

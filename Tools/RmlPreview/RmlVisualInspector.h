@@ -29,6 +29,12 @@ namespace dragonboard::tools
 
         void SetDocument(Rml::ElementDocument* document, const std::filesystem::path& path);
         void SelectElement(Rml::Element* element);
+        bool BeginMove(Rml::Element* element);
+        void UpdateMove(float deltaX, float deltaY);
+        [[nodiscard]] std::string EndMove();
+        [[nodiscard]] std::string SerializeOverrides() const;
+        void SetOverrideSource(std::string_view source);
+        bool Undo();
 
     private:
         using Properties = std::map<std::string, std::string>;
@@ -55,7 +61,7 @@ namespace dragonboard::tools
         void ApplyOverrides(const Overrides& previous);
         void SaveOverrides();
         void LoadOverrides();
-        void Undo();
+        void ParseOverrides(std::istream& stream);
         void Redo();
         void UpdateButtons();
 
@@ -88,5 +94,10 @@ namespace dragonboard::tools
         std::set<std::size_t> _dirtyProperties;
         StatusCallback _statusCallback;
         bool _populatingFields = false;
+        Rml::Element* _movingElement = nullptr;
+        std::string _movingSelector;
+        Overrides _movePrevious;
+        float _moveInitialLeft = 0.0f;
+        float _moveInitialTop = 0.0f;
     };
 }

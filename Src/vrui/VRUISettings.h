@@ -1,5 +1,8 @@
 #pragma once
 
+#include "MapCalibration.h"
+
+#include <array>
 #include <string>
 #include <map>
 #include <vector>
@@ -261,8 +264,8 @@ namespace vrui
         float bModsRotX = 0.000000f; float bModsRotY = 0.000000f; float bModsRotZ = 20.000000f;
         float bModsScale = 1.000000f;
 
-        std::string bFavLabel  = "Favorites";     
-        std::string bFavAction = "FavoritesPanel"; 
+        std::string bFavLabel  = "Journal";
+        std::string bFavAction = "Journal";
         float bFavPosX = -14.000000f;  float bFavPosY =  0.250000f;  float bFavPosZ = 4.500000f;
         float bFavRotX = 0.000000f; float bFavRotY = 0.000000f; float bFavRotZ = 20.000000f;
         float bFavScale = 1.000000f;
@@ -340,6 +343,19 @@ namespace vrui
         float mapMarkerOffsetZ          = -0.9f;
 
         std::string mapMarkerNifPath = "DragonBoardVR/Player.nif"; 
+        std::array<MapCalibrationPoint, kMapCalibrationPointCount> mapCalibrationPoints{};
+
+        // [QuestMarker]
+        bool  bEnableQuestMarker = true;
+        float questMarkerScale = 0.5f;
+        float questMarkerRotX = 90.0f;
+        float questMarkerRotY = 0.0f;
+        float questMarkerRotZ = 180.0f;
+        std::string questMarkerNifPath = "meshes\\DragonBoardVR\\QuestMarker.nif";
+        std::uint32_t questMarkerLastFormID = 0;
+        std::uint32_t questMarkerLastQuestInstanceID = 0;
+        std::uint32_t questMarkerLastObjectiveInstanceID = 0;
+        std::uint16_t questMarkerLastObjectiveID = 0;
 
         // -----------------------------------------------------------------------
         // API

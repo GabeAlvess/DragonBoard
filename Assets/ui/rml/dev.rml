@@ -16,6 +16,7 @@
             <div class="dev-nav">
                 <button id="dev-tab-commands" class="nav-item"><span>Console commands</span></button>
                 <button id="dev-tab-info" class="nav-item"><span>Game information</span></button>
+                <button id="dev-tab-calibration" class="nav-item"><span>Map calibration</span></button>
             </div>
 
             <div class="sidebar-status developer-status">
@@ -82,6 +83,29 @@
                         <div class="info-row"><span>Worldspace FormID</span><span id="dev-worldspace-form" class="info-value">--------</span></div>
                     </div>
                 </section>
+
+                <section id="dev-page-calibration" class="page dev-page calibration-page">
+                    <div class="calibration-toolbar">
+                        <div class="calibration-title">MAP MARKER CALIBRATION</div>
+                        <div class="calibration-instructions">
+                            Fast travel to a city, select its name, then press CAPTURE CURRENT SPAWN. The map landmark is fixed automatically.
+                        </div>
+                        <div class="calibration-cities">
+                            <button id="dev-cal-city-0" class="calibration-city active"><span>Whiterun</span><span id="dev-cal-status-0" class="calibration-status">Not captured</span></button>
+                            <button id="dev-cal-city-1" class="calibration-city"><span>Riften</span><span id="dev-cal-status-1" class="calibration-status">Not captured</span></button>
+                            <button id="dev-cal-city-2" class="calibration-city"><span>Solitude</span><span id="dev-cal-status-2" class="calibration-status">Not captured</span></button>
+                            <button id="dev-cal-city-3" class="calibration-city"><span>Falkreath</span><span id="dev-cal-status-3" class="calibration-status">Not captured</span></button>
+                            <button id="dev-cal-city-4" class="calibration-city"><span>Windhelm</span><span id="dev-cal-status-4" class="calibration-status">Not captured</span></button>
+                        </div>
+                        <div class="calibration-summary-row">
+                            <div id="dev-calibration-summary" class="calibration-summary">0/5 points captured</div>
+                            <button id="dev-calibration-reset" class="calibration-reset"><span>Reset calibration</span></button>
+                        </div>
+                        <div class="calibration-map-frame">
+                            <img class="calibration-map-image" src="assets/map_calibration.png" />
+                        </div>
+                    </div>
+                </section>
             </main>
 
             <footer class="dev-footer">
@@ -92,6 +116,9 @@
                 </div>
             </footer>
         </div>
+        <button id="dev-calibration-surface" class="calibration-surface">
+            <span>CAPTURE CURRENT SPAWN</span>
+        </button>
         <div id="vr-cursor"></div>
     </div>
 </body>

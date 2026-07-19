@@ -7,13 +7,148 @@
 #include <RE/N/NiAVObject.h>
 #include "VRUIMapMarker.h"
 #include "VRUISettings.h"
+#include "MapCalibration.h"
+#include "VRMenuManager.h"
+#include "VRUIPanel.h"
+
+#include <DirectXPackedVector.h>
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cstring>
+#include <mutex>
+#include <string_view>
 
 namespace vrui
 {
-    VRUIMapMarker::VRUIMapMarker(const std::string& nifPath) :
-        VRUIWidget("MapMarker", 0.5f, 0.5f), _nifPath(nifPath)
+    namespace
+    {
+        struct QuestObjectivePositionCache
+        {
+            RE::FormID questFormId = 0;
+            RE::FormID targetFormId = 0;
+            RE::NiPoint3 worldPosition{};
+            bool valid = false;
+        };
+
+        std::mutex g_questObjectivePositionMutex;
+        QuestObjectivePositionCache g_questObjectivePosition;
+
+        constexpr float kAtlasSize = 4096.0f;
+        constexpr float kRotatedMapSourceWidth = 1536.0f;
+        constexpr float kRotatedMapSourceHeight = 2216.0f;
+        constexpr float kRotatedMapSourceTop = 1880.0f;
+
+        RE::NiPoint2 MapArtworkUvToAtlasUv(float mapU, float mapV)
+        {
+            // The map is stored rotated counter-clockwise in the lower-left
+            // portion of DragonBoardMat_Tex.dds. This is the inverse of the
+            // crop=1536:2216:0:1880,transpose=2 inspection transform.
+            return {
+                (1.0f - mapV) * kRotatedMapSourceWidth / kAtlasSize,
+                (kRotatedMapSourceTop + mapU * kRotatedMapSourceHeight) / kAtlasSize
+            };
+        }
+
+        bool ContainsCaseInsensitive(std::string_view value, std::string_view needle)
+        {
+            std::string lowered(value);
+            std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+            return lowered.find(needle) != std::string::npos;
+        }
+
+        float ReadHalf(const std::uint8_t* bytes)
+        {
+            std::uint16_t value = 0;
+            std::memcpy(&value, bytes, sizeof(value));
+            return DirectX::PackedVector::XMConvertHalfToFloat(value);
+        }
+
+        RE::NiPoint3 ReadPosition(
+            const RE::BSGraphics::TriShape& rendererData,
+            RE::BSGraphics::VertexDesc vertexDesc,
+            std::uint16_t index)
+        {
+            const auto stride = vertexDesc.GetSize();
+            const auto offset = vertexDesc.GetAttributeOffset(
+                RE::BSGraphics::Vertex::Attribute::VA_POSITION);
+            const auto* bytes = rendererData.rawVertexData +
+                static_cast<std::size_t>(index) * stride + offset;
+            RE::NiPoint3 position;
+            std::memcpy(&position, bytes, sizeof(position));
+            return position;
+        }
+
+        RE::NiPoint2 ReadTextureUv(
+            const RE::BSGraphics::TriShape& rendererData,
+            RE::BSGraphics::VertexDesc vertexDesc,
+            std::uint16_t index)
+        {
+            const auto stride = vertexDesc.GetSize();
+            const auto offset = vertexDesc.GetAttributeOffset(
+                RE::BSGraphics::Vertex::Attribute::VA_TEXCOORD0);
+            const auto* bytes = rendererData.rawVertexData +
+                static_cast<std::size_t>(index) * stride + offset;
+            return { ReadHalf(bytes), ReadHalf(bytes + sizeof(std::uint16_t)) };
+        }
+
+        bool CalculateBarycentric(
+            const RE::NiPoint2& point,
+            const std::array<RE::NiPoint2, 3>& triangle,
+            std::array<float, 3>& weights)
+        {
+            const float denominator =
+                (triangle[1].y - triangle[2].y) * (triangle[0].x - triangle[2].x) +
+                (triangle[2].x - triangle[1].x) * (triangle[0].y - triangle[2].y);
+            if (std::abs(denominator) <= 1.0e-8f) return false;
+
+            weights[0] =
+                ((triangle[1].y - triangle[2].y) * (point.x - triangle[2].x) +
+                    (triangle[2].x - triangle[1].x) * (point.y - triangle[2].y)) /
+                denominator;
+            weights[1] =
+                ((triangle[2].y - triangle[0].y) * (point.x - triangle[2].x) +
+                    (triangle[0].x - triangle[2].x) * (point.y - triangle[2].y)) /
+                denominator;
+            weights[2] = 1.0f - weights[0] - weights[1];
+            constexpr float kUvTolerance = -0.002f;
+            return weights[0] >= kUvTolerance && weights[1] >= kUvTolerance &&
+                weights[2] >= kUvTolerance;
+        }
+    }
+
+    VRUIMapMarker::VRUIMapMarker(
+        const std::string& nifPath,
+        MapMarkerSource source) :
+        VRUIWidget(
+            source == MapMarkerSource::Player ? "MapMarker" : "QuestObjectiveMarker",
+            0.5f,
+            0.5f),
+        _nifPath(nifPath),
+        _source(source)
     {
         initializeVisuals();
+    }
+
+    void VRUIMapMarker::SetQuestObjectivePosition(
+        RE::FormID questFormId,
+        RE::FormID targetFormId,
+        const RE::NiPoint3& worldPosition)
+    {
+        std::scoped_lock lock(g_questObjectivePositionMutex);
+        g_questObjectivePosition = {
+            questFormId,
+            targetFormId,
+            worldPosition,
+            true
+        };
+    }
+
+    void VRUIMapMarker::ClearQuestObjectivePosition()
+    {
+        std::scoped_lock lock(g_questObjectivePositionMutex);
+        g_questObjectivePosition = {};
     }
 
     void VRUIMapMarker::initializeVisuals()
@@ -40,7 +175,9 @@ namespace vrui
         VRUIWidget::update(deltaTime);
 
         auto& settings = VRUISettings::get();
-        if (!settings.bEnableMapMarker) {
+        const bool questMarker = _source == MapMarkerSource::QuestObjective;
+        if ((!questMarker && !settings.bEnableMapMarker) ||
+            (questMarker && !settings.bEnableQuestMarker)) {
             setVisible(false);
             return;
         }
@@ -48,44 +185,90 @@ namespace vrui
         auto player = RE::PlayerCharacter::GetSingleton();
         if (!player) return;
 
-        RE::NiPoint3 worldPos = player->GetPosition();
-
-        // Use member access and basic virtuals for stability
-        RE::TESObjectCELL* currentCell = player->parentCell;
-        
-        bool isInterior = false;
-        if (currentCell) {
-             // Use any() for const-correct flag checking
-             isInterior = currentCell->cellFlags.any(RE::TESObjectCELL::Flag::kIsInteriorCell);
+        RE::NiPoint3 worldPos{};
+        if (questMarker) {
+            std::scoped_lock lock(g_questObjectivePositionMutex);
+            if (!g_questObjectivePosition.valid) {
+                setVisible(false);
+                return;
+            }
+            worldPos = g_questObjectivePosition.worldPosition;
+        } else {
+            worldPos = player->GetPosition();
+            RE::TESObjectCELL* currentCell = player->parentCell;
+            const bool isInterior = currentCell &&
+                currentCell->cellFlags.any(RE::TESObjectCELL::Flag::kIsInteriorCell);
+            if (isInterior) {
+                setVisible(false);
+                return;
+            }
         }
 
-        if (isInterior) {
+        float mapU = 0.0f;
+        float mapV = 0.0f;
+        if (!MapWorldToTextureUv(
+                settings.mapCalibrationPoints, worldPos.x, worldPos.y, mapU, mapV) ||
+            mapU < -0.1f || mapU > 1.1f || mapV < -0.1f || mapV > 1.1f) {
             setVisible(false);
             return;
         }
 
+        auto surfacePanel = VRMenuManager::get().findPanelByName("Background_Panel");
+        auto* panelNode = surfacePanel ? surfacePanel->getNode() : nullptr;
+        auto* backgroundNode = surfacePanel ? surfacePanel->getBackgroundNode() : nullptr;
+        if (!panelNode || !backgroundNode) {
+            setVisible(false);
+            return;
+        }
+        if (_cachedBackgroundNode != backgroundNode && !rebuildMapSurfaceCache(backgroundNode)) {
+            setVisible(false);
+            return;
+        }
+
+        RE::NiPoint3 surfacePosition;
+        RE::NiPoint3 surfaceNormal;
+        if (!textureUvToPanelLocal(
+                panelNode,
+                std::clamp(mapU, 0.0f, 1.0f),
+                std::clamp(mapV, 0.0f, 1.0f),
+                surfacePosition,
+                surfaceNormal)) {
+            setVisible(false);
+            if (!_surfaceFailureLogged) {
+                const auto atlasUv = MapArtworkUvToAtlasUv(mapU, mapV);
+                logger::warn(
+                    "DragonBoardVR: {} calibrated map UV ({:.4f}, {:.4f}) / atlas UV ({:.4f}, {:.4f}) is not covered by the map mesh UVs.",
+                    questMarker ? "quest objective" : "player",
+                    mapU, mapV, atlasUv.x, atlasUv.y);
+                _surfaceFailureLogged = true;
+            }
+            return;
+        }
+
+        _surfaceFailureLogged = false;
+        if (!_surfacePlacementLogged) {
+            const auto atlasUv = MapArtworkUvToAtlasUv(mapU, mapV);
+            logger::info(
+                "DragonBoardVR: {} map marker placement resolved: mapUV=({:.4f}, {:.4f}) atlasUV=({:.4f}, {:.4f}) panel=({:.3f}, {:.3f}, {:.3f}) normal=({:.3f}, {:.3f}, {:.3f}).",
+                questMarker ? "quest objective" : "player",
+                mapU, mapV, atlasUv.x, atlasUv.y,
+                surfacePosition.x, surfacePosition.y, surfacePosition.z,
+                surfaceNormal.x, surfaceNormal.y, surfaceNormal.z);
+            _surfacePlacementLogged = true;
+        }
         setVisible(true);
-
-        // Map world coordinates to tablet surface coordinates (0.0 to 1.0)
-        float tX = (worldPos.x - settings.mapWorldMinX) / (settings.mapWorldMaxX - settings.mapWorldMinX);
-        float tY = (worldPos.y - settings.mapWorldMinY) / (settings.mapWorldMaxY - settings.mapWorldMinY);
-
-        // Convert to local widget position on the tablet
-        float localX = (tX - 0.5f) * settings.mapWidth + settings.mapMarkerOffsetX;
-        float localY = (tY - 0.5f) * settings.mapHeight + settings.mapMarkerOffsetY;
-
-        setLocalPosition({ localX, settings.mapMarkerOffsetZ, localY });
-        setLocalScale(settings.mapMarkerScale);
+        setLocalPosition(surfacePosition + surfaceNormal * (questMarker ? 0.10f : 0.08f));
+        setLocalScale(questMarker ? settings.questMarkerScale : settings.mapMarkerScale);
 
         // Apply rotation
         RE::NiMatrix3 meshRot;
         meshRot.SetEulerAnglesXYZ(
-            settings.mapMarkerRotX * kDegToRad,
-            settings.mapMarkerRotY * kDegToRad,
-            settings.mapMarkerRotZ * kDegToRad
+            (questMarker ? settings.questMarkerRotX : settings.mapMarkerRotX) * kDegToRad,
+            (questMarker ? settings.questMarkerRotY : settings.mapMarkerRotY) * kDegToRad,
+            (questMarker ? settings.questMarkerRotZ : settings.mapMarkerRotZ) * kDegToRad
         );
 
-        if (settings.bMapMarkerDynamicRotation) {
+        if (!questMarker && settings.bMapMarkerDynamicRotation) {
             // The player's heading (yaw) is around the Z axis in world space.
             // The tablet's surface normal is the Y axis (local space X-Z plane).
             float heading = player->GetAngle().z + (settings.mapMarkerRotOffset * kDegToRad);
@@ -101,5 +284,134 @@ namespace vrui
         
         RE::NiUpdateData updateData;
         _node->Update(updateData);
+    }
+
+    bool VRUIMapMarker::rebuildMapSurfaceCache(RE::NiNode* backgroundNode)
+    {
+        _cachedBackgroundNode = backgroundNode;
+        _mapSurfaceTriangles.clear();
+        _surfaceFailureLogged = false;
+        _surfacePlacementLogged = false;
+        if (!backgroundNode) return false;
+
+        std::size_t matchedGeometryCount = 0;
+        RE::BSVisit::TraverseScenegraphGeometries(
+            backgroundNode,
+            [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                auto* triShape = geometry ? geometry->AsTriShape() : nullptr;
+                auto* property = geometry ? geometry->lightingShaderProp_cast() : nullptr;
+                auto* material = property ? static_cast<RE::BSLightingShaderMaterialBase*>(
+                    property->GetBaseMaterial()) : nullptr;
+                const std::string_view textureName =
+                    material && material->diffuseTexture && material->diffuseTexture->name.c_str() ?
+                    material->diffuseTexture->name.c_str() : "";
+                if (!triShape || !material ||
+                    !ContainsCaseInsensitive(textureName, "dragonboardmat_tex")) {
+                    return RE::BSVisit::BSVisitControl::kContinue;
+                }
+
+                ++matchedGeometryCount;
+                const auto& geometryData = triShape->GetGeometryRuntimeData();
+                const auto& shapeData = triShape->GetTrishapeRuntimeData();
+                auto* rendererData = geometryData.rendererData;
+                auto vertexDesc = geometryData.vertexDesc;
+                if (!rendererData || !rendererData->rawVertexData || !rendererData->rawIndexData ||
+                    !vertexDesc.HasFlag(RE::BSGraphics::Vertex::VF_VERTEX) ||
+                    !vertexDesc.HasFlag(RE::BSGraphics::Vertex::VF_UV)) {
+                    logger::warn(
+                        "DragonBoardVR: map geometry '{}' has no retained CPU vertex/index/UV data.",
+                        geometry->name.c_str());
+                    return RE::BSVisit::BSVisitControl::kContinue;
+                }
+
+                for (std::uint16_t triangleIndex = 0;
+                     triangleIndex < shapeData.triangleCount;
+                     ++triangleIndex) {
+                    MapSurfaceTriangle triangle;
+                    triangle.geometry = triShape;
+                    bool valid = true;
+                    for (std::size_t corner = 0; corner < 3; ++corner) {
+                        const auto index = rendererData->rawIndexData[
+                            static_cast<std::size_t>(triangleIndex) * 3 + corner];
+                        if (index >= shapeData.vertexCount) {
+                            valid = false;
+                            break;
+                        }
+                        triangle.indices[corner] = index;
+                        auto uv = ReadTextureUv(*rendererData, vertexDesc, index);
+                        uv.x = uv.x * material->texCoordScale[0].x + material->texCoordOffset[0].x;
+                        uv.y = uv.y * material->texCoordScale[0].y + material->texCoordOffset[0].y;
+                        triangle.textureUv[corner] = uv;
+                    }
+                    if (valid) _mapSurfaceTriangles.push_back(triangle);
+                }
+
+                logger::info(
+                    "DragonBoardVR: indexed map surface geometry '{}' texture='{}' vertices={} triangles={}.",
+                    geometry->name.c_str(), textureName, shapeData.vertexCount,
+                    shapeData.triangleCount);
+                return RE::BSVisit::BSVisitControl::kContinue;
+            });
+
+        if (_mapSurfaceTriangles.empty()) {
+            logger::warn(
+                "DragonBoardVR: no usable UV triangles found for DragonBoardMat_Tex.dds (matched geometries={}).",
+                matchedGeometryCount);
+            return false;
+        }
+
+        logger::info(
+            "DragonBoardVR: texture-UV map marker ready with {} cached surface triangles.",
+            _mapSurfaceTriangles.size());
+        return true;
+    }
+
+    bool VRUIMapMarker::textureUvToPanelLocal(
+        RE::NiNode* panelNode,
+        float mapU,
+        float mapV,
+        RE::NiPoint3& position,
+        RE::NiPoint3& normal)
+    {
+        if (!panelNode) return false;
+        const auto targetUv = MapArtworkUvToAtlasUv(mapU, mapV);
+        for (const auto& triangle : _mapSurfaceTriangles) {
+            if (!triangle.geometry) continue;
+            std::array<float, 3> weights{};
+            if (!CalculateBarycentric(targetUv, triangle.textureUv, weights)) continue;
+
+            const auto& geometryData = triangle.geometry->GetGeometryRuntimeData();
+            auto* rendererData = geometryData.rendererData;
+            if (!rendererData || !rendererData->rawVertexData) continue;
+            auto vertexDesc = geometryData.vertexDesc;
+
+            std::array<RE::NiPoint3, 3> panelVertices{};
+            const auto worldToPanel = panelNode->world.Invert();
+            for (std::size_t corner = 0; corner < 3; ++corner) {
+                const auto geometryLocal = ReadPosition(
+                    *rendererData, vertexDesc, triangle.indices[corner]);
+                panelVertices[corner] = worldToPanel *
+                    (triangle.geometry->world * geometryLocal);
+            }
+
+            position = panelVertices[0] * weights[0] +
+                panelVertices[1] * weights[1] + panelVertices[2] * weights[2];
+            const auto edgeA = panelVertices[1] - panelVertices[0];
+            const auto edgeB = panelVertices[2] - panelVertices[0];
+            normal = {
+                edgeA.y * edgeB.z - edgeA.z * edgeB.y,
+                edgeA.z * edgeB.x - edgeA.x * edgeB.z,
+                edgeA.x * edgeB.y - edgeA.y * edgeB.x
+            };
+            const float length = normal.Length();
+            if (length <= 1.0e-5f) return false;
+            normal = normal / length;
+            // The sampled parchment lies near local Y=-0.812, while the
+            // established visible marker plane is near Y=-0.750. Therefore
+            // the viewer-facing side of the DragonBoard is positive local Y.
+            if (normal.y < 0.0f) normal = normal * -1.0f;
+            return true;
+        }
+        return false;
     }
 }

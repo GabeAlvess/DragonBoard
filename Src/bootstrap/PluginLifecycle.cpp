@@ -58,6 +58,10 @@ namespace dragonboard::bootstrap
             // handlers below remain safe fallbacks.
             logger::info("DragonBoardVR: SKSE input loaded; registering VR input sink.");
             VRFrameUpdater::Register();
+            // Start the staged RmlUi warm-up while Skyrim is still loading.
+            // RequestRmlWarmup is idempotent and kDataLoaded remains a retry
+            // point if the swap chain is not available yet.
+            dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             break;
 
         case SKSE::MessagingInterface::kDataLoaded: {
@@ -95,10 +99,9 @@ namespace dragonboard::bootstrap
             }
 
             logger::trace("DragonBoardVR: Keys registered (G=grip, ControlMap=Hotkey8)");
-            // kDataLoaded runs after the renderer is normally available at the
-            // main menu, but before the player skeleton and DragonBoard 3D
-            // items are initialized. Only arm a Present-thread RmlUi warm-up;
-            // no scene graph nodes are created here.
+            // Retry the staged Present-thread warm-up once the renderer is
+            // normally available. The first request is made at kInputLoaded so
+            // document work can be spread across frames during loading.
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             break;
         }
@@ -110,6 +113,7 @@ namespace dragonboard::bootstrap
         case SKSE::MessagingInterface::kPostLoadGame:
             logger::trace("DragonBoardVR: ===== kPostLoadGame =====");
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
+            dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestQuestMarkerRestore();
             VRFrameUpdater::Register();
             break;
 
@@ -117,6 +121,7 @@ namespace dragonboard::bootstrap
             logger::trace("DragonBoardVR: ===== kNewGame =====");
             dragonboard::papyrus::ResetPapyrusPanels();
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
+            dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestQuestMarkerRestore();
             VRFrameUpdater::Register();
             break;
         }

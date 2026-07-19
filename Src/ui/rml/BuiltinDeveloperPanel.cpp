@@ -1,5 +1,8 @@
 #include "ui/rml/RmlPanelHost.h"
+#include "ui/rml/DragonBoardRmlUi.h"
 #include "game/actions/ActionExecutor.h"
+#include "vrui/VRMenuManager.h"
+#include "vrui/VRUISettings.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -211,7 +214,53 @@ namespace dragonboard::ui::rml
                 }
             }
         }
+        snapshot.mapCalibrationPoints = vrui::VRUISettings::get().mapCalibrationPoints;
         std::scoped_lock lock(_devMutex);
         _devGameInfo = std::move(snapshot);
+    }
+
+    void RmlPanelHost::CaptureMapCalibrationGameThread(
+        std::size_t cityIndex, float, float)
+    {
+        static constexpr std::array<const char*, vrui::kMapCalibrationPointCount> cityNames{
+            "Whiterun", "Riften", "Solitude", "Falkreath", "Windhelm"
+        };
+        if (cityIndex >= cityNames.size()) return;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* cell = player ? player->GetParentCell() : nullptr;
+        if (!player || !cell || cell->cellFlags.any(RE::TESObjectCELL::Flag::kIsInteriorCell) ||
+            !cell->GetRuntimeData().worldSpace) {
+            logger::warn(
+                "DragonBoardVR: map calibration point '{}' rejected because the player is not in an exterior worldspace.",
+                cityNames[cityIndex]);
+            _pendingRmlHapticCue.store(static_cast<std::uint8_t>(
+                DragonBoardRmlUi::HapticCue::kError), std::memory_order_release);
+            return;
+        }
+
+        const auto position = player->GetPosition();
+        auto& settings = vrui::VRUISettings::get();
+        float mapU = 0.0f;
+        float mapV = 0.0f;
+        if (!vrui::GetMapCalibrationLandmarkUv(cityIndex, mapU, mapV)) {
+            logger::warn("DragonBoardVR: map calibration could not resolve the fixed '{}' landmark.", cityNames[cityIndex]);
+            return;
+        }
+        settings.mapCalibrationPoints[cityIndex] = vrui::MapCalibrationPoint{
+            true, position.x, position.y, mapU, mapV
+        };
+        vrui::VRMenuManager::get().saveSettingsNow();
+        CaptureDevGameInfoGameThread();
+        _rmlDeveloperInfoSyncPending.store(true, std::memory_order_release);
+        _pendingRmlHapticCue.store(static_cast<std::uint8_t>(
+            DragonBoardRmlUi::HapticCue::kStrong), std::memory_order_release);
+
+        vrui::MapCalibrationTransform calibration;
+        const bool ready = vrui::FitMapCalibration(settings.mapCalibrationPoints, calibration);
+        logger::info(
+            "DragonBoardVR: map calibration '{}' saved against fixed texture UV: world=({:.2f}, {:.2f}) mapUV=({:.4f}, {:.4f}) ready={} rms={:.5f}.",
+            cityNames[cityIndex], position.x, position.y, mapU, mapV,
+            ready, ready ? calibration.rmsError : 0.0f);
     }
 }

@@ -28,7 +28,6 @@
 #include "vrui/VRUIMenuMCM.h"
 #include "vrui/VRUIInventoryContainer.h"
 #include "vrui/VRUIMagicContainer.h"
-#include "vrui/VRUIFavoritesContainer.h"
 #include "vrui/VRUIMapMarker.h"
 
 using namespace vrui;
@@ -56,7 +55,7 @@ static VRUIButton::PressCallback openJournalPanel()
 {
     return [](VRUIButton*, EquipHand) {
         auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-        if (rmlHost.IsOpen()) {
+        if (rmlHost.IsJournalOpen()) {
             rmlHost.Close();
             return;
         }
@@ -170,7 +169,6 @@ static void ensureDynamicPanel(const std::string& panelName, const std::string& 
     std::shared_ptr<VRUIDynamicContainer> container;
     if (type == "Inventory") container = std::make_shared<VRUIInventoryContainer>(panelName + "_Grid");
     else if (type == "Magic")  container = std::make_shared<VRUIMagicContainer>(panelName + "_Grid");
-    else if (type == "Favorites") container = std::make_shared<VRUIFavoritesContainer>(panelName + "_Grid");
 
     if (container) {
         auto& settings = VRUISettings::get();
@@ -207,7 +205,6 @@ static void ensureDynamicPanel(const std::string& panelName, const std::string& 
         constexpr const char* kQuestIconNif = "DragonBoardVR\\questicon.nif";
         constexpr const char* kBooksIconNif = "DragonBoardVR\\booksicon.nif";
         constexpr const char* kMiscIconNif = "DragonBoardVR\\miscicon.nif";
-        constexpr const char* kMagicIconNif = "DragonBoardVR\\magicicon.nif";
         constexpr const char* kDestructionIconNif = "DragonBoardVR\\destructionicon.nif";
         constexpr const char* kConjurationIconNif = "DragonBoardVR\\conjurationicon.nif";
         constexpr const char* kRestorationIconNif = "DragonBoardVR\\restorationicon.nif";
@@ -250,42 +247,6 @@ static void ensureDynamicPanel(const std::string& panelName, const std::string& 
             const std::vector<const char*> elementIds = {
                 "Btn_Cat_Weapons", "Btn_Cat_Armor", "Btn_Cat_Consumables",
                 "Btn_Cat_Quest", "Btn_Cat_Books", "Btn_Cat_Misc"
-            };
-            finalizeCategoryButtons(buttons, elementIds, navCont);
-        }
-
-        if (type == "Favorites") {
-            auto favContainer = std::static_pointer_cast<VRUIFavoritesContainer>(container);
-            auto navCont = std::make_shared<VRUIContainer>(panelName + "_NavCont", ContainerLayout::Free);
-
-            auto makeCatBtn = [&](const char* lbl, const char* overlayNif, InventoryFilterMode fm) {
-                auto b = std::make_shared<VRUIButton>(overlayNif ? "" : lbl, "DragonBoardVR\\IconPlane.nif", "textures\\test.dds", 2.0f, 2.0f, overlayNif != nullptr);
-                if (overlayNif) {
-                    b->setButtonId(lbl);
-                    b->setOverlayNif(overlayNif, categoryButtonIconXOffset, categoryButtonIconYOffset, categoryButtonIconZOffset, categoryButtonIconScale);
-                }
-                b->setOnPressHandler([favContainer, fm](VRUIButton*, EquipHand) {
-                    favContainer->setFilter(fm);
-                    favContainer->scheduleRefresh(0.05f);
-                });
-                return b;
-            };
-
-            auto btnAll     = makeCatBtn("All Items",       nullptr,              InventoryFilterMode::All);
-            auto btnWeapons = makeCatBtn("Weapons",         kWeaponIconNif,       InventoryFilterMode::WeaponsAll);
-            auto btnArmor   = makeCatBtn("Armor",           kArmorIconNif,        InventoryFilterMode::ArmorAll);
-            auto btnConsum  = makeCatBtn("Consumables",     kConsumablesIconNif,  InventoryFilterMode::ConsumablesAll);
-            auto btnQuest   = makeCatBtn("Quest Items",     kQuestIconNif,        InventoryFilterMode::QuestItems);
-            auto btnBooks   = makeCatBtn("Books",           kBooksIconNif,        InventoryFilterMode::BooksAll);
-            auto btnMisc    = makeCatBtn("Misc",            kMiscIconNif,         InventoryFilterMode::MiscAll);
-            auto btnMagic   = makeCatBtn("Magic & Powers",  kMagicIconNif,        InventoryFilterMode::MagicAll);
-
-            const std::vector<std::shared_ptr<VRUIButton>> buttons = {
-                btnAll, btnWeapons, btnArmor, btnConsum, btnQuest, btnBooks, btnMisc, btnMagic
-            };
-            const std::vector<const char*> elementIds = {
-                "Btn_Cat_All", "Btn_Cat_Weapons", "Btn_Cat_Armor", "Btn_Cat_Consumables",
-                "Btn_Cat_Quest", "Btn_Cat_Books", "Btn_Cat_Misc", "Btn_Cat_Magic"
             };
             finalizeCategoryButtons(buttons, elementIds, navCont);
         }
@@ -346,7 +307,7 @@ static VRUIButton::PressCallback resolveFixedButtonAction(const std::string& act
     if (lower == "mcm_panel" || lower == "settings") {
         return [](VRUIButton*, EquipHand) {
             auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-            if (rmlHost.IsOpen()) {
+            if (rmlHost.IsSettingsOpen()) {
                 rmlHost.Close();
                 return;
             }
@@ -367,10 +328,9 @@ static VRUIButton::PressCallback resolveFixedButtonAction(const std::string& act
         ensureDynamicPanel("MagicPanel", "Magic");
         return [](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("MagicPanel"); };
     }
-    if (lower == "favoritespanel") {
-        ensureDynamicPanel("FavoritesPanel", "Favorites");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("FavoritesPanel"); };
-    }
+    // Old INIs may still name FavoritesPanel. Route that retired action to the
+    // replacement RmlUi Journal instead of recreating the removed container.
+    if (lower == "favoritespanel")                          return openJournalPanel();
     if (lower == "bookspanel") {
         ensureDynamicPanel("BooksPanel", "Books");
         return [](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("BooksPanel"); };
@@ -458,6 +418,10 @@ void dragonboard::ui::menu::Create()
     // Player Map Marker integration
     auto mapMarker = std::make_shared<vrui::VRUIMapMarker>(settings.mapMarkerNifPath);
     bgPanel->addElement(std::static_pointer_cast<vrui::VRUIWidget>(mapMarker));
+    auto questMarker = std::make_shared<vrui::VRUIMapMarker>(
+        settings.questMarkerNifPath,
+        vrui::MapMarkerSource::QuestObjective);
+    bgPanel->addElement(std::static_pointer_cast<vrui::VRUIWidget>(questMarker));
     auto persistentPanel = std::make_shared<VRUIPanel>("Persistent_Panel", 1.0f, false);
     persistentPanel->setPointerSurface(true);
     auto alwaysVisiblePanel = std::make_shared<VRUIPanel>("AlwaysVisiblePanel", 1.0f, false);
@@ -545,7 +509,7 @@ void dragonboard::ui::menu::Create()
     configureFavoriteButton(fixedContainer, sbMods, settings.bModsAction, settings.bModsLabel);
 
     auto sbFav = std::make_shared<VRUIButton>("", settings.favNifPath, "textures\\test.dds", 2.0f, 2.0f, true);
-    sbFav->setButtonId("Favorites");
+    sbFav->setButtonId("Journal");
     sbFav->setOverlayNif(kFavoritesIconNif, fixedButtonIconXOffset, fixedButtonIconYOffset, fixedButtonIconZOffset, fixedButtonIconScale);
     sbFav->setOnPressHandler(resolveFixedButtonAction(settings.bFavAction));
     sbFav->setLocalPosition({settings.bFavPosX, settings.bFavPosY, settings.bFavPosZ});
@@ -732,7 +696,7 @@ void dragonboard::ui::menu::Create()
         if (lowerAction == "settings") {
             btn->setOnPressHandler([](VRUIButton*, EquipHand) {
                 auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-                if (rmlHost.IsOpen()) {
+                if (rmlHost.IsSettingsOpen()) {
                     rmlHost.Close();
                     return;
                 }
@@ -777,8 +741,7 @@ void dragonboard::ui::menu::Create()
             ensureDynamicPanel("MagicPanel", "Magic");
             btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("MagicPanel"); });
         } else if (lowerAction == "container:favorites" || lowerAction == "favorites_dyn") {
-            ensureDynamicPanel("FavoritesPanel", "Favorites");
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("FavoritesPanel"); });
+            btn->setOnPressHandler(openJournalPanel());
         } else if (lowerAction == "container:books" || lowerAction == "books_dyn") {
             ensureDynamicPanel("BooksPanel", "Books");
             btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("BooksPanel"); });
@@ -869,7 +832,6 @@ void dragonboard::ui::menu::Create()
     // Ensure dynamic panels exist from the start so background pre-loading works properly
     ensureDynamicPanel("InventoryPanel", "Inventory");
     ensureDynamicPanel("MagicPanel", "Magic");
-    ensureDynamicPanel("FavoritesPanel", "Favorites");
     ensureDynamicPanel("ModsPanel", "Mods");
     ensureDynamicPanel("BooksPanel", "Books");
 

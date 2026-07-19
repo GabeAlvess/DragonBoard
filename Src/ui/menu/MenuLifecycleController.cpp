@@ -57,7 +57,9 @@ namespace dragonboard::ui::menu
             } else {
                 manager.switchToPanel("MainPanel");
 
-                if (startup.action == "QuickSave" || startup.action == "Save") {
+                if (startup.action == "Journal" || startup.action == "JournalMenu") {
+                    dragonboard::ui::rml::RmlPanelHost::GetSingleton().OpenJournal();
+                } else if (startup.action == "QuickSave" || startup.action == "Save") {
                     manager.toggleMenu();
                     dragonboard::runtime::vr::QueueQuickSave();
                 } else {

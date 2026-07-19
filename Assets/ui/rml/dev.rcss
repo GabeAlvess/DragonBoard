@@ -194,6 +194,169 @@
     width: 1310px;
 }
 
+.dev-app.calibration-mode {
+    background-color: transparent;
+    decorator: none;
+}
+
+.dev-app.calibration-mode .dev-shell,
+.dev-app.calibration-mode .dev-main {
+    background-color: transparent;
+}
+
+.dev-app.calibration-mode .dev-sidebar {
+    background-color: transparent;
+    border-right-color: transparent;
+}
+
+.dev-app.calibration-mode .brand,
+.dev-app.calibration-mode .sidebar-status,
+.dev-app.calibration-mode .dev-footer {
+    display: none;
+}
+
+.dev-app.calibration-mode .dev-nav,
+.dev-app.calibration-mode .dev-header .close-button {
+    position: relative;
+    z-index: 4;
+}
+
+.calibration-page {
+    position: relative;
+    width: 1310px;
+    height: 725px;
+}
+
+.calibration-toolbar {
+    position: absolute;
+    z-index: 6;
+    top: 0;
+    left: 0;
+    width: 1310px;
+    padding: 16px 20px;
+    background-color: rgba(13, 15, 16, 242);
+    border: 1px #696d6e;
+    border-radius: 4px;
+}
+
+.calibration-title {
+    color: #eeeeee;
+    font-size: 34px;
+    letter-spacing: 1px;
+}
+
+.calibration-instructions {
+    margin-top: 5px;
+    color: #b9bcbd;
+    font-size: 26px;
+}
+
+.calibration-cities {
+    position: relative;
+    z-index: 7;
+    display: flex;
+    margin-top: 12px;
+}
+
+.calibration-city {
+    width: 240px;
+    height: 76px;
+    margin-right: 12px;
+    padding: 7px 10px;
+    color: #d0d2d2;
+    font-size: 27px;
+    line-height: 1.0;
+    background-color: rgba(35, 38, 39, 235);
+    border: 1px #626667;
+    border-radius: 3px;
+}
+
+.calibration-city span {
+    display: block;
+}
+
+.calibration-city.active {
+    color: #ffffff;
+    background-color: rgba(66, 78, 82, 245);
+    border-color: #c2c9cb;
+}
+
+.calibration-status {
+    margin-top: 6px;
+    color: #9fa5a6;
+    font-size: 19px;
+}
+
+.calibration-summary {
+    margin-top: 10px;
+    color: #d2d5d5;
+    font-size: 24px;
+}
+
+.calibration-summary-row {
+    display: flex;
+    align-items: center;
+}
+
+.calibration-summary-row .calibration-summary {
+    width: 1000px;
+}
+
+.calibration-reset {
+    position: relative;
+    z-index: 8;
+    width: 245px;
+    height: 48px;
+    margin-top: 8px;
+    color: #dddddd;
+    font-size: 22px;
+    background-color: rgba(58, 36, 36, 235);
+    border: 1px #876262;
+    border-radius: 3px;
+}
+
+.calibration-map-frame {
+    width: 690px;
+    height: 478px;
+    margin: 14px auto 0 auto;
+    overflow: hidden;
+    background-color: #101414;
+    border: 1px #747b7d;
+    border-radius: 4px;
+}
+
+.calibration-map-image {
+    width: 690px;
+    height: 478px;
+}
+
+.calibration-surface {
+    display: none;
+    position: absolute;
+    z-index: 2;
+    top: 942px;
+    left: 720px;
+    width: 480px;
+    height: 90px;
+    padding: 0;
+    color: #ffffff;
+    font-size: 28px;
+    text-align: center;
+    background-color: rgba(42, 77, 67, 245);
+    border: 2px #a7c7bc;
+    border-radius: 4px;
+}
+
+.dev-app.calibration-mode .calibration-surface {
+    display: block;
+}
+
+.calibration-surface:hover {
+    color: #ffffff;
+    background-color: rgba(55, 105, 89, 255);
+    border-color: #ffffff;
+}
+
 .command-workspace {
     width: 1310px;
     height: 725px;

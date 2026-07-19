@@ -1,9 +1,12 @@
 #include "ui/rml/DragonBoardRmlRenderer.h"
+#include "RmlSourceEditor.h"
 #include "RmlVisualInspector.h"
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/EventListener.h>
+#include <RmlUi/Core/Factory.h>
 #include <RmlUi/Core/SystemInterface.h>
+#include <RmlUi/Core/StyleSheetContainer.h>
 #include <RmlUi/Debugger.h>
 
 #include <Windows.h>
@@ -28,6 +31,7 @@ namespace
 {
     using Microsoft::WRL::ComPtr;
     using dragonboard::ui::rml::DragonBoardRmlRenderer;
+    using dragonboard::tools::RmlSourceEditor;
     using dragonboard::tools::RmlVisualInspector;
 
     constexpr int kCanvasWidth = 1920;
@@ -42,6 +46,7 @@ namespace
     constexpr UINT kCommandReload = 1002;
     constexpr UINT kCommandExit = 1003;
     constexpr UINT kCommandInspector = 1004;
+    constexpr UINT kCommandEditor = 1005;
     constexpr UINT kCommandDocumentBase = 2000;
 
     constexpr std::array<const char*, 5> kSettingsPages{
@@ -141,6 +146,25 @@ namespace
             if (!_context || !LoadFont()) return false;
 
             _listener = std::make_unique<PreviewEventListener>(*this);
+            if (!_sourceEditor.Create(
+                    instance,
+                    _window,
+                    [this](const std::filesystem::path&) { ReloadDocument(false); },
+                    [this](const std::filesystem::path& path, std::string source) {
+                        PreviewEditedSource(path, std::move(source));
+                    },
+                    [this]() {
+                        if (!_inspector.Undo()) return false;
+                        auto overridePath = _documentPath;
+                        overridePath.replace_extension(".editor-overrides.rcss");
+                        _sourceEditor.SetGeneratedContent(
+                            overridePath, _inspector.SerializeOverrides(), "");
+                        return true;
+                    },
+                    [this](std::string status) { SetStatus(std::move(status)); })) {
+                std::cerr << "Source editor could not be initialized.\n";
+                return false;
+            }
             if (!_inspector.Create(instance, _window, [this](std::string status) {
                     SetStatus(std::move(status));
                 })) {
@@ -174,6 +198,7 @@ namespace
             while (!_exitRequested) {
                 while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
                     if (message.message == WM_QUIT) _exitRequested = true;
+                    if (_sourceEditor.HandleShortcut(message)) continue;
                     TranslateMessage(&message);
                     DispatchMessageW(&message);
                 }
@@ -196,6 +221,7 @@ namespace
 
         void Shutdown()
         {
+            _sourceEditor.Destroy();
             _inspector.Destroy();
             if (_debuggerInitialized) {
                 Rml::Debugger::Shutdown();
@@ -260,6 +286,8 @@ namespace
                     _exitRequested = true;
                 } else if (command == kCommandInspector) {
                     _inspector.Toggle();
+                } else if (command == kCommandEditor) {
+                    _sourceEditor.Toggle();
                 } else if (command >= kCommandDocumentBase &&
                            command < kCommandDocumentBase + _documentFiles.size()) {
                     LoadDocument(_documentFiles[command - kCommandDocumentBase]);
@@ -270,15 +298,55 @@ namespace
                 if (_context) {
                     const auto [x, y] = ScaleMouse(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
                     _context->ProcessMouseMove(x, y, GetModifiers());
+                    if ((wParam & MK_LBUTTON) && _sourceEditor.IsMoveModeEnabled() && _dragCandidate) {
+                        float deltaX = static_cast<float>(x - _dragStartX);
+                        float deltaY = static_cast<float>(y - _dragStartY);
+                        const bool constrainAxis = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+                        if (constrainAxis) {
+                            if (_dragAxis == 0 && (std::abs(deltaX) >= 3.0f || std::abs(deltaY) >= 3.0f)) {
+                                _dragAxis = std::abs(deltaX) >= std::abs(deltaY) ? 1 : 2;
+                            }
+                            if (_dragAxis == 1) deltaY = 0.0f;
+                            else if (_dragAxis == 2) deltaX = 0.0f;
+                        } else {
+                            _dragAxis = 0;
+                        }
+                        if (!_directDragging && (std::abs(deltaX) >= 3.0f || std::abs(deltaY) >= 3.0f)) {
+                            _directDragging = _inspector.BeginMove(_dragCandidate);
+                        }
+                        if (_directDragging) _inspector.UpdateMove(deltaX, deltaY);
+                    }
                 }
                 return 0;
             case WM_LBUTTONDOWN:
                 SetCapture(window);
-                if (_context) _context->ProcessMouseButtonDown(0, GetModifiers());
+                if (_context) {
+                    const auto [x, y] = ScaleMouse(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                    _dragStartX = x;
+                    _dragStartY = y;
+                    _dragCandidate = nullptr;
+                    _context->ProcessMouseMove(x, y, GetModifiers());
+                    _context->ProcessMouseButtonDown(0, GetModifiers());
+                }
                 return 0;
             case WM_LBUTTONUP:
                 ReleaseCapture();
-                if (_context) _context->ProcessMouseButtonUp(0, GetModifiers());
+                if (_context) {
+                    _suppressNextClick = _directDragging;
+                    _context->ProcessMouseButtonUp(0, GetModifiers());
+                    if (_directDragging) {
+                        const auto selector = _inspector.EndMove();
+                        if (!selector.empty()) {
+                            auto overridePath = _documentPath;
+                            overridePath.replace_extension(".editor-overrides.rcss");
+                            _sourceEditor.SetGeneratedContent(
+                                overridePath, _inspector.SerializeOverrides(), selector);
+                        }
+                    }
+                }
+                _dragCandidate = nullptr;
+                _directDragging = false;
+                _dragAxis = 0;
                 return 0;
             case WM_MOUSEWHEEL:
                 if (_context) {
@@ -304,6 +372,8 @@ namespace
                     Rml::Debugger::SetVisible(!Rml::Debugger::IsVisible());
                 } else if (wParam == VK_F9) {
                     _inspector.Toggle();
+                } else if (wParam == VK_F10) {
+                    _sourceEditor.Toggle();
                 }
                 return 0;
             default:
@@ -320,6 +390,12 @@ namespace
                 selectedElement = selectedElement->GetParentNode();
             }
             _inspector.SelectElement(selectedElement);
+            _sourceEditor.SelectElement(selectedElement);
+
+            if (event.GetType() == "mousedown") {
+                _dragCandidate = selectedElement;
+                return;
+            }
 
             // Text and RmlUi's internal slider elements can be the event target.
             // Resolve them back to the nearest identified control so clicking a
@@ -342,6 +418,10 @@ namespace
             }
 
             if (event.GetType() != "click") return;
+            if (_suppressNextClick) {
+                _suppressNextClick = false;
+                return;
+            }
             if (id.starts_with("tab-")) {
                 SelectPage(kSettingsPages, "tab-", "page-", id.substr(4));
             } else if (id.starts_with("dev-tab-")) {
@@ -422,6 +502,7 @@ namespace
 
             AppendMenuW(menuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(fileMenu), L"&File");
             AppendMenuW(menuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(_documentsMenu), L"&Documents");
+            AppendMenuW(menuBar, MF_STRING, kCommandEditor, L"&Source Editor\tF10");
             AppendMenuW(menuBar, MF_STRING, kCommandInspector, L"&Inspector\tF9");
             SetMenu(_window, menuBar);
         }
@@ -519,12 +600,13 @@ namespace
 
         bool LoadFont()
         {
-            constexpr std::array<const char*, 3> candidates{
-                "Data/SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf",
-                "SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf",
-                "Assets/ui/rml/assets/DragonBoardVR_Font.ttf"
+            const std::array<std::filesystem::path, 4> candidates{
+                _assetsDirectory / "assets" / "DragonBoardVR_Font.ttf",
+                std::filesystem::path("Data/SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf"),
+                std::filesystem::path("SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf"),
+                std::filesystem::path("Assets/ui/rml/assets/DragonBoardVR_Font.ttf")
             };
-            for (const auto* path : candidates) {
+            for (const auto& path : candidates) {
                 std::ifstream stream(path, std::ios::binary | std::ios::ate);
                 if (!stream) continue;
                 const auto size = stream.tellg();
@@ -543,7 +625,9 @@ namespace
             return false;
         }
 
-        bool LoadDocument(const std::filesystem::path& requestedPath)
+        bool LoadDocument(
+            const std::filesystem::path& requestedPath,
+            bool refreshSourceEditor = true)
         {
             if (!_context) return false;
             std::error_code error;
@@ -568,6 +652,7 @@ namespace
             _documentPath = path;
             BindDocument();
             _document->Show();
+            if (refreshSourceEditor) _sourceEditor.SetDocument(_documentPath);
             _inspector.SetDocument(_document, _documentPath);
             RefreshDocumentMenu();
             _lastObservedWrite = LatestAssetWriteTime();
@@ -575,9 +660,57 @@ namespace
             return true;
         }
 
-        bool ReloadDocument()
+        bool ReloadDocument(bool refreshSourceEditor = true)
         {
-            return !_documentPath.empty() && LoadDocument(_documentPath);
+            return !_documentPath.empty() && LoadDocument(_documentPath, refreshSourceEditor);
+        }
+
+        void PreviewEditedSource(const std::filesystem::path& path, std::string source)
+        {
+            if (!_context || !_document) return;
+            if (path.extension() == ".rml") {
+                auto* nextDocument = _context->LoadDocumentFromMemory(source, path.string());
+                if (!nextDocument) {
+                    SetStatus("Preview waiting for valid RML - changes are not saved");
+                    return;
+                }
+                _document->Close();
+                _context->Update();
+                _document = nextDocument;
+                _documentPath = path;
+                BindDocument();
+                _document->Show();
+                _inspector.SetDocument(_document, _documentPath);
+                SetStatus("Unsaved RML preview");
+                return;
+            }
+            if (path.extension() != ".rcss") return;
+
+            auto overridePath = _documentPath;
+            overridePath.replace_extension(".editor-overrides.rcss");
+            std::error_code error;
+            const bool equivalent = std::filesystem::equivalent(path, overridePath, error);
+            const bool isOverride = equivalent ||
+                (error && path.lexically_normal() == overridePath.lexically_normal());
+            if (isOverride) {
+                _inspector.SetOverrideSource(source);
+                _document->UpdateDocument();
+                SetStatus("Unsaved visual overrides preview");
+                return;
+            }
+
+            if (!LoadDocument(_documentPath, false)) return;
+            auto editedStyle = Rml::Factory::InstanceStyleSheetString(source);
+            if (!editedStyle) {
+                SetStatus("Preview waiting for valid RCSS - changes are not saved");
+                return;
+            }
+            if (const auto* baseStyle = _document->GetStyleSheetContainer()) {
+                editedStyle = baseStyle->CombineStyleSheetContainer(*editedStyle);
+            }
+            _document->SetStyleSheetContainer(std::move(editedStyle));
+            _document->UpdateDocument();
+            SetStatus("Unsaved RCSS preview");
         }
 
         void BindDocument()
@@ -585,6 +718,7 @@ namespace
             // Listen once at the document root so arbitrary buttons and controls,
             // including elements created dynamically, work without C++ registration.
             _document->AddEventListener("click", _listener.get());
+            _document->AddEventListener("mousedown", _listener.get());
             _document->AddEventListener("change", _listener.get());
 
             const auto fileName = _documentPath.filename().string();
@@ -863,7 +997,7 @@ namespace
             const std::string document = _documentPath.empty() ?
                 "No document" : _documentPath.filename().string();
             const std::string title = "DragonBoard Rml Preview - " + document + " - " + _status +
-                " | Ctrl+O Open  F5 Reload  F8 Debugger";
+                " | Ctrl+O Open  F5 Reload  F9 Inspector  F10 Editor";
             SetWindowTextA(_window, title.c_str());
         }
 
@@ -874,6 +1008,7 @@ namespace
         ComPtr<IDXGISwapChain> _swapChain;
         ComPtr<ID3D11RenderTargetView> _renderTarget;
         DragonBoardRmlRenderer _renderer;
+        RmlSourceEditor _sourceEditor;
         RmlVisualInspector _inspector;
         PreviewSystemInterface _systemInterface;
         Rml::Context* _context = nullptr;
@@ -892,6 +1027,12 @@ namespace
         bool _rmlInitialized = false;
         bool _debuggerInitialized = false;
         bool _exitRequested = false;
+        Rml::Element* _dragCandidate = nullptr;
+        int _dragStartX = 0;
+        int _dragStartY = 0;
+        bool _directDragging = false;
+        bool _suppressNextClick = false;
+        int _dragAxis = 0;  // 0 = free, 1 = horizontal, 2 = vertical.
     };
 
     void PreviewEventListener::ProcessEvent(Rml::Event& event)
@@ -910,6 +1051,12 @@ int wmain(int argumentCount, wchar_t* arguments[])
     g_app = &app;
     if (!app.Initialize(GetModuleHandleW(nullptr), requestedDocument)) {
         std::cerr << "DragonBoard Rml Preview initialization failed.\n";
+        MessageBoxW(
+            nullptr,
+            L"DragonBoard RML Editor could not start.\n\n"
+            L"Verify that the project Assets/ui/rml folder is still available.",
+            L"DragonBoard RML Editor",
+            MB_OK | MB_ICONERROR);
         g_app = nullptr;
         return 1;
     }

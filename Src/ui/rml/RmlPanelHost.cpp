@@ -8,6 +8,7 @@
 #include "vrui/VRUIMagicContainer.h"
 #include "vrui/VRUIItemUtils.h"
 #include "vrui/VRUISettings.h"
+#include "vrui/VRUIMapMarker.h"
 #include "vrui/ModActionManager.h"
 #include "game/actions/ActionExecutor.h"
 #include "ui/pointer/PointerVisualController.h"
@@ -323,6 +324,37 @@ namespace dragonboard::ui::rml
             return *reinterpret_cast<RE::BSTArray<RE::BGSInstancedQuestObjective>*>(
                 reinterpret_cast<std::byte*>(player) + kObjectivesOffset);
         }
+
+        RE::BSSimpleList<RE::TESQuestStageItem*>& GetVrQuestLog(
+            RE::PlayerCharacter* player)
+        {
+            constexpr std::ptrdiff_t kQuestLogOffset = 0xB60;
+            return *reinterpret_cast<RE::BSSimpleList<RE::TESQuestStageItem*>*>(
+                reinterpret_cast<std::byte*>(player) + kQuestLogOffset);
+        }
+
+        struct QuestTargetTeleportPathView
+        {
+            struct ParentSpaceNode
+            {
+                bool isWorldspace = false;
+                std::byte pad01[7]{};
+                RE::TESWorldSpace* worldspace = nullptr;
+                RE::TESObjectCELL* interiorCell = nullptr;
+            };
+
+            struct TeleportLink
+            {
+                RE::TESObjectREFR* reference = nullptr;
+                RE::NiPoint3 teleportLocation{};
+            };
+
+            RE::BSTArray<ParentSpaceNode> spaces;
+            RE::BSTArray<TeleportLink> teleportLinks;
+            RE::NiPoint3 start{};
+            RE::NiPoint3 end{};
+        };
+        static_assert(sizeof(QuestTargetTeleportPathView) == 0x48);
 #endif
 
         template <class QuestContainer>
@@ -566,7 +598,8 @@ namespace dragonboard::ui::rml
             return false;
         }
         if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
-            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsSettingsReady()))) {
+            (_rendererReady.load() &&
+             (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsSettingsReady())))) {
             logger::error("DragonBoardVR: RmlUi Settings document is unavailable.");
             return false;
         }
@@ -587,7 +620,8 @@ namespace dragonboard::ui::rml
             return false;
         }
         if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
-            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsDeveloperReady()))) {
+            (_rendererReady.load() &&
+             (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsDeveloperReady())))) {
             logger::error("DragonBoardVR: RmlUi Developer document is unavailable.");
             return false;
         }
@@ -618,7 +652,8 @@ namespace dragonboard::ui::rml
             return false;
         }
         if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
-            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsItemEditReady()))) {
+            (_rendererReady.load() &&
+             (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsItemEditReady())))) {
             logger::error("DragonBoardVR: RmlUi Item Editor document is unavailable.");
             return false;
         }
@@ -679,7 +714,8 @@ namespace dragonboard::ui::rml
     {
         if (!EnsurePresentHookInstalled()) return false;
         if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
-            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsModsReady()))) return false;
+            (_rendererReady.load() &&
+             (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsModsReady())))) return false;
         const auto actions = vrui::ModActionManager::get().getActions();
         {
             std::scoped_lock lock(_modsMutex);
@@ -710,7 +746,8 @@ namespace dragonboard::ui::rml
             return false;
         }
         if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
-            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsInventoryReady()))) {
+            (_rendererReady.load() &&
+             (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsInventoryReady())))) {
             logger::error("DragonBoardVR: RmlUi Inventory document is unavailable.");
             return false;
         }
@@ -770,7 +807,8 @@ namespace dragonboard::ui::rml
             return false;
         }
         if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
-            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsMagicReady()))) {
+            (_rendererReady.load() &&
+             (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsMagicReady())))) {
             logger::error("DragonBoardVR: RmlUi Magic document is unavailable.");
             return false;
         }
@@ -826,7 +864,8 @@ namespace dragonboard::ui::rml
             return false;
         }
         if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
-            (_rendererReady.load() && (!_rmlUi || !_rmlUi->IsJournalReady()))) {
+            (_rendererReady.load() &&
+             (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsJournalReady())))) {
             logger::error("DragonBoardVR: RmlUi Journal document is unavailable.");
             return false;
         }
@@ -837,7 +876,10 @@ namespace dragonboard::ui::rml
         _localPanelMode.store(LocalPanelMode::kJournal);
         _rmlJournalSyncPending.store(true);
         _journalActionPending.store(JournalAction::kNone);
-        _journalActionIndex.store(0);
+        _journalActionFormID.store(0);
+        _journalActionInstanceID.store(0);
+        _journalActionObjectiveInstanceID.store(0);
+        _journalActionObjectiveID.store(0);
         _journalPollAccumulator = 0.0f;
         _visible.store(true);
         logger::info("DragonBoardVR: opened RmlUi journal.");
@@ -861,9 +903,27 @@ namespace dragonboard::ui::rml
         }
     }
 
+    void RmlPanelHost::RequestQuestMarkerRestore()
+    {
+        const auto& settings = vrui::VRUISettings::get();
+        if (settings.questMarkerLastFormID == 0) return;
+        _questMarkerRestoreDelay = 2.0f;
+        _questMarkerRestoreAttempts = 8;
+    }
+
     bool RmlPanelHost::IsDeveloperOpen() const
     {
         return _visible.load() && _localPanelMode.load() == LocalPanelMode::kDeveloper;
+    }
+
+    bool RmlPanelHost::IsSettingsOpen() const
+    {
+        return _visible.load() && _localPanelMode.load() == LocalPanelMode::kSettings;
+    }
+
+    bool RmlPanelHost::IsJournalOpen() const
+    {
+        return _visible.load() && _localPanelMode.load() == LocalPanelMode::kJournal;
     }
 
     bool RmlPanelHost::IsModsOpen() const
@@ -1247,6 +1307,48 @@ namespace dragonboard::ui::rml
         if (_magicPreviewRefreshPending.exchange(false, std::memory_order_acq_rel)) {
             UpdateMagicPreviewGameThread();
         }
+        if (_questTargetResolveDelay >= 0.0f) {
+            _questTargetResolveDelay -= std::clamp(deltaTime, 0.0f, 0.5f);
+            if (_questTargetResolveDelay <= 0.0f) {
+                const bool resolved = CacheQuestObjectiveTargetGameThread(
+                    _questTargetResolveFormID,
+                    _questTargetResolveInstanceID,
+                    _questTargetResolveObjectiveID);
+                if (resolved || _questTargetResolveAttempts <= 1) {
+                    _questTargetResolveDelay = -1.0f;
+                    _questTargetResolveAttempts = 0;
+                } else {
+                    --_questTargetResolveAttempts;
+                    _questTargetResolveDelay = 0.75f;
+                }
+            }
+        }
+        if (_questMarkerRestoreDelay >= 0.0f) {
+            _questMarkerRestoreDelay -= std::clamp(deltaTime, 0.0f, 0.5f);
+            if (_questMarkerRestoreDelay <= 0.0f) {
+                if (RestoreQuestMarkerGameThread() || _questMarkerRestoreAttempts <= 1) {
+                    _questMarkerRestoreDelay = -1.0f;
+                    _questMarkerRestoreAttempts = 0;
+                } else {
+                    --_questMarkerRestoreAttempts;
+                    _questMarkerRestoreDelay = 1.0f;
+                }
+            }
+        }
+        if (_questMarkerWatchFormID != 0) {
+            _questMarkerPollAccumulator += std::clamp(deltaTime, 0.0f, 0.5f);
+            if (_questMarkerPollAccumulator >= 0.5f) {
+                _questMarkerPollAccumulator = 0.0f;
+                RefreshTrackedQuestObjectiveGameThread();
+            }
+        }
+        if (_questMovingTargetHandle) {
+            _questMovingTargetPollAccumulator += std::clamp(deltaTime, 0.0f, 0.5f);
+            if (_questMovingTargetPollAccumulator >= 1.0f) {
+                _questMovingTargetPollAccumulator = 0.0f;
+                RefreshMovingQuestTargetGameThread();
+            }
+        }
         if (const auto action = _itemEditActionPending.exchange(ItemEditAction::kNone);
             action != ItemEditAction::kNone) {
             ExecuteItemEditActionGameThread(action);
@@ -1269,7 +1371,10 @@ namespace dragonboard::ui::rml
             action != JournalAction::kNone) {
             ExecuteJournalActionGameThread(
                 action,
-                _journalActionIndex.exchange(0));
+                _journalActionFormID.exchange(0),
+                _journalActionInstanceID.exchange(0),
+                _journalActionObjectiveInstanceID.exchange(0),
+                _journalActionObjectiveID.exchange(0));
         }
         if (_modsAddPending.exchange(false)) {
             Close();
@@ -1372,6 +1477,24 @@ namespace dragonboard::ui::rml
                                 "DragonBoardVR: [DEV] Executed action:");
                 logger::info("DragonBoardVR: Dev command requested: '{}' ({})", label, command);
             }
+        }
+
+        if (_mapCalibrationResetPending.exchange(false, std::memory_order_acq_rel)) {
+            auto& settings = vrui::VRUISettings::get();
+            settings.mapCalibrationPoints = {};
+            vrui::VRMenuManager::get().saveSettingsNow();
+            CaptureDevGameInfoGameThread();
+            _rmlDeveloperInfoSyncPending.store(true, std::memory_order_release);
+            logger::info("DragonBoardVR: map calibration reset; legacy moving marker restored.");
+        }
+
+        if (const auto city = _mapCalibrationCityPending.exchange(
+                static_cast<std::size_t>(-1), std::memory_order_acq_rel);
+            city != static_cast<std::size_t>(-1)) {
+            CaptureMapCalibrationGameThread(
+                city,
+                _mapCalibrationPointerU.load(std::memory_order_acquire),
+                _mapCalibrationPointerV.load(std::memory_order_acquire));
         }
 
     }
@@ -1483,6 +1606,47 @@ namespace dragonboard::ui::rml
             }
         }
         _pointerInHostedPanel = pointerInPanel;
+    }
+
+    bool RmlPanelHost::PanelUvToMapMarkerLocal(
+        float pointerU, float pointerV, float& panelX, float& panelY) const
+    {
+        if (!_screenNode) return false;
+        auto surfacePanel = vrui::VRMenuManager::get().findPanelByName("Background_Panel");
+        if (!surfacePanel || !surfacePanel->getNode()) return false;
+
+        const auto& screen = _screenNode->world;
+        RE::NiPoint3 screenX(
+            screen.rotate.entry[0][0], screen.rotate.entry[1][0], screen.rotate.entry[2][0]);
+        RE::NiPoint3 screenY(
+            screen.rotate.entry[0][1], screen.rotate.entry[1][1], screen.rotate.entry[2][1]);
+        const float screenXLength = screenX.Length();
+        const float screenYLength = screenY.Length();
+        const float screenScale = std::abs(screen.scale);
+        if (screenXLength <= 1.0e-5f || screenYLength <= 1.0e-5f || screenScale <= 1.0e-5f) {
+            return false;
+        }
+        screenX = screenX / screenXLength;
+        screenY = screenY / screenYLength;
+        const float width = kScenePlaneExtent * screenXLength * screenScale;
+        const float height = kScenePlaneExtent * screenYLength * screenScale;
+        const RE::NiPoint3 worldPoint = screen.translate +
+            screenX * ((std::clamp(pointerU, 0.0f, 1.0f) - 0.5f) * width) +
+            screenY * ((0.5f - std::clamp(pointerV, 0.0f, 1.0f)) * height);
+
+        const auto& parent = surfacePanel->getNode()->world;
+        if (std::abs(parent.scale) <= 1.0e-5f) return false;
+        const RE::NiPoint3 delta = worldPoint - parent.translate;
+        const RE::NiPoint3 local(
+            (delta.x * parent.rotate.entry[0][0] + delta.y * parent.rotate.entry[1][0] +
+                delta.z * parent.rotate.entry[2][0]) / parent.scale,
+            (delta.x * parent.rotate.entry[0][1] + delta.y * parent.rotate.entry[1][1] +
+                delta.z * parent.rotate.entry[2][1]) / parent.scale,
+            (delta.x * parent.rotate.entry[0][2] + delta.y * parent.rotate.entry[1][2] +
+                delta.z * parent.rotate.entry[2][2]) / parent.scale);
+        panelX = local.x;
+        panelY = local.z;
+        return std::isfinite(panelX) && std::isfinite(panelY);
     }
 
     bool RmlPanelHost::UpdateScenePanelGameThread(RE::NiNode* backgroundNode)
@@ -1623,6 +1787,7 @@ namespace dragonboard::ui::rml
         UpdateDeveloperCommandKeyboardPresentThread();
         UpdateInventorySearchKeyboardPresentThread();
         UpdateMagicSearchKeyboardPresentThread();
+        bool initializedThisFrame = false;
         if (_rmlWarmupRequested.exchange(false, std::memory_order_acq_rel) &&
             !_rendererReady.load(std::memory_order_acquire)) {
             _rmlWarmupAttempted.store(true, std::memory_order_release);
@@ -1631,18 +1796,23 @@ namespace dragonboard::ui::rml
             const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - started).count();
             if (initialized) {
+                initializedThisFrame = true;
                 logger::info(
-                    "DragonBoardVR: RmlUi warm-up completed in {} ms before a local panel was opened.",
+                    "DragonBoardVR: RmlUi core warm-up completed in {} ms; "
+                    "documents will load on later Present frames.",
                     elapsedMs);
             } else {
+                _rmlWarmupAttempted.store(false, std::memory_order_release);
                 logger::warn(
                     "DragonBoardVR: RmlUi warm-up failed after {} ms.",
                     elapsedMs);
             }
         }
-        if (_rendererReady.load(std::memory_order_acquire) && !_visible.load()) {
+        if (_rendererReady.load(std::memory_order_acquire)) {
             ApplyRenderCommandsPresentThread();
-            AdvanceRmlPrewarmPresentThread();
+            if (!initializedThisFrame) {
+                AdvanceRmlPrewarmPresentThread();
+            }
         }
         if (_visible.load()) {
             RenderPanel(deltaTime);
@@ -1706,6 +1876,7 @@ namespace dragonboard::ui::rml
         _panelRenderTarget = rtv;
         _panelShaderResource = srv;
         _rmlPrewarmStep = 0;
+        _rmlPrewarmFrameCount = 0;
         _rmlPrewarmTotalMs = 0;
         _rmlPrewarmComplete = false;
         _rendererReady.store(true);
@@ -1715,9 +1886,27 @@ namespace dragonboard::ui::rml
 
     void RmlPanelHost::AdvanceRmlPrewarmPresentThread()
     {
-        if (_rmlPrewarmComplete || !_rmlUi || !_panelRenderTarget || _visible.load()) {
+        if (_rmlPrewarmComplete || !_rmlUi || !_panelRenderTarget) {
             return;
         }
+
+        if (!_rmlUi->AreBuiltinDocumentsLoaded()) {
+            const auto started = std::chrono::steady_clock::now();
+            const bool loaded = _rmlUi->LoadNextBuiltinDocument();
+            const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - started).count();
+            _rmlPrewarmTotalMs += elapsedMs;
+            ++_rmlPrewarmFrameCount;
+            logger::info(
+                "DragonBoardVR: staged one RmlUi document in {} ms (loaded={}).",
+                elapsedMs,
+                loaded);
+            return;
+        }
+
+        // Document rendering is only speculative prewarm. Do not switch away
+        // from a panel that the player has already opened.
+        if (_visible.load()) return;
 
         using RmlUi = dragonboard::ui::rml::DragonBoardRmlUi;
         using ShowDocument = bool (RmlUi::*)();
@@ -1767,6 +1956,7 @@ namespace dragonboard::ui::rml
         const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - started).count();
         _rmlPrewarmTotalMs += elapsedMs;
+        ++_rmlPrewarmFrameCount;
         logger::info(
             "DragonBoardVR: RmlUi prewarmed {} in {} ms (shown={}, rendered={}).",
             document.name,
@@ -1778,8 +1968,9 @@ namespace dragonboard::ui::rml
         if (_rmlPrewarmStep >= kDocuments.size()) {
             _rmlPrewarmComplete = true;
             logger::info(
-                "DragonBoardVR: RmlUi full prewarm completed across {} Present frames ({} ms total work).",
-                kDocuments.size(),
+                "DragonBoardVR: RmlUi full prewarm completed across {} staged Present frames "
+                "({} ms total work).",
+                _rmlPrewarmFrameCount,
                 _rmlPrewarmTotalMs);
         }
     }
@@ -1915,6 +2106,14 @@ namespace dragonboard::ui::rml
                 }
                 _rmlPreviousTriggerDown = triggerDown;
             } else if (developerRmlActive) {
+                if (auto request = _rmlUi->ConsumeMapCalibrationRequest()) {
+                    _mapCalibrationPointerU.store(request->pointerU, std::memory_order_release);
+                    _mapCalibrationPointerV.store(request->pointerV, std::memory_order_release);
+                    _mapCalibrationCityPending.store(request->cityIndex, std::memory_order_release);
+                }
+                if (_rmlUi->ConsumeMapCalibrationResetRequested()) {
+                    _mapCalibrationResetPending.store(true, std::memory_order_release);
+                }
                 if (_rmlUi->ConsumeDeveloperAddCommandRequested()) {
                     if (!BeginDeveloperCommandKeyboardPresentThread()) {
                         _pendingRmlHapticCue.store(static_cast<std::uint8_t>(
@@ -2093,19 +2292,26 @@ namespace dragonboard::ui::rml
                     break;
                 }
             } else if (journalRmlActive) {
-                const auto [action, index] = _rmlUi->ConsumeJournalAction();
+                const auto request = _rmlUi->ConsumeJournalAction();
+                const auto action = request.action;
                 using RmlJournalAction =
                     dragonboard::ui::rml::DragonBoardRmlUi::JournalAction;
                 switch (action) {
                 case RmlJournalAction::kSelectQuest:
-                    _journalActionIndex.store(index);
+                    _journalActionFormID.store(request.formID);
+                    _journalActionInstanceID.store(request.instanceID);
                     _journalActionPending.store(JournalAction::kSelectQuest);
                     break;
                 case RmlJournalAction::kToggleTracking:
+                    _journalActionFormID.store(request.formID);
+                    _journalActionInstanceID.store(request.instanceID);
                     _journalActionPending.store(JournalAction::kToggleTracking);
                     break;
                 case RmlJournalAction::kTrackObjective:
-                    _journalActionIndex.store(index);
+                    _journalActionFormID.store(request.formID);
+                    _journalActionInstanceID.store(request.instanceID);
+                    _journalActionObjectiveInstanceID.store(request.objectiveInstanceID);
+                    _journalActionObjectiveID.store(request.objectiveID);
                     _journalActionPending.store(JournalAction::kTrackObjective);
                     break;
                 case RmlJournalAction::kSettings:
@@ -2280,6 +2486,32 @@ namespace dragonboard::ui::rml
         info.cellFormId = snapshot.cellFormId;
         info.worldspaceName = std::move(snapshot.worldspaceName);
         info.worldspaceFormId = snapshot.worldspaceFormId;
+        std::size_t validPoints = 0;
+        for (std::size_t city = 0; city < snapshot.mapCalibrationPoints.size(); ++city) {
+            const auto& point = snapshot.mapCalibrationPoints[city];
+            if (point.valid) {
+                ++validPoints;
+                info.mapCalibrationStatus[city] = std::format(
+                    "Saved ({:.0f}, {:.0f})", point.worldX, point.worldY);
+            } else {
+                info.mapCalibrationStatus[city] = "Not captured";
+            }
+        }
+        vrui::MapCalibrationTransform calibration;
+        if (vrui::FitMapCalibration(snapshot.mapCalibrationPoints, calibration) &&
+            vrui::IsMapCalibrationUsable(calibration)) {
+            info.mapCalibrationSummary = std::format(
+                "{}/5 points captured - texture UV calibration active - RMS error {:.4f}",
+                validPoints, calibration.rmsError);
+        } else if (validPoints == vrui::kMapCalibrationPointCount) {
+            info.mapCalibrationSummary = std::format(
+                "5/5 points captured but inconsistent (UV RMS {:.4f}) - marker remains hidden",
+                calibration.rmsError);
+        } else {
+            info.mapCalibrationSummary = std::format(
+                "{}/5 points captured - all five are required before activation",
+                validPoints);
+        }
         _rmlUi->SetDeveloperInfo(info);
     }
 
@@ -2454,6 +2686,7 @@ namespace dragonboard::ui::rml
                 for (const auto& objectiveEntry : entry.objectives) {
                     dragonboard::ui::rml::DragonBoardRmlUi::JournalObjectiveInfo objective;
                     objective.objectiveID = objectiveEntry.objectiveID;
+                    objective.instanceID = objectiveEntry.instanceID;
                     objective.text = objectiveEntry.text;
                     objective.state = objectiveEntry.state;
                     objective.completed = objectiveEntry.completed;
@@ -2494,6 +2727,11 @@ namespace dragonboard::ui::rml
 
         std::vector<JournalQuestEntry> quests;
         std::unordered_map<std::uint64_t, std::size_t> questIndices;
+        const auto isCurrentJournalQuest = [](const RE::TESQuest* quest) {
+            return quest && quest->IsEnabled() && !quest->IsStopped() &&
+                   !quest->IsCompleted() &&
+                   quest->data.flags.none(RE::QuestFlag::kFailed);
+        };
         const auto ensureQuest =
             [&](RE::TESQuest* quest, std::uint32_t instanceID) -> JournalQuestEntry& {
             const auto key = JournalQuestKey(quest->GetFormID(), instanceID);
@@ -2537,9 +2775,51 @@ namespace dragonboard::ui::rml
             return;
         }
 
+        std::unordered_map<std::uint32_t, std::uint32_t> observedInstances;
+        observedInstances.reserve(objectives.size());
+        for (const auto& instanced : objectives) {
+            if (instanced.Objective && instanced.Objective->ownerQuest) {
+                observedInstances.insert_or_assign(
+                    instanced.Objective->ownerQuest->GetFormID(),
+                    instanced.instanceID);
+            }
+        }
+
+#ifdef ENABLE_SKYRIM_VR
+        auto& questLog = GetVrQuestLog(player);
+#else
+        auto& questLog = runtime.questLog;
+#endif
+        std::size_t questLogEntries = 0;
+        for (auto* stageItem : questLog) {
+            if (++questLogEntries > 4096) {
+                logger::error(
+                    "DragonBoardVR: refusing VR journal quest log with more than 4096 entries.");
+                break;
+            }
+            // The native objective array remains the authoritative Journal
+            // source. questLog is historical; use it only for the narrow case
+            // of a currently tracked quest that has not published an objective
+            // yet. This prevents enabled radiant/template quests from leaking
+            // into the RmlUi list after their log updates.
+            if (!stageItem || !stageItem->hasLogEntry ||
+                !isCurrentJournalQuest(stageItem->owner) ||
+                !stageItem->owner->IsActive()) {
+                continue;
+            }
+
+            auto* quest = stageItem->owner;
+            const auto observed = observedInstances.find(quest->GetFormID());
+            const auto instanceID = observed != observedInstances.end() ?
+                                        observed->second :
+                                        quest->currentInstanceID;
+            (void)ensureQuest(quest, instanceID);
+        }
+
         for (const auto& instanced : objectives) {
             auto* objective = instanced.Objective;
             if (!objective || !objective->ownerQuest ||
+                !isCurrentJournalQuest(objective->ownerQuest) ||
                 instanced.InstanceState == RE::QUEST_OBJECTIVE_STATE::kDormant) {
                 continue;
             }
@@ -2561,6 +2841,37 @@ namespace dragonboard::ui::rml
             entry.hasTargets = objective->numTargets > 0;
             quest.objectives.push_back(std::move(entry));
         }
+
+        // Several radiant/template quests can publish separate objective
+        // records with the same user-facing Journal title. The native Journal
+        // consolidates that presentation; keep one stable representative here,
+        // preferring the tracked entry and then the one with current objectives.
+        std::vector<JournalQuestEntry> uniqueQuests;
+        uniqueQuests.reserve(quests.size());
+        std::unordered_map<std::string, std::size_t> titleIndices;
+        for (auto& quest : quests) {
+            auto titleKey = quest.title;
+            std::ranges::transform(
+                titleKey,
+                titleKey.begin(),
+                [](unsigned char character) {
+                    return static_cast<char>(std::tolower(character));
+                });
+            const auto score = [](const JournalQuestEntry& candidate) {
+                return (candidate.active ? 4 : 0) +
+                       (!candidate.objectives.empty() ? 2 : 0) +
+                       (!candidate.completed && !candidate.failed ? 1 : 0);
+            };
+            if (const auto found = titleIndices.find(titleKey);
+                found != titleIndices.end()) {
+                auto& retained = uniqueQuests[found->second];
+                if (score(quest) > score(retained)) retained = std::move(quest);
+                continue;
+            }
+            titleIndices.emplace(std::move(titleKey), uniqueQuests.size());
+            uniqueQuests.push_back(std::move(quest));
+        }
+        quests = std::move(uniqueQuests);
 
         for (auto& quest : quests) {
             std::stable_sort(
@@ -2733,9 +3044,353 @@ namespace dragonboard::ui::rml
         return dispatched;
     }
 
+    bool RmlPanelHost::CacheQuestObjectiveTargetGameThread(
+        std::uint32_t formID,
+        std::uint32_t instanceID,
+        std::uint16_t objectiveID)
+    {
+        _questMovingTargetHandle.reset();
+        _questMovingTargetPollAccumulator = 0.0f;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(formID);
+        if (!player || !quest) {
+            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            return false;
+        }
+
+#ifdef ENABLE_SKYRIM_VR
+        auto& objectives = GetVrQuestObjectives(player);
+#else
+        auto& objectives = player->GetPlayerRuntimeData().objectives;
+#endif
+        RE::BGSQuestObjective* selectedObjective = nullptr;
+        for (const auto& instanced : objectives) {
+            auto* objective = instanced.Objective;
+            if (objective && objective->ownerQuest == quest &&
+                objective->index == objectiveID &&
+                instanced.instanceID == instanceID) {
+                selectedObjective = objective;
+                break;
+            }
+        }
+
+        if (!selectedObjective || !selectedObjective->targets ||
+            selectedObjective->numTargets == 0 || selectedObjective->numTargets > 128) {
+            logger::warn(
+                "DragonBoardVR: objective target cache rejected quest={:08X} instance={} objective={}; no valid target array.",
+                formID,
+                instanceID,
+                objectiveID);
+            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            return false;
+        }
+
+        // This action runs on Skyrim's game thread after a short delay. Read
+        // the teleport path already stored in the target by the game's compass
+        // update, then copy only an exterior door position into the render cache.
+        // No relocation and no PlayerCharacter::questTargets lock are used.
+        std::uint32_t unresolvedTargets = 0;
+        std::uint32_t interiorTargets = 0;
+        std::uint32_t teleportPathLinks = 0;
+        for (std::uint32_t targetIndex = 0;
+             targetIndex < selectedObjective->numTargets;
+             ++targetIndex) {
+            auto* target = selectedObjective->targets[targetIndex];
+            if (!target) continue;
+
+            const auto aliasID = static_cast<std::uint32_t>(target->alias);
+            const auto cacheExteriorReference = [&](RE::TESObjectREFR* reference,
+                                                    std::string_view source) {
+                if (!reference || !reference->parentCell ||
+                    reference->parentCell->cellFlags.any(
+                        RE::TESObjectCELL::Flag::kIsInteriorCell)) {
+                    return false;
+                }
+                const auto position = reference->GetPosition();
+                vrui::VRUIMapMarker::SetQuestObjectivePosition(
+                    formID,
+                    reference->GetFormID(),
+                    position);
+                logger::info(
+                    "DragonBoardVR: cached objective {} quest={:08X} instance={} objective={} alias={} target={:08X} world=({:.1f}, {:.1f}, {:.1f}).",
+                    source,
+                    formID,
+                    instanceID,
+                    objectiveID,
+                    aliasID,
+                    reference->GetFormID(),
+                    position.x,
+                    position.y,
+                    position.z);
+                return true;
+            };
+
+#ifdef ENABLE_SKYRIM_VR
+            const auto* teleportPath =
+                reinterpret_cast<const QuestTargetTeleportPathView*>(
+                    reinterpret_cast<const std::byte*>(target) + 0x18);
+            const auto linkCount = teleportPath->teleportLinks.size();
+            if (linkCount <= 64) {
+                teleportPathLinks += static_cast<std::uint32_t>(linkCount);
+                for (const auto& link : teleportPath->teleportLinks) {
+                    if (cacheExteriorReference(link.reference, "teleport-path entrance")) {
+                        return true;
+                    }
+                    if (link.reference) {
+                        const auto linkedDoor =
+                            link.reference->extraList.GetTeleportLinkedDoor().get();
+                        if (cacheExteriorReference(
+                                linkedDoor.get(), "teleport-path linked entrance")) {
+                            return true;
+                        }
+                    }
+                }
+            }
+#endif
+
+            RE::ObjectRefHandle targetHandle{};
+            quest->CreateRefHandleByAliasID(targetHandle, aliasID);
+            const auto targetReference = targetHandle.get();
+            if (!targetReference || !targetReference->parentCell) {
+                ++unresolvedTargets;
+                continue;
+            }
+            if (targetReference->As<RE::Actor>() &&
+                cacheExteriorReference(targetReference.get(), "moving actor target")) {
+                _questMovingTargetHandle = targetHandle;
+                _questMovingTargetPollAccumulator = 0.0f;
+                logger::info(
+                    "DragonBoardVR: enabled 1-second moving quest target updates for actor {:08X}.",
+                    targetReference->GetFormID());
+                return true;
+            }
+            if (cacheExteriorReference(targetReference.get(), "exterior target")) {
+                return true;
+            }
+
+            ++interiorTargets;
+            const auto linkedDoor =
+                targetReference->extraList.GetTeleportLinkedDoor().get();
+            if (cacheExteriorReference(linkedDoor.get(), "target linked entrance")) {
+                return true;
+            }
+        }
+
+        logger::warn(
+            "DragonBoardVR: objective target cache found no exterior reference for quest={:08X} instance={} objective={} targets={} unresolved={} interior={} pathLinks={}.",
+            formID,
+            instanceID,
+            objectiveID,
+            selectedObjective->numTargets,
+            unresolvedTargets,
+            interiorTargets,
+            teleportPathLinks);
+        vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+        return false;
+    }
+
+    void RmlPanelHost::RefreshMovingQuestTargetGameThread()
+    {
+        if (!_questMovingTargetHandle || _questMarkerWatchFormID == 0) {
+            _questMovingTargetHandle.reset();
+            return;
+        }
+
+        const auto reference = _questMovingTargetHandle.get();
+        auto* actor = reference ? reference->As<RE::Actor>() : nullptr;
+        const bool interior = reference && reference->parentCell &&
+            reference->parentCell->cellFlags.any(
+                RE::TESObjectCELL::Flag::kIsInteriorCell);
+        if (!actor || !reference->parentCell || interior) {
+            const auto targetFormID = reference ? reference->GetFormID() : 0;
+            _questMovingTargetHandle.reset();
+            _questMovingTargetPollAccumulator = 0.0f;
+            _questTargetResolveFormID = _questMarkerWatchFormID;
+            _questTargetResolveInstanceID = _questMarkerWatchObjectiveInstanceID;
+            _questTargetResolveObjectiveID = _questMarkerWatchObjectiveID;
+            _questTargetResolveAttempts = 4;
+            _questTargetResolveDelay = 0.25f;
+            logger::info(
+                "DragonBoardVR: moving quest target {:08X} became unavailable or interior; scheduled entrance resolution.",
+                targetFormID);
+            return;
+        }
+
+        vrui::VRUIMapMarker::SetQuestObjectivePosition(
+            _questMarkerWatchFormID,
+            reference->GetFormID(),
+            reference->GetPosition());
+    }
+
+    void RmlPanelHost::PersistQuestMarkerSelectionGameThread()
+    {
+        auto& settings = vrui::VRUISettings::get();
+        settings.questMarkerLastFormID = _questMarkerWatchFormID;
+        settings.questMarkerLastQuestInstanceID = _questMarkerWatchQuestInstanceID;
+        settings.questMarkerLastObjectiveInstanceID =
+            _questMarkerWatchObjectiveInstanceID;
+        settings.questMarkerLastObjectiveID = _questMarkerWatchObjectiveID;
+        settings.save(vrui::VRUISettings::getDefaultIniPath());
+    }
+
+    bool RmlPanelHost::RestoreQuestMarkerGameThread()
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        const auto& settings = vrui::VRUISettings::get();
+        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(
+            settings.questMarkerLastFormID);
+        if (!player || !quest || !quest->IsActive()) return false;
+
+#ifdef ENABLE_SKYRIM_VR
+        auto& objectives = GetVrQuestObjectives(player);
+#else
+        auto& objectives = player->GetPlayerRuntimeData().objectives;
+#endif
+        if (objectives.size() > 4096) return false;
+
+        const RE::BGSInstancedQuestObjective* exact = nullptr;
+        const RE::BGSInstancedQuestObjective* newest = nullptr;
+        for (const auto& instanced : objectives) {
+            auto* objective = instanced.Objective;
+            if (!objective || objective->ownerQuest != quest || objective->numTargets == 0 ||
+                instanced.InstanceState == RE::QUEST_OBJECTIVE_STATE::kDormant ||
+                ObjectiveCompleted(instanced.InstanceState) ||
+                ObjectiveFailed(instanced.InstanceState)) {
+                continue;
+            }
+            if (objective->index == settings.questMarkerLastObjectiveID &&
+                instanced.instanceID == settings.questMarkerLastObjectiveInstanceID) {
+                exact = std::addressof(instanced);
+            }
+            if (!newest || objective->index > newest->Objective->index) {
+                newest = std::addressof(instanced);
+            }
+        }
+
+        const auto* restored = exact ? exact : newest;
+        if (!restored) return false;
+
+        _questMarkerWatchFormID = settings.questMarkerLastFormID;
+        _questMarkerWatchQuestInstanceID = settings.questMarkerLastQuestInstanceID;
+        _questMarkerWatchObjectiveInstanceID = restored->instanceID;
+        _questMarkerWatchObjectiveID = restored->Objective->index;
+        _questMarkerPollAccumulator = 0.0f;
+        _questMovingTargetHandle.reset();
+        _questMovingTargetPollAccumulator = 0.0f;
+        _questTargetResolveFormID = _questMarkerWatchFormID;
+        _questTargetResolveInstanceID = restored->instanceID;
+        _questTargetResolveObjectiveID = restored->Objective->index;
+        _questTargetResolveAttempts = 4;
+        _questTargetResolveDelay = 0.25f;
+        PersistQuestMarkerSelectionGameThread();
+        logger::info(
+            "DragonBoardVR: restored persisted quest marker quest={:08X} questInstance={} objectiveInstance={} objective={}.",
+            _questMarkerWatchFormID,
+            _questMarkerWatchQuestInstanceID,
+            _questMarkerWatchObjectiveInstanceID,
+            _questMarkerWatchObjectiveID);
+        return true;
+    }
+
+    void RmlPanelHost::RefreshTrackedQuestObjectiveGameThread()
+    {
+        if (_questMarkerWatchFormID == 0) return;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(_questMarkerWatchFormID);
+        if (!player || !quest || !quest->IsActive()) {
+            logger::info(
+                "DragonBoardVR: stopped automatic objective marker updates for quest {:08X}; quest is no longer tracked.",
+                _questMarkerWatchFormID);
+            _questMarkerWatchFormID = 0;
+            _questMarkerWatchQuestInstanceID = 0;
+            _questMarkerWatchObjectiveInstanceID = 0;
+            _questMarkerWatchObjectiveID = 0;
+            _questMovingTargetHandle.reset();
+            _questMovingTargetPollAccumulator = 0.0f;
+            _questTargetResolveDelay = -1.0f;
+            _questTargetResolveAttempts = 0;
+            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            PersistQuestMarkerSelectionGameThread();
+            return;
+        }
+
+#ifdef ENABLE_SKYRIM_VR
+        auto& objectives = GetVrQuestObjectives(player);
+#else
+        auto& objectives = player->GetPlayerRuntimeData().objectives;
+#endif
+        if (objectives.size() > 4096) return;
+
+        const RE::BGSInstancedQuestObjective* current = nullptr;
+        const RE::BGSInstancedQuestObjective* replacement = nullptr;
+        for (const auto& instanced : objectives) {
+            auto* objective = instanced.Objective;
+            if (!objective || objective->ownerQuest != quest || objective->numTargets == 0 ||
+                instanced.InstanceState == RE::QUEST_OBJECTIVE_STATE::kDormant ||
+                ObjectiveCompleted(instanced.InstanceState) ||
+                ObjectiveFailed(instanced.InstanceState)) {
+                continue;
+            }
+
+            if (objective->index == _questMarkerWatchObjectiveID &&
+                instanced.instanceID == _questMarkerWatchObjectiveInstanceID) {
+                current = std::addressof(instanced);
+            }
+            if (!replacement || objective->index > replacement->Objective->index) {
+                replacement = std::addressof(instanced);
+            }
+        }
+
+        // Skyrim can publish the next stage before retiring the previous one.
+        // Advance when a newer objective exists; otherwise preserve the user's
+        // current choice while it remains active.
+        if (current && replacement &&
+            replacement->Objective->index <= current->Objective->index) {
+            return;
+        }
+
+        if (!replacement) {
+            if (_questMarkerWatchObjectiveID != 0) {
+                logger::info(
+                    "DragonBoardVR: tracked quest {:08X} currently has no active map objective; marker hidden until the next update.",
+                    _questMarkerWatchFormID);
+                _questMarkerWatchObjectiveID = 0;
+                _questMovingTargetHandle.reset();
+                _questMovingTargetPollAccumulator = 0.0f;
+                _questMarkerWatchObjectiveInstanceID = 0;
+                _questTargetResolveDelay = -1.0f;
+                _questTargetResolveAttempts = 0;
+                vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            }
+            return;
+        }
+
+        _questMarkerWatchObjectiveID = replacement->Objective->index;
+        _questMarkerWatchObjectiveInstanceID = replacement->instanceID;
+        _questMovingTargetHandle.reset();
+        _questMovingTargetPollAccumulator = 0.0f;
+        _questTargetResolveFormID = _questMarkerWatchFormID;
+        _questTargetResolveInstanceID = replacement->instanceID;
+        _questTargetResolveObjectiveID = replacement->Objective->index;
+        _questTargetResolveAttempts = 4;
+        _questTargetResolveDelay = 0.25f;
+        PersistQuestMarkerSelectionGameThread();
+        vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+        logger::info(
+            "DragonBoardVR: objective update detected; scheduled marker refresh quest={:08X} questInstance={} objectiveInstance={} objective={}.",
+            _questMarkerWatchFormID,
+            _questMarkerWatchQuestInstanceID,
+            replacement->instanceID,
+            replacement->Objective->index);
+    }
+
     void RmlPanelHost::ExecuteJournalActionGameThread(
         JournalAction action,
-        std::size_t index)
+        std::uint32_t formID,
+        std::uint32_t instanceID,
+        std::uint32_t objectiveInstanceID,
+        std::uint16_t objectiveID)
     {
         if (action == JournalAction::kSettings) {
             (void)OpenSettings();
@@ -2746,28 +3401,50 @@ namespace dragonboard::ui::rml
             return;
         }
 
-        std::uint32_t formID = 0;
         bool tracked = false;
         {
             std::scoped_lock lock(_journalMutex);
-            if (action == JournalAction::kSelectQuest) {
-                if (index >= _journalQuests.size()) return;
-                _journalSelectedIndex = index;
-                _journalSelectedFormID = _journalQuests[index].formID;
-                _journalSelectedInstanceID = _journalQuests[index].instanceID;
-                _rmlJournalSyncPending.store(true);
-                return;
-            }
-            if (_journalQuests.empty() ||
-                _journalSelectedIndex >= _journalQuests.size()) {
+            const auto selected = std::find_if(
+                _journalQuests.begin(),
+                _journalQuests.end(),
+                [&](const JournalQuestEntry& quest) {
+                    return quest.formID == formID && quest.instanceID == instanceID;
+                });
+            if (selected == _journalQuests.end()) {
+                logger::warn(
+                    "DragonBoardVR: ignored stale journal action {} for quest={:08X} instance={}.",
+                    static_cast<unsigned>(action),
+                    formID,
+                    instanceID);
                 return;
             }
 
-            auto& quest = _journalQuests[_journalSelectedIndex];
-            formID = quest.formID;
-            tracked = quest.active;
+            if (action == JournalAction::kSelectQuest) {
+                _journalSelectedIndex = static_cast<std::size_t>(
+                    std::distance(_journalQuests.begin(), selected));
+                _journalSelectedFormID = selected->formID;
+                _journalSelectedInstanceID = selected->instanceID;
+                _rmlJournalSyncPending.store(true);
+                return;
+            }
+
+            tracked = selected->active;
             if (action == JournalAction::kTrackObjective) {
-                if (index >= quest.objectives.size()) return;
+                const auto objective = std::find_if(
+                    selected->objectives.begin(),
+                    selected->objectives.end(),
+                    [&](const JournalObjectiveEntry& entry) {
+                        return entry.objectiveID == objectiveID &&
+                               entry.instanceID == objectiveInstanceID;
+                    });
+                if (objective == selected->objectives.end()) {
+                    logger::warn(
+                        "DragonBoardVR: ignored stale objective action quest={:08X} instance={} objective={}.",
+                        formID,
+                        objectiveInstanceID,
+                        objectiveID);
+                    return;
+                }
                 tracked = false;
             }
         }
@@ -2776,13 +3453,51 @@ namespace dragonboard::ui::rml
             action == JournalAction::kToggleTracking ? !tracked : true;
         if (!SetQuestTrackedGameThread(formID, desiredTracking)) return;
 
+        if (action == JournalAction::kTrackObjective) {
+            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            _questMarkerWatchFormID = formID;
+            _questMarkerWatchQuestInstanceID = instanceID;
+            _questMarkerWatchObjectiveInstanceID = objectiveInstanceID;
+            _questMarkerWatchObjectiveID = objectiveID;
+            _questMarkerPollAccumulator = 0.0f;
+            _questMovingTargetHandle.reset();
+            _questMovingTargetPollAccumulator = 0.0f;
+            PersistQuestMarkerSelectionGameThread();
+            _questTargetResolveFormID = formID;
+            _questTargetResolveInstanceID = objectiveInstanceID;
+            _questTargetResolveObjectiveID = objectiveID;
+            _questTargetResolveAttempts = 4;
+            _questTargetResolveDelay = 0.75f;
+            logger::info(
+                "DragonBoardVR: scheduled bounded objective entrance resolution quest={:08X} instance={} objective={}.",
+                formID,
+                objectiveInstanceID,
+                objectiveID);
+        } else if (!desiredTracking) {
+            if (_questMarkerWatchFormID == formID) {
+                _questMarkerWatchFormID = 0;
+                _questMarkerWatchQuestInstanceID = 0;
+                _questMarkerWatchObjectiveInstanceID = 0;
+                _questMarkerWatchObjectiveID = 0;
+                _questMovingTargetHandle.reset();
+                _questMovingTargetPollAccumulator = 0.0f;
+                PersistQuestMarkerSelectionGameThread();
+            }
+            _questTargetResolveDelay = -1.0f;
+            _questTargetResolveAttempts = 0;
+            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            logger::info(
+                "DragonBoardVR: objective map marker cache cleared with quest {:08X} tracking.",
+                formID);
+        }
+
         {
             std::scoped_lock lock(_journalMutex);
             const auto selected = std::find_if(
                 _journalQuests.begin(),
                 _journalQuests.end(),
                 [&](const JournalQuestEntry& quest) {
-                    return quest.formID == formID;
+                    return quest.formID == formID && quest.instanceID == instanceID;
                 });
             if (selected != _journalQuests.end()) {
                 selected->active = desiredTracking;

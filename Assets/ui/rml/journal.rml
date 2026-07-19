@@ -44,8 +44,10 @@
                                 <span id="journal-tracking-state" class="journal-tracking-state">NOT TRACKED</span>
                             </div>
                             <div id="journal-quest-title" class="command-title journal-title">No quest selected</div>
-                            <div id="journal-quest-summary" class="command-description journal-summary">
-                                Quest information will appear here.
+                            <div class="journal-summary-row">
+                                <div id="journal-quest-summary" class="journal-summary">
+                                    Quest information will appear here.
+                                </div>
                             </div>
 
                             <div class="journal-objectives-heading"><span>OBJECTIVES</span></div>

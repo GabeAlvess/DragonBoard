@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -18,6 +19,55 @@ namespace dragonboard::ui::rml
 {
     namespace
     {
+        bool ParseDecimal(std::string_view value, std::uint32_t& result)
+        {
+            if (value.empty()) return false;
+            const auto [end, error] = std::from_chars(
+                value.data(), value.data() + value.size(), result);
+            return error == std::errc{} && end == value.data() + value.size();
+        }
+
+        bool ParseJournalQuestIdentity(
+            std::string_view value,
+            std::uint32_t& formID,
+            std::uint32_t& instanceID)
+        {
+            const auto separator = value.find('-');
+            return separator != std::string_view::npos &&
+                   ParseDecimal(value.substr(0, separator), formID) &&
+                   ParseDecimal(value.substr(separator + 1), instanceID);
+        }
+
+        bool ParseJournalObjectiveIdentity(
+            std::string_view value,
+            std::uint32_t& formID,
+            std::uint32_t& questInstanceID,
+            std::uint32_t& objectiveInstanceID,
+            std::uint16_t& objectiveID)
+        {
+            const auto first = value.find('-');
+            const auto second = first == std::string_view::npos ?
+                                    std::string_view::npos :
+                                    value.find('-', first + 1);
+            const auto third = second == std::string_view::npos ?
+                                   std::string_view::npos :
+                                   value.find('-', second + 1);
+            std::uint32_t parsedObjectiveID = 0;
+            if (first == std::string_view::npos || second == std::string_view::npos ||
+                third == std::string_view::npos ||
+                !ParseDecimal(value.substr(0, first), formID) ||
+                !ParseDecimal(
+                    value.substr(first + 1, second - first - 1), questInstanceID) ||
+                !ParseDecimal(
+                    value.substr(second + 1, third - second - 1), objectiveInstanceID) ||
+                !ParseDecimal(value.substr(third + 1), parsedObjectiveID) ||
+                parsedObjectiveID > std::numeric_limits<std::uint16_t>::max()) {
+                return false;
+            }
+            objectiveID = static_cast<std::uint16_t>(parsedObjectiveID);
+            return true;
+        }
+
         bool IsActionCard(const Rml::Element* element)
         {
             if (!element) return false;
@@ -90,8 +140,12 @@ namespace dragonboard::ui::rml
             "labelScale", "labelSpacing", "labelXOffset", "labelYOffset", "labelZOffset"
         };
 
-        constexpr std::array<const char*, 2> kDeveloperPages{
-            "commands", "info"
+        constexpr std::array<const char*, 3> kDeveloperPages{
+            "commands", "info", "calibration"
+        };
+
+        constexpr std::array<const char*, 5> kMapCalibrationCities{
+            "Whiterun", "Riften", "Solitude", "Falkreath", "Windhelm"
         };
 
         constexpr std::array<const char*, 4> kItemEditPages{
@@ -190,7 +244,7 @@ namespace dragonboard::ui::rml
 
     bool DragonBoardRmlUi::Initialize(ID3D11Device* device, ID3D11DeviceContext* context)
     {
-        if (IsReady()) return true;
+        if (_renderer && _renderer->IsReady() && _context) return true;
         Shutdown();
 
         _renderer = std::make_unique<DragonBoardRmlRenderer>();
@@ -253,209 +307,186 @@ namespace dragonboard::ui::rml
             return false;
         }
 
-        const char* loadedSettingsDocument = nullptr;
-        for (const auto* path : kDocumentCandidates) {
-            if (!std::filesystem::exists(path)) continue;
-            const auto loadStarted = std::chrono::steady_clock::now();
-            _settingsDocument = _context->LoadDocument(path);
-            const auto loadMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - loadStarted).count();
-            logger::info(
-                "DragonBoardVR: RmlUi settings document load took {} ms (path='{}', success={}).",
-                loadMs,
-                path,
-                _settingsDocument != nullptr);
-            if (_settingsDocument) {
-                loadedSettingsDocument = path;
-                break;
-            }
-        }
-        const char* loadedDeveloperDocument = nullptr;
-        for (const auto* path : kDeveloperDocumentCandidates) {
-            if (!std::filesystem::exists(path)) continue;
-            const auto loadStarted = std::chrono::steady_clock::now();
-            _developerDocument = _context->LoadDocument(path);
-            const auto loadMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - loadStarted).count();
-            logger::info(
-                "DragonBoardVR: RmlUi developer document load took {} ms (path='{}', success={}).",
-                loadMs,
-                path,
-                _developerDocument != nullptr);
-            if (_developerDocument) {
-                loadedDeveloperDocument = path;
-                break;
-            }
-        }
-        const char* loadedItemEditDocument = nullptr;
-        for (const auto* path : kItemEditDocumentCandidates) {
-            if (!std::filesystem::exists(path)) continue;
-            const auto loadStarted = std::chrono::steady_clock::now();
-            _itemEditDocument = _context->LoadDocument(path);
-            const auto loadMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - loadStarted).count();
-            logger::info(
-                "DragonBoardVR: RmlUi item editor document load took {} ms (path='{}', success={}).",
-                loadMs, path, _itemEditDocument != nullptr);
-            if (_itemEditDocument) {
-                loadedItemEditDocument = path;
-                break;
-            }
-        }
-        const char* loadedModsDocument = nullptr;
-        for (const auto* path : kModsDocumentCandidates) {
-            if (!std::filesystem::exists(path)) continue;
-            _modsDocument = _context->LoadDocument(path);
-            if (_modsDocument) { loadedModsDocument = path; break; }
-        }
-        const char* loadedInventoryDocument = nullptr;
-        for (const auto* path : kInventoryDocumentCandidates) {
-            if (!std::filesystem::exists(path)) continue;
-            _inventoryDocument = _context->LoadDocument(path);
-            if (_inventoryDocument) {
-                loadedInventoryDocument = path;
-                break;
-            }
-        }
-        const char* loadedMagicDocument = nullptr;
-        for (const auto* path : kMagicDocumentCandidates) {
-            if (!std::filesystem::exists(path)) continue;
-            _magicDocument = _context->LoadDocument(path);
-            if (_magicDocument) {
-                loadedMagicDocument = path;
-                break;
-            }
-        }
-        const char* loadedJournalDocument = nullptr;
-        for (const auto* path : kJournalDocumentCandidates) {
-            if (!std::filesystem::exists(path)) continue;
-            _journalDocument = _context->LoadDocument(path);
-            if (_journalDocument) {
-                loadedJournalDocument = path;
-                break;
-            }
-        }
-        if (!_settingsDocument && !_developerDocument && !_itemEditDocument &&
-            !_modsDocument && !_inventoryDocument && !_magicDocument &&
-            !_journalDocument) {
-            logger::error("DragonBoardVR: no RmlUi document could be loaded.");
-            Shutdown();
+        _eventListener = std::make_unique<UiEventListener>(*this);
+        _builtinDocumentLoadStep = 0;
+        return true;
+    }
+
+    bool DragonBoardRmlUi::LoadNextBuiltinDocument()
+    {
+        constexpr std::size_t kBuiltinDocumentCount = 7;
+        if (!_context || !_eventListener || _builtinDocumentLoadStep >= kBuiltinDocumentCount) {
             return false;
         }
 
-        _eventListener = std::make_unique<UiEventListener>(*this);
-        for (auto* document : {
-                 _settingsDocument, _developerDocument, _itemEditDocument,
-                 _modsDocument, _inventoryDocument, _magicDocument,
-                 _journalDocument }) {
-            if (!document) continue;
-            document->AddEventListener("change", _eventListener.get());
-        }
-        if (_settingsDocument) {
-            for (const auto* page : kPages) {
-                const std::string tabId = std::string("tab-") + page;
-                BindClick(_settingsDocument, tabId.c_str());
+        const auto loadDocument =
+            [this]<std::size_t N>(
+                const std::array<const char*, N>& candidates,
+                Rml::ElementDocument*& destination,
+                const char* name) -> const char* {
+                for (const auto* path : candidates) {
+                    if (!std::filesystem::exists(path)) continue;
+                    const auto started = std::chrono::steady_clock::now();
+                    destination = _context->LoadDocument(path);
+                    const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - started).count();
+                    logger::info(
+                        "DragonBoardVR: staged RmlUi {} document load took {} ms "
+                        "(path='{}', success={}).",
+                        name,
+                        elapsedMs,
+                        path,
+                        destination != nullptr);
+                    if (destination) return path;
+                }
+                logger::error("DragonBoardVR: RmlUi {} document could not be loaded.", name);
+                return nullptr;
+            };
+
+        const auto step = _builtinDocumentLoadStep++;
+        Rml::ElementDocument* loadedDocument = nullptr;
+        switch (step) {
+        case 0: {
+            const auto* path = loadDocument(kDocumentCandidates, _settingsDocument, "Settings");
+            loadedDocument = _settingsDocument;
+            if (_settingsDocument) {
+                for (const auto* page : kPages) {
+                    const std::string tabId = std::string("tab-") + page;
+                    BindClick(_settingsDocument, tabId.c_str());
+                }
+                for (const auto* slider : kSliders) BindSlider(_settingsDocument, slider);
+                BindClick(_settingsDocument, "save");
+                BindClick(_settingsDocument, "close");
+                BindClick(_settingsDocument, "toggle-edit-mode");
+                BindClick(_settingsDocument, "toggle-dev-panel");
+                SelectSettingsPage("general");
+                _settingsDocument->Hide();
+                logger::info("DragonBoardVR: external RmlUi settings loaded from '{}'.", path);
             }
-            for (const auto* slider : kSliders) BindSlider(_settingsDocument, slider);
-            BindClick(_settingsDocument, "save");
-            BindClick(_settingsDocument, "close");
-            BindClick(_settingsDocument, "toggle-edit-mode");
-            BindClick(_settingsDocument, "toggle-dev-panel");
-            SelectSettingsPage("general");
-            logger::info("DragonBoardVR: external RmlUi settings loaded from '{}'.", loadedSettingsDocument);
+            break;
         }
-        if (_developerDocument) {
-            for (const auto* page : kDeveloperPages) {
-                const std::string tabId = std::string("dev-tab-") + page;
-                BindClick(_developerDocument, tabId.c_str());
+        case 1: {
+            const auto* path = loadDocument(
+                kDeveloperDocumentCandidates, _developerDocument, "Developer");
+            loadedDocument = _developerDocument;
+            if (_developerDocument) {
+                for (const auto* page : kDeveloperPages) {
+                    const std::string tabId = std::string("dev-tab-") + page;
+                    BindClick(_developerDocument, tabId.c_str());
+                }
+                BindClick(_developerDocument, "dev-add-command");
+                BindClick(_developerDocument, "dev-execute");
+                BindClick(_developerDocument, "dev-close");
+                BindClick(_developerDocument, "dev-calibration-surface");
+                BindClick(_developerDocument, "dev-calibration-reset");
+                for (std::size_t city = 0; city < kMapCalibrationCities.size(); ++city) {
+                    const auto id = "dev-cal-city-" + std::to_string(city);
+                    BindClick(_developerDocument, id.c_str());
+                }
+                SelectDeveloperPage("commands");
+                _developerDocument->Hide();
+                logger::info("DragonBoardVR: external RmlUi developer panel loaded from '{}'.", path);
             }
-            BindClick(_developerDocument, "dev-add-command");
-            BindClick(_developerDocument, "dev-execute");
-            BindClick(_developerDocument, "dev-close");
-            SelectDeveloperPage("commands");
-            _developerDocument->Hide();
-            logger::info("DragonBoardVR: external RmlUi developer panel loaded from '{}'.", loadedDeveloperDocument);
+            break;
         }
-        if (_itemEditDocument) {
-            for (const auto* page : kItemEditPages) {
-                const std::string tabId = std::string("edit-tab-") + page;
-                BindClick(_itemEditDocument, tabId.c_str());
+        case 2: {
+            const auto* path = loadDocument(
+                kItemEditDocumentCandidates, _itemEditDocument, "ItemEdit");
+            loadedDocument = _itemEditDocument;
+            if (_itemEditDocument) {
+                for (const auto* page : kItemEditPages) {
+                    const std::string tabId = std::string("edit-tab-") + page;
+                    BindClick(_itemEditDocument, tabId.c_str());
+                }
+                for (const auto* slider : kItemEditSliders) BindSlider(_itemEditDocument, slider);
+                for (const auto* id : {
+                         "edit-apply-item", "edit-apply-category", "edit-reset", "edit-back", "edit-close",
+                         "edit-pin-dashboard", "edit-pin-left", "edit-pin-world", "edit-toggle-label" }) {
+                    BindClick(_itemEditDocument, id);
+                }
+                SelectItemEditPage("position");
+                _itemEditDocument->Hide();
+                logger::info("DragonBoardVR: external RmlUi item editor loaded from '{}'.", path);
             }
-            for (const auto* slider : kItemEditSliders) BindSlider(_itemEditDocument, slider);
-            for (const auto* id : {
-                     "edit-apply-item", "edit-apply-category", "edit-reset", "edit-back", "edit-close",
-                     "edit-pin-dashboard", "edit-pin-left", "edit-pin-world", "edit-toggle-label" }) {
-                BindClick(_itemEditDocument, id);
+            break;
+        }
+        case 3: {
+            const auto* path = loadDocument(kModsDocumentCandidates, _modsDocument, "Mods");
+            loadedDocument = _modsDocument;
+            if (_modsDocument) {
+                BindClick(_modsDocument, "mods-add");
+                BindClick(_modsDocument, "mods-close");
+                _modsDocument->Hide();
+                logger::info("DragonBoardVR: external RmlUi mods panel loaded from '{}'.", path);
             }
-            SelectItemEditPage("position");
-            _itemEditDocument->Hide();
-            logger::info("DragonBoardVR: external RmlUi item editor loaded from '{}'.", loadedItemEditDocument);
+            break;
         }
-        if (_modsDocument) {
-            BindClick(_modsDocument, "mods-add");
-            BindClick(_modsDocument, "mods-close");
-            _modsDocument->Hide();
-            logger::info("DragonBoardVR: external RmlUi mods panel loaded from '{}'.", loadedModsDocument);
-        }
-        if (_inventoryDocument) {
-            for (const auto* id : {
-                     "inventory-equip", "inventory-drop", "inventory-pin", "inventory-close",
-                     "inventory-search", "inventory-search-clear",
-                     "inventory-filter-weapons", "inventory-filter-armor",
-                     "inventory-filter-consumables", "inventory-filter-quest",
-                     "inventory-filter-books", "inventory-filter-misc" }) {
-                BindClick(_inventoryDocument, id);
+        case 4: {
+            const auto* path = loadDocument(
+                kInventoryDocumentCandidates, _inventoryDocument, "Inventory");
+            loadedDocument = _inventoryDocument;
+            if (_inventoryDocument) {
+                for (const auto* id : {
+                         "inventory-equip", "inventory-drop", "inventory-pin", "inventory-close",
+                         "inventory-search", "inventory-search-clear",
+                         "inventory-filter-weapons", "inventory-filter-armor",
+                         "inventory-filter-consumables", "inventory-filter-quest",
+                         "inventory-filter-books", "inventory-filter-misc" }) {
+                    BindClick(_inventoryDocument, id);
+                }
+                _inventoryDocument->Hide();
+                logger::info("DragonBoardVR: external RmlUi inventory panel loaded from '{}'.", path);
             }
-            _inventoryDocument->Hide();
-            logger::info(
-                "DragonBoardVR: external RmlUi inventory panel loaded from '{}'.",
-                loadedInventoryDocument);
+            break;
         }
-        if (_magicDocument) {
-            for (const auto* id : {
-                     "magic-equip", "magic-edit", "magic-pin", "magic-close",
-                     "magic-search", "magic-search-clear",
-                     "magic-filter-destruction", "magic-filter-conjuration",
-                     "magic-filter-restoration", "magic-filter-illusion",
-                     "magic-filter-alteration", "magic-filter-powers",
-                     "magic-filter-passive", "magic-pin-dashboard",
-                     "magic-pin-left", "magic-pin-world", "magic-pin-label" }) {
-                BindClick(_magicDocument, id);
+        case 5: {
+            const auto* path = loadDocument(kMagicDocumentCandidates, _magicDocument, "Magic");
+            loadedDocument = _magicDocument;
+            if (_magicDocument) {
+                for (const auto* id : {
+                         "magic-equip", "magic-edit", "magic-pin", "magic-close",
+                         "magic-search", "magic-search-clear",
+                         "magic-filter-destruction", "magic-filter-conjuration",
+                         "magic-filter-restoration", "magic-filter-illusion",
+                         "magic-filter-alteration", "magic-filter-powers",
+                         "magic-filter-passive", "magic-pin-dashboard",
+                         "magic-pin-left", "magic-pin-world", "magic-pin-label" }) {
+                    BindClick(_magicDocument, id);
+                }
+                _magicDocument->Hide();
+                logger::info("DragonBoardVR: external RmlUi magic panel loaded from '{}'.", path);
             }
-            _magicDocument->Hide();
-            logger::info(
-                "DragonBoardVR: external RmlUi magic panel loaded from '{}'.",
-                loadedMagicDocument);
+            break;
         }
-        if (_journalDocument) {
-            for (const auto* id : {
-                     "journal-tab-quests", "journal-tab-stats",
-                     "journal-settings", "journal-close",
-                     "journal-toggle-tracking" }) {
-                BindClick(_journalDocument, id);
+        case 6: {
+            const auto* path = loadDocument(kJournalDocumentCandidates, _journalDocument, "Journal");
+            loadedDocument = _journalDocument;
+            if (_journalDocument) {
+                for (const auto* id : {
+                         "journal-tab-quests", "journal-tab-stats",
+                         "journal-settings", "journal-close",
+                         "journal-toggle-tracking" }) {
+                    BindClick(_journalDocument, id);
+                }
+                SelectJournalPage("quests");
+                _journalDocument->Hide();
+                logger::info("DragonBoardVR: external RmlUi journal loaded from '{}'.", path);
             }
-            SelectJournalPage("quests");
-            _journalDocument->Hide();
-            logger::info(
-                "DragonBoardVR: external RmlUi journal loaded from '{}'.",
-                loadedJournalDocument);
+            break;
         }
-        if (_settingsDocument) {
-            ShowSettings();
-        } else if (_developerDocument) {
-            ShowDeveloper();
-        } else if (_itemEditDocument) {
-            ShowItemEdit();
-        } else if (_modsDocument) {
-            ShowMods();
-        } else if (_inventoryDocument) {
-            ShowInventory();
-        } else if (_magicDocument) {
-            ShowMagic();
-        } else {
-            ShowJournal();
+        default:
+            break;
         }
-        return true;
+
+        if (loadedDocument) {
+            loadedDocument->AddEventListener("change", _eventListener.get());
+        }
+        return loadedDocument != nullptr;
+    }
+
+    bool DragonBoardRmlUi::AreBuiltinDocumentsLoaded() const
+    {
+        return _builtinDocumentLoadStep >= 7;
     }
 
     void DragonBoardRmlUi::Shutdown()
@@ -494,6 +525,7 @@ namespace dragonboard::ui::rml
         _journalActiveQuestOrder.clear();
         _registeredPanels.clear();
         _panelEvents.clear();
+        _builtinDocumentLoadStep = 0;
         _eventListener.reset();
         if (_context) {
             Rml::RemoveContext(kContextName);
@@ -513,7 +545,7 @@ namespace dragonboard::ui::rml
 
     bool DragonBoardRmlUi::IsReady() const
     {
-        return _renderer && _renderer->IsReady() && _context && _activeDocument;
+        return _renderer && _renderer->IsReady() && _context;
     }
 
     bool DragonBoardRmlUi::IsSettingsReady() const
@@ -751,6 +783,19 @@ namespace dragonboard::ui::rml
         return event;
     }
 
+    std::optional<DragonBoardRmlUi::MapCalibrationRequest>
+    DragonBoardRmlUi::ConsumeMapCalibrationRequest()
+    {
+        auto result = _mapCalibrationRequest;
+        _mapCalibrationRequest.reset();
+        return result;
+    }
+
+    bool DragonBoardRmlUi::ConsumeMapCalibrationResetRequested()
+    {
+        return std::exchange(_mapCalibrationResetRequested, false);
+    }
+
     void DragonBoardRmlUi::ProcessInput(
         bool pointerOnPanel,
         float pointerU,
@@ -774,6 +819,8 @@ namespace dragonboard::ui::rml
             static_cast<int>(std::lround(std::clamp(pointerV, 0.0f, 1.0f) * height)), 0, height - 1);
         int pointerX = rawPointerX;
         int pointerY = rawPointerY;
+        _inputWidth = std::max(width, 1);
+        _inputHeight = std::max(height, 1);
 
         if (pointerOnPanel) {
             if (!_pointerSmoothingInitialized || !_pointerWasOnPanel) {
@@ -814,6 +861,8 @@ namespace dragonboard::ui::rml
 
         int submittedPointerX = pointerX;
         int submittedPointerY = pointerY;
+        _latestPointerX = pointerX;
+        _latestPointerY = pointerY;
         if (_triggerCaptureMode == TriggerCaptureMode::kButton) {
             submittedPointerX = _triggerCaptureX;
             submittedPointerY = _triggerCaptureY;
@@ -1488,12 +1537,20 @@ namespace dragonboard::ui::rml
         return result;
     }
 
-    std::pair<DragonBoardRmlUi::JournalAction, std::size_t>
-    DragonBoardRmlUi::ConsumeJournalAction()
+    DragonBoardRmlUi::JournalActionRequest DragonBoardRmlUi::ConsumeJournalAction()
     {
-        const auto result = std::pair{ _journalAction, _journalActionIndex };
+        const JournalActionRequest result{
+            _journalAction,
+            _journalActionFormID,
+            _journalActionInstanceID,
+            _journalActionObjectiveInstanceID,
+            _journalActionObjectiveID
+        };
         _journalAction = JournalAction::kNone;
-        _journalActionIndex = 0;
+        _journalActionFormID = 0;
+        _journalActionInstanceID = 0;
+        _journalActionObjectiveInstanceID = 0;
+        _journalActionObjectiveID = 0;
         return result;
     }
 
@@ -1947,6 +2004,11 @@ namespace dragonboard::ui::rml
         }
         setText("journal-active-quest", "Active quest: " + activeQuestTitle);
 
+        const auto questButtonId = [](const JournalQuestInfo& quest) {
+            return "journal-quest-" + std::to_string(quest.formID) + "-" +
+                   std::to_string(quest.instanceID);
+        };
+
         if (auto* list = _journalDocument->GetElementById("journal-quest-list")) {
             std::string markup;
             const auto appendSection = [&](const char* title, bool active) {
@@ -1963,7 +2025,7 @@ namespace dragonboard::ui::rml
                     if (index == info.selectedIndex) classes += " active";
                     if (quest.completed) classes += " completed";
                     if (quest.failed) classes += " failed";
-                    markup += "<button id=\"journal-quest-" + std::to_string(index) +
+                    markup += "<button id=\"" + questButtonId(quest) +
                         "\" class=\"" + classes + "\"><span class=\"journal-quest-marker\">" +
                         (quest.active ? "&gt;" : "") +
                         "</span><span id=\"journal-quest-name-" + std::to_string(index) +
@@ -1982,14 +2044,14 @@ namespace dragonboard::ui::rml
                 _journalQuestListMarkup = markup;
                 list->SetInnerRML(markup);
                 for (std::size_t index = 0; index < info.quests.size(); ++index) {
-                    BindClick(
-                        _journalDocument,
-                        ("journal-quest-" + std::to_string(index)).c_str());
+                    BindClick(_journalDocument, questButtonId(info.quests[index]).c_str());
                 }
             }
         }
 
         if (info.quests.empty()) {
+            _journalSelectedFormID = 0;
+            _journalSelectedInstanceID = 0;
             setText("journal-quest-type", "JOURNAL");
             setText("journal-quest-title", "No quest selected");
             setText("journal-quest-summary", "Quest information will appear here.");
@@ -2005,6 +2067,8 @@ namespace dragonboard::ui::rml
         } else {
             const auto selectedIndex = std::min(info.selectedIndex, info.quests.size() - 1);
             const auto& selected = info.quests[selectedIndex];
+            _journalSelectedFormID = selected.formID;
+            _journalSelectedInstanceID = selected.instanceID;
             setText("journal-quest-type", selected.type.empty() ? "QUEST" : selected.type);
             setText("journal-quest-title", selected.title);
             setText(
@@ -2032,7 +2096,12 @@ namespace dragonboard::ui::rml
                     if (objective.completed) classes += " completed";
                     if (objective.failed) classes += " failed";
                     if (objective.hasTargets) classes += " has-target";
-                    markup += "<button id=\"journal-objective-" + std::to_string(index) +
+                    const auto objectiveButtonId =
+                        "journal-objective-" + std::to_string(selected.formID) + "-" +
+                        std::to_string(selected.instanceID) + "-" +
+                        std::to_string(objective.instanceID) + "-" +
+                        std::to_string(objective.objectiveID);
+                    markup += "<button id=\"" + objectiveButtonId +
                         "\" class=\"" + classes + "\"><span class=\"journal-objective-state\">" +
                         EscapeRml(objective.state) +
                         "</span><span class=\"journal-objective-text\">" +
@@ -2049,9 +2118,13 @@ namespace dragonboard::ui::rml
                         std::string::npos) {
                         continue;
                     }
-                    BindClick(
-                        _journalDocument,
-                        ("journal-objective-" + std::to_string(index)).c_str());
+                    const auto& objective = selected.objectives[index];
+                    const auto objectiveButtonId =
+                        "journal-objective-" + std::to_string(selected.formID) + "-" +
+                        std::to_string(selected.instanceID) + "-" +
+                        std::to_string(objective.instanceID) + "-" +
+                        std::to_string(objective.objectiveID);
+                    BindClick(_journalDocument, objectiveButtonId.c_str());
                 }
             }
         }
@@ -2214,6 +2287,12 @@ namespace dragonboard::ui::rml
         setText("dev-worldspace", info.worldspaceName.empty() ? "<interior or none>" : info.worldspaceName);
         setText("dev-worldspace-form", info.worldspaceFormId == 0 ? "--------" :
             Rml::CreateString("%08X", info.worldspaceFormId));
+        for (std::size_t city = 0; city < kMapCalibrationCities.size(); ++city) {
+            setText(
+                ("dev-cal-status-" + std::to_string(city)).c_str(),
+                info.mapCalibrationStatus[city]);
+        }
+        setText("dev-calibration-summary", info.mapCalibrationSummary);
     }
 
     int DragonBoardRmlUi::GetLastDrawCallCount() const
@@ -2379,25 +2458,31 @@ namespace dragonboard::ui::rml
         } else if (value == "journal-settings") {
             _journalAction = JournalAction::kSettings;
         } else if (value == "journal-toggle-tracking") {
+            _journalActionFormID = _journalSelectedFormID;
+            _journalActionInstanceID = _journalSelectedInstanceID;
             _journalAction = JournalAction::kToggleTracking;
         } else if (value == "journal-tab-quests") {
             SelectJournalPage("quests");
         } else if (value == "journal-tab-stats") {
             SelectJournalPage("stats");
         } else if (value.starts_with("journal-quest-")) {
-            try {
-                _journalActionIndex =
-                    static_cast<std::size_t>(std::stoul(std::string(value.substr(14))));
+            if (ParseJournalQuestIdentity(
+                    value.substr(14),
+                    _journalActionFormID,
+                    _journalActionInstanceID)) {
                 _journalAction = JournalAction::kSelectQuest;
-            } catch (...) {
+            } else {
                 logger::warn("DragonBoardVR: invalid journal quest id '{}'.", id);
             }
         } else if (value.starts_with("journal-objective-")) {
-            try {
-                _journalActionIndex =
-                    static_cast<std::size_t>(std::stoul(std::string(value.substr(18))));
+            if (ParseJournalObjectiveIdentity(
+                    value.substr(18),
+                    _journalActionFormID,
+                    _journalActionInstanceID,
+                    _journalActionObjectiveInstanceID,
+                    _journalActionObjectiveID)) {
                 _journalAction = JournalAction::kTrackObjective;
-            } catch (...) {
+            } else {
                 logger::warn("DragonBoardVR: invalid journal objective id '{}'.", id);
             }
         } else if (value == "save") {
@@ -2410,6 +2495,28 @@ namespace dragonboard::ui::rml
             SelectSettingsPage(id + 4);
         } else if (value.starts_with("dev-tab-")) {
             SelectDeveloperPage(id + 8);
+        } else if (value.starts_with("dev-cal-city-")) {
+            try {
+                _selectedMapCalibrationCity = std::min<std::size_t>(
+                    std::stoul(std::string(value.substr(13))),
+                    kMapCalibrationCities.size() - 1);
+                for (std::size_t city = 0; city < kMapCalibrationCities.size(); ++city) {
+                    if (auto* button = _developerDocument->GetElementById(
+                            "dev-cal-city-" + std::to_string(city))) {
+                        button->SetClass("active", city == _selectedMapCalibrationCity);
+                    }
+                }
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid map calibration city id '{}'.", id);
+            }
+        } else if (value == "dev-calibration-surface") {
+            _mapCalibrationRequest = MapCalibrationRequest{
+                _selectedMapCalibrationCity,
+                0.0f,
+                0.0f
+            };
+        } else if (value == "dev-calibration-reset") {
+            _mapCalibrationResetRequested = true;
         } else if (value.starts_with("edit-tab-")) {
             SelectItemEditPage(id + 9);
         } else if (value.starts_with("dev-command-")) {
@@ -2518,6 +2625,9 @@ namespace dragonboard::ui::rml
             if (auto* content = _developerDocument->GetElementById(pageId)) {
                 content->SetProperty("display", active ? "block" : "none");
             }
+        }
+        if (auto* app = _developerDocument->GetElementById("app")) {
+            app->SetClass("calibration-mode", std::string_view(selectedPage) == "calibration");
         }
     }
 

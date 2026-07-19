@@ -232,12 +232,20 @@
     font-size: 68px;
 }
 
-.journal-summary {
+.journal-summary-row {
     width: 1248px;
-    min-height: 126px;
-    max-height: 158px;
+    height: 158px;
+    display: block;
     margin-top: 10px;
+    overflow-x: hidden;
     overflow-y: auto;
+}
+
+.journal-summary {
+    width: 1190px;
+    min-height: 126px;
+    display: block;
+    margin: 0;
     color: #b9baba;
     font-size: 44px;
     line-height: 1.16;

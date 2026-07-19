@@ -257,6 +257,10 @@ namespace vrui
         bModsAction   = ini.GetValue("FixedButtons", "sModsAction",   bModsAction.c_str());
         bFavLabel     = ini.GetValue("FixedButtons", "sFavLabel",     bFavLabel.c_str());
         bFavAction    = ini.GetValue("FixedButtons", "sFavAction",    bFavAction.c_str());
+        // Preserve the legacy INI keys (and therefore the existing transform),
+        // while migrating the retired Favorites button to the RmlUi Journal.
+        bFavLabel = "Journal";
+        bFavAction = "Journal";
         bMapLabel     = ini.GetValue("FixedButtons", "sMapLabel",     bMapLabel.c_str());
         bMapAction    = ini.GetValue("FixedButtons", "sMapAction",    bMapAction.c_str());
         bDevLabel     = ini.GetValue("FixedButtons", "sDevLabel",     bDevLabel.c_str());
@@ -323,6 +327,32 @@ namespace vrui
         mapMarkerOffsetY          = (float)ini.GetDoubleValue("MapMarker", "fOffsetY",     mapMarkerOffsetY);
         mapMarkerOffsetZ          = (float)ini.GetDoubleValue("MapMarker", "fOffsetZ",     mapMarkerOffsetZ);
         mapMarkerNifPath = ini.GetValue("MapMarker", "sMarkerNifPath", mapMarkerNifPath.c_str());
+        bEnableQuestMarker = ini.GetBoolValue("QuestMarker", "bEnableQuestMarker", bEnableQuestMarker);
+        questMarkerScale = (float)ini.GetDoubleValue("QuestMarker", "fMarkerScale", questMarkerScale);
+        questMarkerRotX = (float)ini.GetDoubleValue("QuestMarker", "fRotX", questMarkerRotX);
+        questMarkerRotY = (float)ini.GetDoubleValue("QuestMarker", "fRotY", questMarkerRotY);
+        questMarkerRotZ = (float)ini.GetDoubleValue("QuestMarker", "fRotZ", questMarkerRotZ);
+        questMarkerNifPath = ini.GetValue("QuestMarker", "sMarkerNifPath", questMarkerNifPath.c_str());
+        questMarkerLastFormID = static_cast<std::uint32_t>(
+            ini.GetLongValue("QuestMarker", "iLastFormID", questMarkerLastFormID));
+        questMarkerLastQuestInstanceID = static_cast<std::uint32_t>(
+            ini.GetLongValue(
+                "QuestMarker", "iLastQuestInstanceID", questMarkerLastQuestInstanceID));
+        questMarkerLastObjectiveInstanceID = static_cast<std::uint32_t>(
+            ini.GetLongValue(
+                "QuestMarker", "iLastObjectiveInstanceID", questMarkerLastObjectiveInstanceID));
+        questMarkerLastObjectiveID = static_cast<std::uint16_t>(
+            ini.GetLongValue("QuestMarker", "iLastObjectiveID", questMarkerLastObjectiveID));
+        for (std::size_t i = 0; i < mapCalibrationPoints.size(); ++i) {
+            const auto prefix = "Point" + std::to_string(i + 1);
+            auto& point = mapCalibrationPoints[i];
+            (void)GetMapCalibrationLandmarkUv(i, point.mapU, point.mapV);
+            point.valid = ini.GetBoolValue("MapCalibration", ("b" + prefix + "Valid").c_str(), point.valid);
+            point.worldX = (float)ini.GetDoubleValue("MapCalibration", ("f" + prefix + "WorldX").c_str(), point.worldX);
+            point.worldY = (float)ini.GetDoubleValue("MapCalibration", ("f" + prefix + "WorldY").c_str(), point.worldY);
+            point.mapU = (float)ini.GetDoubleValue("MapCalibration", ("f" + prefix + "MapU").c_str(), point.mapU);
+            point.mapV = (float)ini.GetDoubleValue("MapCalibration", ("f" + prefix + "MapV").c_str(), point.mapV);
+        }
 
         // [CategoryOverrides]
         // [CategoryOverrides] & [CategoryButtons]
@@ -391,6 +421,27 @@ namespace vrui
         ini.SetDoubleValue("MapMarker", "fOffsetY",         mapMarkerOffsetY);
         ini.SetDoubleValue("MapMarker", "fOffsetZ",         mapMarkerOffsetZ);
         ini.SetValue("MapMarker", "sMarkerNifPath", mapMarkerNifPath.c_str());
+        ini.SetBoolValue("QuestMarker", "bEnableQuestMarker", bEnableQuestMarker);
+        ini.SetDoubleValue("QuestMarker", "fMarkerScale", questMarkerScale);
+        ini.SetDoubleValue("QuestMarker", "fRotX", questMarkerRotX);
+        ini.SetDoubleValue("QuestMarker", "fRotY", questMarkerRotY);
+        ini.SetDoubleValue("QuestMarker", "fRotZ", questMarkerRotZ);
+        ini.SetValue("QuestMarker", "sMarkerNifPath", questMarkerNifPath.c_str());
+        ini.SetLongValue("QuestMarker", "iLastFormID", questMarkerLastFormID);
+        ini.SetLongValue(
+            "QuestMarker", "iLastQuestInstanceID", questMarkerLastQuestInstanceID);
+        ini.SetLongValue(
+            "QuestMarker", "iLastObjectiveInstanceID", questMarkerLastObjectiveInstanceID);
+        ini.SetLongValue("QuestMarker", "iLastObjectiveID", questMarkerLastObjectiveID);
+        for (std::size_t i = 0; i < mapCalibrationPoints.size(); ++i) {
+            const auto prefix = "Point" + std::to_string(i + 1);
+            const auto& point = mapCalibrationPoints[i];
+            ini.SetBoolValue("MapCalibration", ("b" + prefix + "Valid").c_str(), point.valid);
+            ini.SetDoubleValue("MapCalibration", ("f" + prefix + "WorldX").c_str(), point.worldX);
+            ini.SetDoubleValue("MapCalibration", ("f" + prefix + "WorldY").c_str(), point.worldY);
+            ini.SetDoubleValue("MapCalibration", ("f" + prefix + "MapU").c_str(), point.mapU);
+            ini.SetDoubleValue("MapCalibration", ("f" + prefix + "MapV").c_str(), point.mapV);
+        }
 
         // [General]
         ini.SetBoolValue("General", "bVerboseLogging", verboseLogging, "; Enable trace-level logging (default: false, very spammy)");
@@ -584,8 +635,8 @@ namespace vrui
         ini.SetValue("FixedButtons", "sSaveAction",   bSaveAction.c_str(),   "; Action: QuickSave");
         ini.SetValue("FixedButtons", "sModsLabel",    bModsLabel.c_str(),    "; Displayed name of the Mods button");
         ini.SetValue("FixedButtons", "sModsAction",   bModsAction.c_str(),   "; Action: ModsPanel");
-        ini.SetValue("FixedButtons", "sFavLabel",     bFavLabel.c_str(),     "; Displayed name of the Favorites button");
-        ini.SetValue("FixedButtons", "sFavAction",    bFavAction.c_str(),    "; Action: FavoritesPanel");
+        ini.SetValue("FixedButtons", "sFavLabel",     bFavLabel.c_str(),     "; Displayed name of the Journal button");
+        ini.SetValue("FixedButtons", "sFavAction",    bFavAction.c_str(),    "; Action: Journal (RmlUi)");
         ini.SetValue("FixedButtons", "sMapLabel",     bMapLabel.c_str(),     "; Displayed name of the Map button");
         ini.SetValue("FixedButtons", "sMapAction",    bMapAction.c_str(),    "; Action: MapMenu");
         ini.SetValue("FixedButtons", "sDevLabel",     bDevLabel.c_str(),     "; Displayed name of the Dev button");

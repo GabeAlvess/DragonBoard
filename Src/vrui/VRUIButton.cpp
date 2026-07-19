@@ -997,8 +997,6 @@ namespace vrui
         if (suppressWiggle) {
             _animatedVisualRoot->local.translate = { 0.0f, 0.0f, 0.0f };
             _animatedVisualRoot->local.rotate.SetEulerAnglesXYZ(0.0f, 0.0f, 0.0f);
-            RE::NiUpdateData updateData;
-            _animatedVisualRoot->Update(updateData);
             return;
         }
 
@@ -1014,9 +1012,6 @@ namespace vrui
 
         _animatedVisualRoot->local.translate = { sideDrift, 0.0f, posBob };
         _animatedVisualRoot->local.rotate.SetEulerAnglesXYZ(rotX * kDegToRad, 0.0f, rotZ * kDegToRad);
-
-        RE::NiUpdateData updateData;
-        _animatedVisualRoot->Update(updateData);
     }
 
 
@@ -1365,9 +1360,6 @@ namespace vrui
                 }
             }
         }
-
-        // Call base class update (handles children + entrance animation)
-        VRUIWidget::update(deltaTime);
     }
 
     void VRUIButton::onRayEnter()
@@ -1772,7 +1764,7 @@ namespace vrui
                 settings.bModsPosX = _node->local.translate.x; settings.bModsPosY = _node->local.translate.y; settings.bModsPosZ = _node->local.translate.z;
                 settings.bModsRotX = rx; settings.bModsRotY = ry; settings.bModsRotZ = rz;
                 settings.bModsScale = _node->local.scale;
-            } else if (buttonId == "Favorites") {
+            } else if (buttonId == "Journal") {
                 settings.bFavPosX = _node->local.translate.x; settings.bFavPosY = _node->local.translate.y; settings.bFavPosZ = _node->local.translate.z;
                 settings.bFavRotX = rx; settings.bFavRotY = ry; settings.bFavRotZ = rz;
                 settings.bFavScale = _node->local.scale;

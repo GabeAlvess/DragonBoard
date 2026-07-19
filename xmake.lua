@@ -150,6 +150,7 @@ target('DragonBoardRmlPreview')
 
     add_files(
         'Tools/RmlPreview/main.cpp',
+        'Tools/RmlPreview/RmlSourceEditor.cpp',
         'Tools/RmlPreview/RmlVisualInspector.cpp',
         'Src/ui/rml/DragonBoardRmlRenderer.cpp'
     )

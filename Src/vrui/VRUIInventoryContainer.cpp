@@ -873,14 +873,34 @@ namespace vrui
         }
 
         RE::ExtraDataList* extraList = nullptr;
+        RE::InventoryEntryData* liveInventoryEntry = nullptr;
         auto* changes = player->GetInventoryChanges();
         if (changes && changes->entryList) {
             for (auto* entry : *changes->entryList) {
                 if (entry && entry->object == item) {
+                    liveInventoryEntry = entry;
                     if (entry->extraLists && !entry->extraLists->empty()) {
                         extraList = entry->extraLists->front();
                     }
                     break;
+                }
+            }
+        }
+
+        if (equipped && (isWeapon || isLight)) {
+            // When identical items occupy both hands, the equip slot alone is
+            // not sufficient: Skyrim may remove whichever inventory instance
+            // matches extraList. Resolve the instance marked for the clicked
+            // hand so left trigger always toggles left and right toggles right.
+            extraList = nullptr;
+            const auto wornType = isLeft ?
+                RE::ExtraDataType::kWornLeft : RE::ExtraDataType::kWorn;
+            if (liveInventoryEntry && liveInventoryEntry->extraLists) {
+                for (auto* candidate : *liveInventoryEntry->extraLists) {
+                    if (candidate && candidate->HasType(wornType)) {
+                        extraList = candidate;
+                        break;
+                    }
                 }
             }
         }
@@ -907,13 +927,50 @@ namespace vrui
             }
             VRMenuManager::get().notifyEquip();
             VRMenuManager::get().scheduleEquipRefresh(0.15f);
-            logger::trace("DragonBoardVR: Unequipped from RmlUi inventory: {}", item->GetName());
+            logger::info(
+                "DragonBoardVR: unequipped {:08X} '{}' from {} hand "
+                "(matchedExtraList={}).",
+                formID,
+                item->GetName(),
+                isLeft ? "left" : "right",
+                extraList != nullptr);
             return true;
         }
 
+        auto* equippedOther = player->GetEquippedObject(!isLeft);
+        const bool sameWeaponInOtherHand =
+            isWeapon && equippedOther && equippedOther->formID == formID;
+
+        if (sameWeaponInOtherHand && count >= 2) {
+            // Each equipped copy must use a different inventory instance. Reusing
+            // the ExtraDataList marked as worn makes Skyrim move that instance
+            // between hands instead of equipping the second item from the stack.
+            // Prefer an unworn extra list (enchanted/tempered copies); nullptr
+            // intentionally selects an unmodified item from the base stack.
+            extraList = nullptr;
+            if (liveInventoryEntry && liveInventoryEntry->extraLists) {
+                for (auto* candidate : *liveInventoryEntry->extraLists) {
+                    if (!candidate ||
+                        candidate->HasType(RE::ExtraDataType::kWorn) ||
+                        candidate->HasType(RE::ExtraDataType::kWornLeft)) {
+                        continue;
+                    }
+                    extraList = candidate;
+                    break;
+                }
+            }
+            logger::info(
+                "DragonBoardVR: equipping second copy of {:08X} '{}' in {} hand "
+                "(count={}, separateExtraList={}).",
+                formID,
+                item->GetName(),
+                isLeft ? "left" : "right",
+                count,
+                extraList != nullptr);
+        }
+
         if (count < 2 && isWeapon) {
-            auto* equippedOther = player->GetEquippedObject(!isLeft);
-            if (equippedOther && equippedOther->formID == formID) {
+            if (sameWeaponInOtherHand) {
                 auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(
                     !isLeft ? 0x13F43 : 0x13F42);
                 equipManager->UnequipObject(player, item, nullptr, 1, otherSlot);
