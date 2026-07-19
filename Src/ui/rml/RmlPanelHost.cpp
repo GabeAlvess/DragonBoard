@@ -1098,6 +1098,12 @@ namespace dragonboard::ui::rml
                     "DragonBoardVR: RmlUi render command {} failed for external panel {}.",
                     static_cast<unsigned>(command.type),
                     command.panel);
+            } else if (command.type == RenderCommandType::kRegister ||
+                       command.type == RenderCommandType::kUnregister ||
+                       command.type == RenderCommandType::kShow) {
+                _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+            } else {
+                _renderScheduler.MarkDirty(RmlDirtyReason::kData);
             }
         }
     }
@@ -1814,7 +1820,24 @@ namespace dragonboard::ui::rml
                 AdvanceRmlPrewarmPresentThread();
             }
         }
-        if (_visible.load()) {
+        const auto& settings = vrui::VRUISettings::get();
+        _renderScheduler.Configure(settings.rmlRenderOnDirty, settings.rmlMaxActiveFPS);
+        const bool visible = _visible.load(std::memory_order_acquire);
+        if (visible != _rmlWasVisiblePresentThread) {
+            _rmlWasVisiblePresentThread = visible;
+            _renderScheduler.SetVisible(visible);
+            _rmlInputStateInitialized = false;
+            _lastRmlPanelModePresentThread.reset();
+            _lastRmlExternalPanelPresentThread = DragonBoardVR_API::InvalidPanel;
+            _rmlRenderRateAccumulator = 0.0f;
+            _rmlRendersInRateWindow = 0;
+            _rmlRendersPerSecond = 0.0f;
+            if (visible) {
+                _rmlCachedFrames = 0;
+                _rmlDirtyReason = "Open";
+            }
+        }
+        if (visible) {
             RenderPanel(deltaTime);
         }
     }
@@ -1978,6 +2001,14 @@ namespace dragonboard::ui::rml
     void RmlPanelHost::RenderPanel(float deltaTime)
     {
         if (!_visible.load() || !InitializeRenderer()) return;
+        const float presentSeconds = std::clamp(deltaTime, 1.0f / 240.0f, 0.1f);
+        _rmlRenderRateAccumulator += presentSeconds;
+        if (_rmlRenderRateAccumulator >= 1.0f) {
+            _rmlRendersPerSecond = static_cast<float>(_rmlRendersInRateWindow) /
+                _rmlRenderRateAccumulator;
+            _rmlRenderRateAccumulator = 0.0f;
+            _rmlRendersInRateWindow = 0;
+        }
         ApplyRenderCommandsPresentThread();
         _previewInteractionZoneHovered.store(false, std::memory_order_release);
 
@@ -1997,6 +2028,14 @@ namespace dragonboard::ui::rml
         const bool journalRmlActive = panelMode == LocalPanelMode::kJournal &&
             _rmlUi && _rmlUi->IsJournalReady();
         const auto externalPanel = _activeExternalPanel.load();
+        if (!_lastRmlPanelModePresentThread ||
+            *_lastRmlPanelModePresentThread != panelMode ||
+            (panelMode == LocalPanelMode::kExternal &&
+             _lastRmlExternalPanelPresentThread != externalPanel)) {
+            _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+            _lastRmlPanelModePresentThread = panelMode;
+            _lastRmlExternalPanelPresentThread = externalPanel;
+        }
         const bool externalRmlActive = panelMode == LocalPanelMode::kExternal &&
             _rmlUi && _rmlUi->IsPanelReady(externalPanel);
         if (settingsRmlActive || developerRmlActive || itemEditRmlActive ||
@@ -2005,42 +2044,91 @@ namespace dragonboard::ui::rml
             externalRmlActive) {
             if (settingsRmlActive) {
                 _rmlUi->ShowSettings();
-                if (_rmlSettingsSyncPending.exchange(false)) SyncRmlSettingsFromDraft();
+                if (_rmlSettingsSyncPending.exchange(false)) {
+                    SyncRmlSettingsFromDraft();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
             } else if (developerRmlActive) {
                 _rmlUi->ShowDeveloper();
-                if (_rmlDeveloperSyncPending.exchange(false)) SyncRmlDeveloperCommands();
+                if (_rmlDeveloperSyncPending.exchange(false)) {
+                    SyncRmlDeveloperCommands();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
                 _developerInfoPresentAccumulator += std::clamp(deltaTime, 0.0f, 0.1f);
                 if (_rmlDeveloperInfoSyncPending.exchange(false) ||
                     _developerInfoPresentAccumulator >= 0.25f) {
                     _developerInfoPresentAccumulator = 0.0f;
                     SyncRmlDeveloperInfo();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
                 }
             } else if (itemEditRmlActive) {
                 _rmlUi->ShowItemEdit();
-                if (_rmlItemEditSyncPending.exchange(false)) SyncRmlItemEdit();
+                if (_rmlItemEditSyncPending.exchange(false)) {
+                    SyncRmlItemEdit();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
             } else if (modsRmlActive) {
                 _rmlUi->ShowMods();
-                if (_rmlModsSyncPending.exchange(false)) SyncRmlMods();
+                if (_rmlModsSyncPending.exchange(false)) {
+                    SyncRmlMods();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
             } else if (inventoryRmlActive) {
                 _rmlUi->ShowInventory();
-                if (_rmlInventorySyncPending.exchange(false)) SyncRmlInventory();
+                if (_rmlInventorySyncPending.exchange(false)) {
+                    SyncRmlInventory();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
             } else if (magicRmlActive) {
                 _rmlUi->ShowMagic();
-                if (_rmlMagicSyncPending.exchange(false)) SyncRmlMagic();
+                if (_rmlMagicSyncPending.exchange(false)) {
+                    SyncRmlMagic();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
             } else if (journalRmlActive) {
                 _rmlUi->ShowJournal();
-                if (_rmlJournalSyncPending.exchange(false)) SyncRmlJournal();
+                if (_rmlJournalSyncPending.exchange(false)) {
+                    SyncRmlJournal();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
             } else {
                 _rmlUi->ShowPanel(externalPanel);
             }
+
+            const bool pointerOnPanel = _pointerInHostedPanel.load();
+            const float pointerU = _pointerU.load();
+            const float pointerV = _pointerV.load();
+            const bool triggerDown = _triggerDown.load();
+            const bool gripDown = _gripDown.load();
+            const float stickX = _stickX.load();
+            const float stickY = _stickY.load();
+            const bool pointerChanged = !_rmlInputStateInitialized ||
+                pointerOnPanel != _lastRmlPointerOnPanel ||
+                std::abs(pointerU - _lastRmlPointerU) >= (0.5f / static_cast<float>(kPanelWidth)) ||
+                std::abs(pointerV - _lastRmlPointerV) >= (0.5f / static_cast<float>(kPanelHeight)) ||
+                triggerDown != _lastRmlTriggerDown;
+            const bool scrollChanged = !_rmlInputStateInitialized ||
+                gripDown != _lastRmlGripDown ||
+                std::abs(stickX - _lastRmlStickX) >= 0.01f ||
+                std::abs(stickY - _lastRmlStickY) >= 0.01f;
+            if (pointerChanged) _renderScheduler.MarkDirty(RmlDirtyReason::kPointer);
+            if (scrollChanged) _renderScheduler.MarkDirty(RmlDirtyReason::kScroll);
+            _rmlInputStateInitialized = true;
+            _lastRmlPointerOnPanel = pointerOnPanel;
+            _lastRmlPointerU = pointerU;
+            _lastRmlPointerV = pointerV;
+            _lastRmlTriggerDown = triggerDown;
+            _lastRmlGripDown = gripDown;
+            _lastRmlStickX = stickX;
+            _lastRmlStickY = stickY;
             _rmlUi->ProcessInput(
-                _pointerInHostedPanel.load(),
-                _pointerU.load(),
-                _pointerV.load(),
-                _triggerDown.load(),
-                _gripDown.load(),
-                _stickX.load(),
-                _stickY.load(),
+                pointerOnPanel,
+                pointerU,
+                pointerV,
+                triggerDown,
+                gripDown,
+                stickX,
+                stickY,
                 static_cast<int>(kPanelWidth),
                 static_cast<int>(kPanelHeight),
                 deltaTime);
@@ -2327,17 +2415,30 @@ namespace dragonboard::ui::rml
                 CollectExternalEventsPresentThread();
             }
 
-            const bool rendered = _rmlUi->Render(
-                _panelRenderTarget,
-                static_cast<int>(kPanelWidth),
-                static_cast<int>(kPanelHeight));
             if (_rmlUi->ConsumeCloseRequested()) {
                 Close();
+                return;
             }
             if (settingsRmlActive && _rmlUi->ConsumeSaveRequested()) {
                 _savePending.store(true);
             }
+
+            const bool shouldRender = _renderScheduler.ShouldRender(
+                deltaTime,
+                _rmlUi->RequiresContinuousRendering());
+            if (!shouldRender) {
+                ++_rmlCachedFrames;
+                return;
+            }
+
+            const bool rendered = _rmlUi->Render(
+                _panelRenderTarget,
+                static_cast<int>(kPanelWidth),
+                static_cast<int>(kPanelHeight));
             if (rendered) {
+                _renderScheduler.OnRendered();
+                _rmlDirtyReason = _renderScheduler.DescribeLastRenderedReasons();
+                ++_rmlRendersInRateWindow;
                 const float frameSeconds =
                     std::clamp(deltaTime, 1.0f / 240.0f, 0.1f);
                 if (_presentFrameTimeHistoryCount < _presentFrameTimeHistory.size()) {
@@ -2381,14 +2482,6 @@ namespace dragonboard::ui::rml
                 _rmlRenderWidth = timing.width;
                 _rmlRenderHeight = timing.height;
                 _rmlActiveDocument = timing.activeDocument;
-                _rmlRenderRateAccumulator += frameSeconds;
-                ++_rmlRendersInRateWindow;
-                if (_rmlRenderRateAccumulator >= 1.0f) {
-                    _rmlRendersPerSecond = static_cast<float>(_rmlRendersInRateWindow) /
-                        _rmlRenderRateAccumulator;
-                    _rmlRenderRateAccumulator = 0.0f;
-                    _rmlRendersInRateWindow = 0;
-                }
                 return;
             }
 

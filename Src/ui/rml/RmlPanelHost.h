@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DragonBoardVR_API.h"
+#include "ui/rml/RmlRenderScheduler.h"
 #include "vrui/MapCalibration.h"
 
 #include <RE/Skyrim.h>
@@ -646,7 +647,20 @@ namespace dragonboard::ui::rml
         int _rmlRenderWidth = 0;
         int _rmlRenderHeight = 0;
         std::string _rmlActiveDocument;
-        std::string _rmlDirtyReason{ "Every frame (baseline)" };
+        std::string _rmlDirtyReason{ "Open" };
+        RmlRenderScheduler _renderScheduler;
+        bool _rmlWasVisiblePresentThread = false;
+        std::optional<LocalPanelMode> _lastRmlPanelModePresentThread;
+        DragonBoardVR_API::PanelHandle _lastRmlExternalPanelPresentThread =
+            DragonBoardVR_API::InvalidPanel;
+        bool _rmlInputStateInitialized = false;
+        bool _lastRmlPointerOnPanel = false;
+        float _lastRmlPointerU = 0.0f;
+        float _lastRmlPointerV = 0.0f;
+        bool _lastRmlTriggerDown = false;
+        bool _lastRmlGripDown = false;
+        float _lastRmlStickX = 0.0f;
+        float _lastRmlStickY = 0.0f;
         bool _rmlPreviousTriggerDown = false;
         bool _deferredRmlTransformApply = false;
         std::atomic<float> _pointerU{ 0.0f };

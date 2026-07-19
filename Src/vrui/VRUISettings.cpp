@@ -1,6 +1,7 @@
 #include "VRUISettings.h"
 
 #include <CLIBUtil/simpleINI.hpp>
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 
@@ -70,6 +71,13 @@ namespace vrui
         // [General]
         verboseLogging = ini.GetBoolValue("General", "bVerboseLogging", verboseLogging);
         editModeEnabled = ini.GetBoolValue("General", "bEditModeEnabled", editModeEnabled);
+
+        // [RmlUi]
+        rmlRenderOnDirty = ini.GetBoolValue("RmlUi", "bRenderOnDirty", rmlRenderOnDirty);
+        rmlMaxActiveFPS = std::clamp(
+            static_cast<int>(ini.GetLongValue("RmlUi", "iMaxActiveFPS", rmlMaxActiveFPS)),
+            15,
+            240);
 
         // [Activation]
         activationMode = static_cast<ActivationMode>(ini.GetLongValue("Activation", "iActivationMode", static_cast<int>(activationMode)));
@@ -446,6 +454,12 @@ namespace vrui
         // [General]
         ini.SetBoolValue("General", "bVerboseLogging", verboseLogging, "; Enable trace-level logging (default: false, very spammy)");
         ini.SetBoolValue("General", "bEditModeEnabled", editModeEnabled, "; Enable Pin to Dashboard and widget editing features");
+
+        // [RmlUi]
+        ini.SetBoolValue("RmlUi", "bRenderOnDirty", rmlRenderOnDirty,
+            "; Reuse the last RmlUi texture while the active document is unchanged");
+        ini.SetLongValue("RmlUi", "iMaxActiveFPS", rmlMaxActiveFPS,
+            "; Maximum RmlUi texture refresh rate during pointer, scroll, or animation activity");
 
         // [Activation]
         ini.SetLongValue  ("Activation", "iActivationMode",      static_cast<int>(activationMode), "; 0=Grip, 1=Trigger, 2=Thumbstick, 3=GripPlusThumbstick, 4=GripPlusY, 5=GripPlusB, 6=Hotkey8");

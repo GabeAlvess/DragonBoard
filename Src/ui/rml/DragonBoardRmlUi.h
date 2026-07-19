@@ -386,6 +386,7 @@ namespace dragonboard::ui::rml
             int width,
             int height,
             float deltaTime);
+        [[nodiscard]] bool RequiresContinuousRendering() const;
         bool Render(ID3D11RenderTargetView* renderTarget, int width, int height);
 
         [[nodiscard]] bool ConsumeCloseRequested();
@@ -558,6 +559,7 @@ namespace dragonboard::ui::rml
         float _inventoryMarqueeOffset = 0.0f;
         float _inventoryMarqueePause = 0.0f;
         bool _inventoryMarqueeAtEnd = false;
+        bool _inventoryMarqueeActive = false;
         std::string _inventoryLongPressElementId;
         float _inventoryLongPressTimer = 0.0f;
         bool _inventoryLongPressTriggered = false;
@@ -587,5 +589,6 @@ namespace dragonboard::ui::rml
         std::chrono::steady_clock::time_point _lastDomCountSample{};
         std::size_t _lastDomElementCount = 0;
         Rml::ElementDocument* _lastDomCountDocument = nullptr;
+        bool _pointerMotionActive = false;
     };
 }

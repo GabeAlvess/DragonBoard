@@ -780,7 +780,7 @@ namespace
             SetText("dev-cached-frames", "0");
             SetText("dev-texture-size", "1920 x 1080");
             SetText("dev-active-document", "Developer");
-            SetText("dev-dirty-reason", "Every frame (baseline)");
+            SetText("dev-dirty-reason", "Pointer");
             SetText("dev-helper", "Connected");
             SetText("dev-version", "0.8 preview");
             SetText("dev-feature-level", "0xB000");

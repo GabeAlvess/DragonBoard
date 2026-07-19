@@ -864,8 +864,12 @@ namespace dragonboard::ui::rml
                 static_cast<int>(std::lround(_smoothedPointerX)), 0, width - 1);
             pointerY = std::clamp(
                 static_cast<int>(std::lround(_smoothedPointerY)), 0, height - 1);
+            _pointerMotionActive =
+                std::abs(static_cast<float>(rawPointerX) - _smoothedPointerX) >= 0.5f ||
+                std::abs(static_cast<float>(rawPointerY) - _smoothedPointerY) >= 0.5f;
         } else {
             _pointerSmoothingInitialized = false;
+            _pointerMotionActive = false;
         }
 
         // RmlUi's mouse interaction can move a scroll container while the
@@ -1076,6 +1080,13 @@ namespace dragonboard::ui::rml
         (void)stickX;
     }
 
+    bool DragonBoardRmlUi::RequiresContinuousRendering() const
+    {
+        return _pointerMotionActive || _inventoryMarqueeActive || _gripScrollActive ||
+               _triggerCaptureMode == TriggerCaptureMode::kSlider ||
+               !_inventoryLongPressElementId.empty();
+    }
+
     Rml::Element* DragonBoardRmlUi::FindInteractiveAtPoint(
         int x, int y, TriggerCaptureMode& mode) const
     {
@@ -1236,6 +1247,7 @@ namespace dragonboard::ui::rml
         _inventoryMarqueeOffset = 0.0f;
         _inventoryMarqueePause = 0.0f;
         _inventoryMarqueeAtEnd = false;
+        _inventoryMarqueeActive = false;
     }
 
     void DragonBoardRmlUi::UpdateInventoryMarquee(float deltaTime)
@@ -1298,8 +1310,10 @@ namespace dragonboard::ui::rml
         if (maximum <= 1.0f) {
             track->SetProperty("left", "0px");
             _inventoryMarqueeOffset = 0.0f;
+            _inventoryMarqueeActive = false;
             return;
         }
+        _inventoryMarqueeActive = true;
 
         const float frameTime = std::clamp(deltaTime, 0.0f, 0.05f);
         if (_inventoryMarqueePause > 0.0f) {

@@ -80,7 +80,7 @@
                             <div class="subheading"><span>RUNTIME</span></div>
                             <div class="info-row"><span>Panel texture</span><span id="dev-texture-size" class="info-value">1920 x 1080</span></div>
                             <div class="info-row"><span>Active document</span><span id="dev-active-document" class="info-value">&lt;none&gt;</span></div>
-                            <div class="info-row"><span>Dirty reason</span><span id="dev-dirty-reason" class="info-value">Every frame (baseline)</span></div>
+                            <div class="info-row"><span>Dirty reason</span><span id="dev-dirty-reason" class="info-value">Open</span></div>
                             <div class="info-row"><span>Panel renderer</span><span class="info-value">RmlUi 6.2</span></div>
                             <div class="info-row"><span>DragonBoardVR</span><span id="dev-version" class="info-value">-</span></div>
                             <div class="info-row"><span>D3D feature level</span><span id="dev-feature-level" class="info-value">-</span></div>

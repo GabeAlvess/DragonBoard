@@ -75,6 +75,12 @@ namespace vrui
         bool editModeEnabled = true;        // Master switch for item editing (MCM)
 
         // -----------------------------------------------------------------------
+        // [RmlUi]
+        // -----------------------------------------------------------------------
+        bool rmlRenderOnDirty = true;        // Reuse the last panel texture while unchanged
+        int rmlMaxActiveFPS = 60;             // Maximum texture refresh rate during interaction
+
+        // -----------------------------------------------------------------------
         // [Activation]
         // -----------------------------------------------------------------------
         ActivationMode activationMode     = ActivationMode::GripPlusY; // iActivationMode = 4
