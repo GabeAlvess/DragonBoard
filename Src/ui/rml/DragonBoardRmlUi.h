@@ -420,7 +420,7 @@ namespace dragonboard::ui::rml
         void SetItemEditInfo(const ItemEditInfo& info);
         void SetMods(const std::vector<std::string>& labels);
         void SetInventory(InventoryInfo info);
-        void SetMagic(const MagicInfo& info);
+        void SetMagic(MagicInfo info);
         void SetJournal(const JournalInfo& info);
         void SetEditModeEnabled(bool enabled);
         void SetDeveloperButtonEnabled(bool enabled);
@@ -457,7 +457,7 @@ namespace dragonboard::ui::rml
             Rml::ElementDocument* document = nullptr;
         };
 
-        struct InventoryVirtualRow
+        struct VirtualListRow
         {
             Rml::Element* button = nullptr;
             Rml::Element* state = nullptr;
@@ -498,6 +498,8 @@ namespace dragonboard::ui::rml
         void ResetInventoryMarquee();
         void UpdateInventoryVirtualRows(bool refreshVisibleRows = false);
         void ResetInventoryVirtualRows();
+        void UpdateMagicVirtualRows(bool refreshVisibleRows = false);
+        void ResetMagicVirtualRows();
         void UpdateInventoryLongPress(float deltaTime);
         void ResetInventoryLongPress();
         void BeginTriggerScrollLock();
@@ -569,15 +571,18 @@ namespace dragonboard::ui::rml
         std::string _modsListMarkup;
         std::string _developerCommandListMarkup;
         std::string _inventoryMarqueeElementId;
-        std::string _magicListMarkup;
-        std::size_t _magicListSelectedIndex = static_cast<std::size_t>(-1);
-        bool _magicListInitialized = false;
         RmlVirtualList _inventoryVirtualList{ 548.0f, 108.0f, 4 };
         std::vector<InventoryItemInfo> _inventoryVirtualItems;
-        std::vector<InventoryVirtualRow> _inventoryVirtualRows;
+        std::vector<VirtualListRow> _inventoryVirtualRows;
         std::size_t _inventoryVirtualSelectedIndex = static_cast<std::size_t>(-1);
         std::string _inventoryVirtualContextKey;
         bool _inventoryVirtualInitialized = false;
+        RmlVirtualList _magicVirtualList{ 548.0f, 108.0f, 4 };
+        std::vector<MagicItemInfo> _magicVirtualItems;
+        std::vector<VirtualListRow> _magicVirtualRows;
+        std::size_t _magicVirtualSelectedIndex = static_cast<std::size_t>(-1);
+        std::string _magicVirtualContextKey;
+        bool _magicVirtualInitialized = false;
         std::string _journalQuestListMarkup;
         std::vector<std::uint64_t> _journalActiveQuestOrder;
         float _inventoryMarqueeOffset = 0.0f;

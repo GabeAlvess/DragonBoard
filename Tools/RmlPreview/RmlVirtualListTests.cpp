@@ -55,7 +55,9 @@ int main()
 {
     ValidateDataset(0);
     ValidateDataset(25);
+    ValidateDataset(75);
     ValidateDataset(250);
+    ValidateDataset(500);
     ValidateDataset(1000);
 
     RmlVirtualList list(548.0f, 108.0f, 4);
@@ -67,6 +69,8 @@ int main()
         window.firstIndex + window.rowCount > 500,
         "middle window did not include the requested item");
 
-    std::cout << "RmlVirtualList tests passed (0/25/250/1000 items, max pool 10).\n";
+    std::cout <<
+        "RmlVirtualList Inventory/Magic tests passed "
+        "(0/25/75/250/500/1000 entries, max pool 10).\n";
     return 0;
 }

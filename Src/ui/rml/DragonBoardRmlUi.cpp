@@ -536,9 +536,9 @@ namespace dragonboard::ui::rml
         ResetInventoryVirtualRows();
         _inventoryVirtualItems.clear();
         _inventoryVirtualContextKey.clear();
-        _magicListMarkup.clear();
-        _magicListSelectedIndex = static_cast<std::size_t>(-1);
-        _magicListInitialized = false;
+        ResetMagicVirtualRows();
+        _magicVirtualItems.clear();
+        _magicVirtualContextKey.clear();
         _journalQuestListMarkup.clear();
         _journalActiveQuestOrder.clear();
         _registeredPanels.clear();
@@ -987,6 +987,8 @@ namespace dragonboard::ui::rml
         }
         if (_activeDocument == _inventoryDocument && _inventoryVirtualInitialized) {
             UpdateInventoryVirtualRows();
+        } else if (_activeDocument == _magicDocument && _magicVirtualInitialized) {
+            UpdateMagicVirtualRows();
         }
 
         if (triggerDown != _previousTriggerDown) {
@@ -1747,7 +1749,7 @@ namespace dragonboard::ui::rml
             _inventoryVirtualRows.reserve(poolSize);
             for (std::size_t slot = 0; slot < poolSize; ++slot) {
                 const auto suffix = std::to_string(slot);
-                InventoryVirtualRow row;
+                VirtualListRow row;
                 row.button = _inventoryDocument->GetElementById(
                     "inventory-virtual-row-slot-" + suffix);
                 row.state = _inventoryDocument->GetElementById(
@@ -1764,6 +1766,8 @@ namespace dragonboard::ui::rml
                 _inventoryVirtualRows.push_back(std::move(row));
             }
             _inventoryVirtualInitialized = true;
+            _inventoryVirtualList.Reset();
+            _inventoryVirtualList.SetItemCount(_inventoryVirtualItems.size());
             refreshVisibleRows = true;
             logger::info(
                 "DragonBoardVR: virtualized Inventory uses {} pooled rows for {} items.",
@@ -1984,7 +1988,153 @@ namespace dragonboard::ui::rml
         }
     }
 
-    void DragonBoardRmlUi::SetMagic(const MagicInfo& info)
+    void DragonBoardRmlUi::ResetMagicVirtualRows()
+    {
+        ResetInventoryMarquee();
+        _magicVirtualRows.clear();
+        _magicVirtualList.Reset();
+        _magicVirtualSelectedIndex = static_cast<std::size_t>(-1);
+        _magicVirtualInitialized = false;
+        if (_hoveredElementId.starts_with("magic-spell-")) {
+            _hoveredElementId.clear();
+        }
+    }
+
+    void DragonBoardRmlUi::UpdateMagicVirtualRows(bool refreshVisibleRows)
+    {
+        if (!_magicDocument || _magicVirtualItems.empty()) return;
+        auto* list = _magicDocument->GetElementById("magic-spell-list");
+        if (!list) return;
+
+        _magicVirtualList.SetItemCount(_magicVirtualItems.size());
+        const auto poolSize = _magicVirtualList.GetPoolSize();
+        auto* content = _magicDocument->GetElementById("magic-virtual-content");
+        if (!_magicVirtualInitialized || !content ||
+            _magicVirtualRows.size() != poolSize) {
+            ResetInventoryMarquee();
+            std::string markup =
+                "<div id=\"magic-virtual-content\" class=\"magic-virtual-content\">";
+            for (std::size_t slot = 0; slot < poolSize; ++slot) {
+                const auto suffix = std::to_string(slot);
+                markup +=
+                    "<button id=\"magic-virtual-row-slot-" + suffix +
+                    "\" class=\"magic-list-item\" style=\"display: none;\">"
+                    "<span id=\"magic-virtual-state-slot-" + suffix +
+                    "\" class=\"spell-state-mark\"></span>"
+                    "<span id=\"magic-virtual-name-slot-" + suffix +
+                    "\" class=\"spell-name\"><span id=\"magic-virtual-track-slot-" +
+                    suffix + "\" class=\"spell-name-track\"></span></span></button>";
+            }
+            markup += "</div>";
+            list->SetInnerRML(markup);
+            content = _magicDocument->GetElementById("magic-virtual-content");
+            _magicVirtualRows.clear();
+            _magicVirtualRows.reserve(poolSize);
+            for (std::size_t slot = 0; slot < poolSize; ++slot) {
+                const auto suffix = std::to_string(slot);
+                VirtualListRow row;
+                row.button = _magicDocument->GetElementById(
+                    "magic-virtual-row-slot-" + suffix);
+                row.state = _magicDocument->GetElementById(
+                    "magic-virtual-state-slot-" + suffix);
+                row.nameViewport = _magicDocument->GetElementById(
+                    "magic-virtual-name-slot-" + suffix);
+                row.nameTrack = _magicDocument->GetElementById(
+                    "magic-virtual-track-slot-" + suffix);
+                if (row.button) {
+                    row.button->AddEventListener("click", _eventListener.get());
+                }
+                _magicVirtualRows.push_back(std::move(row));
+            }
+            _magicVirtualInitialized = true;
+            _magicVirtualList.Reset();
+            _magicVirtualList.SetItemCount(_magicVirtualItems.size());
+            refreshVisibleRows = true;
+            logger::info(
+                "DragonBoardVR: virtualized Magic uses {} pooled rows for {} spells.",
+                _magicVirtualRows.size(),
+                _magicVirtualItems.size());
+        }
+        if (!content) return;
+
+        const bool windowChanged = _magicVirtualList.Update(list->GetScrollTop());
+        const auto& window = _magicVirtualList.GetWindow();
+        if (!windowChanged && !refreshVisibleRows) return;
+        content->SetProperty(
+            "height", Rml::CreateString("%.0fpx", window.totalHeight));
+        if (windowChanged) {
+            ResetInventoryMarquee();
+            if (_hoveredElementId.starts_with("magic-spell-")) {
+                _hoveredElementId.clear();
+            }
+            for (std::size_t slot = 0; slot < _magicVirtualRows.size(); ++slot) {
+                auto& row = _magicVirtualRows[slot];
+                const auto suffix = std::to_string(slot);
+                if (row.button) row.button->SetId("magic-virtual-row-slot-" + suffix);
+                if (row.nameViewport) {
+                    row.nameViewport->SetId("magic-virtual-name-slot-" + suffix);
+                }
+                if (row.nameTrack) {
+                    row.nameTrack->SetId("magic-virtual-track-slot-" + suffix);
+                }
+            }
+        }
+
+        for (std::size_t slot = 0; slot < _magicVirtualRows.size(); ++slot) {
+            auto& row = _magicVirtualRows[slot];
+            const auto itemIndex = window.firstIndex + slot;
+            if (!row.button || itemIndex >= _magicVirtualItems.size() ||
+                slot >= window.rowCount) {
+                if (row.button) row.button->SetProperty("display", "none");
+                row.itemIndex = static_cast<std::size_t>(-1);
+                row.contentKey.clear();
+                row.classNames.clear();
+                continue;
+            }
+
+            const auto& item = _magicVirtualItems[itemIndex];
+            const auto indexText = std::to_string(itemIndex);
+            if (windowChanged) {
+                row.button->SetId("magic-spell-" + indexText);
+                if (row.nameViewport) {
+                    row.nameViewport->SetId("magic-spell-name-" + indexText);
+                }
+                if (row.nameTrack) {
+                    row.nameTrack->SetId("magic-spell-name-track-" + indexText);
+                }
+                row.button->RemoveProperty("display");
+                row.button->SetProperty(
+                    "top",
+                    Rml::CreateString(
+                        "%.0fpx", _magicVirtualList.GetRowOffset(itemIndex)));
+            }
+
+            std::string classes = "magic-list-item";
+            if (itemIndex == _magicVirtualSelectedIndex) classes += " active";
+            if (item.equipped) classes += " equipped";
+            if (item.favorited) classes += " favorited";
+            if (classes != row.classNames) {
+                row.button->SetClassNames(classes);
+                row.classNames = std::move(classes);
+            }
+
+            std::string marker;
+            if (item.equippedLeft && item.equippedRight) marker = "[L/R]";
+            else if (item.equippedLeft) marker = "[L]";
+            else if (item.equippedRight) marker = "[R]";
+            std::string contentKey = marker;
+            contentKey.push_back('\x1f');
+            contentKey += item.name;
+            if (contentKey != row.contentKey || row.itemIndex != itemIndex) {
+                if (row.state) row.state->SetInnerRML(marker);
+                if (row.nameTrack) row.nameTrack->SetInnerRML(EscapeRml(item.name));
+                row.contentKey = std::move(contentKey);
+            }
+            row.itemIndex = itemIndex;
+        }
+    }
+
+    void DragonBoardRmlUi::SetMagic(MagicInfo info)
     {
         if (!_magicDocument) return;
 
@@ -2027,66 +2177,25 @@ namespace dragonboard::ui::rml
             }
         }
 
+        const std::string contextKey = info.activeFilter + "\n" + info.searchQuery;
+        const bool resetScroll = !_magicVirtualInitialized ||
+            contextKey != _magicVirtualContextKey;
+        _magicVirtualContextKey = contextKey;
+        _magicVirtualSelectedIndex = info.items.empty() ?
+            static_cast<std::size_t>(-1) :
+            std::min(info.selectedIndex, info.items.size() - 1);
+        _magicVirtualItems = std::move(info.items);
+
         if (auto* list = _magicDocument->GetElementById("magic-spell-list")) {
-            std::string markup;
-            if (info.items.empty()) {
-                markup = info.searchQuery.empty() ?
+            if (_magicVirtualItems.empty()) {
+                ResetMagicVirtualRows();
+                list->SetInnerRML(info.searchQuery.empty() ?
                     "<div class=\"magic-empty\">No spells available</div>" :
-                    "<div class=\"magic-empty\">No matching spells</div>";
+                    "<div class=\"magic-empty\">No matching spells</div>");
             } else {
-                for (std::size_t index = 0; index < info.items.size(); ++index) {
-                    const auto& item = info.items[index];
-                    std::string classes = "magic-list-item";
-                    if (item.equipped) classes += " equipped";
-                    if (item.favorited) classes += " favorited";
-                    std::string marker;
-                    if (item.equippedLeft && item.equippedRight) marker = "[L/R]";
-                    else if (item.equippedLeft) marker = "[L]";
-                    else if (item.equippedRight) marker = "[R]";
-                    markup += "<button id=\"magic-spell-" + std::to_string(index) +
-                        "\" class=\"" + classes + "\">"
-                        "<span class=\"spell-state-mark\">" + marker +
-                        "</span><span id=\"magic-spell-name-" +
-                        std::to_string(index) + "\" class=\"spell-name\">"
-                        "<span id=\"magic-spell-name-track-" +
-                        std::to_string(index) + "\" class=\"spell-name-track\">" +
-                        EscapeRml(item.name) +
-                        "</span></span></button>";
-                }
-            }
-
-            const bool rebuildList = !_magicListInitialized || markup != _magicListMarkup;
-            if (rebuildList) {
-                ResetInventoryMarquee();
-                list->SetInnerRML(markup);
-                for (std::size_t index = 0; index < info.items.size(); ++index) {
-                    BindClick(
-                        _magicDocument,
-                        ("magic-spell-" + std::to_string(index)).c_str());
-                }
-                _magicListMarkup = std::move(markup);
-                _magicListInitialized = true;
-                _magicListSelectedIndex = static_cast<std::size_t>(-1);
-            }
-
-            const auto selectedIndex = info.items.empty() ?
-                static_cast<std::size_t>(-1) :
-                std::min(info.selectedIndex, info.items.size() - 1);
-            if (_magicListSelectedIndex != selectedIndex) {
-                if (_magicListSelectedIndex != static_cast<std::size_t>(-1)) {
-                    if (auto* previous = _magicDocument->GetElementById(
-                            ("magic-spell-" +
-                             std::to_string(_magicListSelectedIndex)).c_str())) {
-                        previous->SetClass("active", false);
-                    }
-                }
-                if (selectedIndex != static_cast<std::size_t>(-1)) {
-                    if (auto* selected = _magicDocument->GetElementById(
-                            ("magic-spell-" + std::to_string(selectedIndex)).c_str())) {
-                        selected->SetClass("active", true);
-                    }
-                }
-                _magicListSelectedIndex = selectedIndex;
+                _magicVirtualList.SetItemCount(_magicVirtualItems.size());
+                if (resetScroll) list->SetScrollTop(0.0f);
+                UpdateMagicVirtualRows(true);
             }
         }
 
@@ -2106,7 +2215,7 @@ namespace dragonboard::ui::rml
             }
         };
 
-        if (info.items.empty()) {
+        if (_magicVirtualItems.empty()) {
             setText("magic-selected-category", "MAGIC");
             setText("magic-selected-name", "No spell selected");
             setText("magic-cost", "--");
@@ -2129,8 +2238,9 @@ namespace dragonboard::ui::rml
             return;
         }
 
-        const auto selectedIndex = std::min(info.selectedIndex, info.items.size() - 1);
-        const auto& selected = info.items[selectedIndex];
+        const auto selectedIndex = std::min(
+            _magicVirtualSelectedIndex, _magicVirtualItems.size() - 1);
+        const auto& selected = _magicVirtualItems[selectedIndex];
         setText("magic-selected-category", selected.category);
         setText("magic-selected-name", selected.name);
         setText("magic-cost", selected.canEquip ?

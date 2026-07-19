@@ -2912,7 +2912,7 @@ namespace dragonboard::ui::rml
             }
             if (!selectedVisible) info.selectedIndex = 0;
         }
-        _rmlUi->SetMagic(info);
+        _rmlUi->SetMagic(std::move(info));
     }
 
     void RmlPanelHost::SyncRmlJournal()
