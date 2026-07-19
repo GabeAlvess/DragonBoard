@@ -1,5 +1,6 @@
 #include "MenuInitializationController.h"
 
+#include "gameplay/CombatSlowTime.h"
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUIPanel.h"
 #include "vrui/VRUISettings.h"
@@ -12,6 +13,7 @@ namespace dragonboard::ui::menu
 {
     void MenuInitializationController::Initialize(vrui::VRMenuManager& manager)
     {
+        dragonboard::gameplay::CombatSlowTime::GetSingleton().Close();
         if (manager._initialized) {
             for (auto& panel : manager._panelRegistry.GetPanels()) {
                 panel->hide();

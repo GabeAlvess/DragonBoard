@@ -36,6 +36,8 @@ repository assets are available. Otherwise it displays the file picker.
 - `F2`: Developer document
 - `F3`: Item Editor document
 - `F5`: force a full RML/RCSS reload
+- `F6`: cycle Inventory/Magic synthetic datasets through 25, 250 and 1,000 entries
+- `F7`: toggle the no-results search scenario for Inventory/Magic
 - `F8`: toggle the RmlUi debugger
 - `F9`: show or hide the visual inspector
 - `F10`: show or hide the source editor
@@ -68,6 +70,12 @@ so newly created buttons and sliders respond without being registered in C++.
 
 DragonBoard's game-dependent values and developer commands are deliberate mock
 data. They test its layout and event bindings without touching Skyrim state.
+Inventory and Magic use a maximum of ten materialized rows while scrolling their
+synthetic datasets. The rows include long names and left, right and dual-hand
+equipment markers so those states can be inspected without loading Skyrim.
+The window title reports the active document's real DOM count, materialized
+row count, draw calls, and rolling average/p95 timings for `Context::Update()`
+and `Context::Render()`. A pool above ten rows is reported as `POOL VIOLATION`.
 Unknown documents are rendered generically and their interactions appear in
 the window status.
 

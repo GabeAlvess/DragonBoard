@@ -72,6 +72,30 @@ namespace vrui
         verboseLogging = ini.GetBoolValue("General", "bVerboseLogging", verboseLogging);
         editModeEnabled = ini.GetBoolValue("General", "bEditModeEnabled", editModeEnabled);
 
+        // [Combat]
+        const bool combatEnabledMissing = !ini.KeyExists("Combat", "bSlowTimeOnOpen");
+        const bool combatMultiplierMissing = !ini.KeyExists("Combat", "fSlowTimeMultiplier");
+        slowTimeOnOpen = ini.GetBoolValue("Combat", "bSlowTimeOnOpen", slowTimeOnOpen);
+        slowTimeMultiplier = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Combat", "fSlowTimeMultiplier", slowTimeMultiplier)),
+            0.05f,
+            1.0f);
+        if (combatEnabledMissing) {
+            ini.SetBoolValue(
+                "Combat", "bSlowTimeOnOpen", slowTimeOnOpen,
+                "; Slow time only when DragonBoard is opened while the player is in combat");
+        }
+        if (combatMultiplierMissing) {
+            ini.SetDoubleValue(
+                "Combat", "fSlowTimeMultiplier", slowTimeMultiplier,
+                "; Game-time multiplier while DragonBoard is open in combat (0.05 to 1.0)");
+        }
+        if ((combatEnabledMissing || combatMultiplierMissing) &&
+            ini.SaveFile(iniPath.c_str()) < 0) {
+            logger::warn("DragonBoardVR: Failed to add [Combat] defaults to '{}'.", iniPath);
+        }
+
         // [RmlUi]
         rmlRenderOnDirty = ini.GetBoolValue("RmlUi", "bRenderOnDirty", rmlRenderOnDirty);
         rmlMaxActiveFPS = std::clamp(
@@ -471,6 +495,14 @@ namespace vrui
         // [General]
         ini.SetBoolValue("General", "bVerboseLogging", verboseLogging, "; Enable trace-level logging (default: false, very spammy)");
         ini.SetBoolValue("General", "bEditModeEnabled", editModeEnabled, "; Enable Pin to Dashboard and widget editing features");
+
+        // [Combat]
+        ini.SetBoolValue(
+            "Combat", "bSlowTimeOnOpen", slowTimeOnOpen,
+            "; Slow time only when DragonBoard is opened while the player is in combat");
+        ini.SetDoubleValue(
+            "Combat", "fSlowTimeMultiplier", slowTimeMultiplier,
+            "; Game-time multiplier while DragonBoard is open in combat (0.05 to 1.0)");
 
         // [RmlUi]
         ini.SetBoolValue("RmlUi", "bRenderOnDirty", rmlRenderOnDirty,

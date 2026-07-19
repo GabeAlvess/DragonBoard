@@ -1,0 +1,47 @@
+#pragma once
+
+#include <RE/Skyrim.h>
+
+namespace dragonboard::ui::rml
+{
+    class RmlSurfaceGrabController
+    {
+    public:
+        struct Input
+        {
+            RE::NiNode* dominantHand = nullptr;
+            RE::NiNode* offHand = nullptr;
+            bool dominantGripDown = false;
+            bool offHandGripDown = false;
+            bool hovered = false;
+        };
+
+        struct UpdateResult
+        {
+            bool grabStarted = false;
+            bool transformChanged = false;
+            bool grabEnded = false;
+        };
+
+        void SetEnabled(bool enabled);
+        void Reset();
+        [[nodiscard]] bool IsGrabbed() const { return _grabbed; }
+        [[nodiscard]] UpdateResult Update(
+            RE::NiNode* surfaceNode,
+            const Input& input,
+            float deltaTime);
+
+    private:
+        bool BeginGrab(RE::NiNode* surfaceNode, RE::NiNode* hand);
+
+        bool _enabled = false;
+        bool _grabbed = false;
+        bool _twoHandScaling = false;
+        float _holdSeconds = 0.0f;
+        float _twoHandInitialDistance = 1.0f;
+        float _twoHandInitialScale = 1.0f;
+        RE::NiPoint3 _grabOffsetLocalHand{};
+        RE::NiMatrix3 _grabInitialHandRotation{};
+        RE::NiMatrix3 _grabInitialSurfaceWorldRotation{};
+    };
+}

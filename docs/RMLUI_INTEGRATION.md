@@ -1,9 +1,18 @@
 # RmlUi panel framework
 
-DragonBoardVR uses RmlUi 6.2 as its only flat-panel renderer. Settings,
-Developer, Item Editor and panels registered by other SKSE plugins all render
-to the same 1920x1080 texture attached to the physical DragonBoard. The board
-therefore keeps its existing hand-following and world-pinned behavior.
+DragonBoardVR uses RmlUi 6.2 as its only flat-panel renderer. It has two kinds
+of RmlUi output:
+
+- **Page panels** such as Inventory, Magic, Settings and panels registered by
+  another SKSE plugin. Only one page is active at a time and it renders to the
+  main 1920x1080 DragonBoard texture.
+- **Independent surfaces** such as the built-in status widget. Each surface
+  owns its RmlUi context, render target, scene quad and transform, so several
+  small widgets can eventually be visible at the same time without replacing
+  the main page texture.
+
+Both kinds attach to the physical DragonBoard scene and therefore inherit its
+hand-following or world-pinned behavior.
 
 RmlUi is not a browser. RML is HTML-like markup, RCSS is RmlUi's CSS subset,
 and there is no JavaScript or Chromium runtime.
@@ -25,6 +34,14 @@ The integration is split by responsibility:
   game/location snapshot.
 - `Src/ui/rml/DragonBoardRmlRenderer.*` is the D3D11 implementation of
   `Rml::RenderInterface`.
+- `Src/ui/rml/StatusWidget.*` is the reference implementation of one
+  independent widget's data adapter. It updates status-specific DOM values but
+  never reads Skyrim objects directly.
+- `Src/ui/rml/RmlSurface.*` owns the reusable private RmlUi context,
+  document, cursor, dirty-state and render path required by every independent
+  widget.
+- `Src/ui/rml/RmlSurfaceGrabController.*` applies one-hand position/rotation
+  and two-hand uniform scaling to an independent surface scene root.
 - `Src/DragonBoardVR_API.*` exposes one generic panel API to other plugins.
   The public surface is RmlUi-only; native DragonBoard widgets remain an
   internal implementation detail.
@@ -38,8 +55,8 @@ installations. The runtime content rendered onto it is exclusively RmlUi.
 ## Runtime flow
 
 1. `kDataLoaded` requests a warm-up without creating or attaching scene nodes.
-2. The next valid Present creates the D3D11 render target and initializes one
-   `DragonBoardRmlUi` context.
+2. The next valid Present creates the main D3D11 render target and initializes
+   the page-panel `DragonBoardRmlUi` context.
 3. Opening a panel selects one document and makes the host visible.
 4. The game thread derives the panel UV from the DragonBoard's actual scene
    transform. This keeps the texture and raycast aligned while the board
@@ -48,6 +65,11 @@ installations. The runtime content rendered onto it is exclusively RmlUi.
    renders the active document.
 6. RmlUi events are copied to a queue. External callbacks and all Skyrim-facing
    actions run later on the game thread.
+
+An independent surface follows the same thread boundary but has its own
+context and render target. The status widget captures gold, carry weight and
+location on the game thread, copies a plain snapshot through a mutex, updates
+its DOM on Present, and renders only when that snapshot marks it dirty.
 
 No RmlUi event listener may call CommonLib or Skyrim gameplay APIs directly.
 
@@ -61,13 +83,169 @@ Built-in document lookup uses this order:
 
 The documents are:
 
+- `inventory.rml` / `inventory.rcss`
+- `magic.rml` / `magic.rcss`
+- `journal.rml` / `journal.rcss`
 - `settings.rml` / `settings.rcss`
 - `dev.rml` / `dev.rcss`
 - `edit.rml` / `edit.rcss`
+- `status_widget.rml` / `status_widget.rcss` (independent surface)
 
 If a requested document cannot load, the host logs the error and rejects it.
 Settings and Item Editor callers may then use their existing native 3D panel;
 there is no ImGui fallback with independent behavior.
+
+## Creating a page panel
+
+A page panel is the correct choice for a full-screen menu that replaces the
+current DragonBoard content. Its creation path is:
+
+1. Create an RML document and RCSS stylesheet in the consumer mod.
+2. Give every interactive `button` or `input` a stable `id`.
+3. Register the document with `RegisterPanel()` or `RegisterPanelV2()`.
+4. Wait for `PanelState::Ready` when using API v2.
+5. Call `ShowPanel()` from a game-thread action.
+6. Use `SetElementText`, `SetElementAttribute` and `SetElementClass` for later
+   updates; never mutate RmlUi from the Skyrim game thread directly.
+7. Call `UnregisterPanel()` before the callback or `userData` becomes invalid.
+
+The host loads the document into the shared page context. Showing another page
+hides the previous document; it does not create another scene quad or another
+render target. See [Public API](#public-api) for a complete C++ example and
+[Papyrus API](#papyrus-api) for a script-only consumer.
+
+## Creating an independent surface
+
+Use an independent surface for a small widget that must coexist with the Home
+screen and have its own position, rotation or scale. The status widget is the
+current reference implementation. Its files are:
+
+- `Assets/ui/rml/status_widget.rml` and `status_widget.rcss`: markup and style.
+- `Src/ui/rml/RmlSurface.*`: shared context, cursor and render base.
+- `Src/ui/rml/StatusWidget.*`: status-specific DOM data adapter.
+- `RmlPanelHost::EnsureStatusRenderTargetPresentThread()`: 250x32 D3D11
+  texture, RTV and SRV allocation.
+- `RmlPanelHost::UpdateStatusSceneSurfaceGameThread()`: quad creation,
+  DragonBoard-relative transform and texture bridge.
+- `RmlPanelHost::CaptureStatusSurfaceGameThread()`: Skyrim data snapshot.
+- `RmlPanelHost::RenderStatusSurfacePresentThread()`: Present-thread DOM update
+  and render-on-dirty execution.
+
+### Required isolation
+
+Every independently rendered scene quad must have all of the following:
+
+- a unique `Rml::Context` name;
+- its own `ID3D11Texture2D`, `ID3D11RenderTargetView` and
+  `ID3D11ShaderResourceView`;
+- its own `RE::BSGraphics::Texture` bridge;
+- a NIF whose diffuse texture path is unique to that surface;
+- its own scene root and geometry runtime data.
+
+The unique diffuse path is mandatory even when the DDS pixels are identical.
+Skyrim caches shader resources by texture path and may keep the render pass
+created when the NIF loads. Cloning a shader property or calling `SetMaterial`
+after load is not sufficient: the widget can display the placeholder on its
+first frame and later sample the last main-panel texture.
+
+The build therefore generates `StatusScreen.nif` from `ImGuiScreen.nif` with
+the internal path changed from `textures\\ImGui0.dds` to
+`textures\\ImGui1.dds`. `Tools/GenerateStatusScreen.ps1` performs a same-length
+binary replacement, and `xmake.lua` installs both the generated NIF and
+`ImGui1.dds`. Runtime code then replaces `NiSourceTexture::rendererTexture`
+directly, which is the same proven binding path used by the main surface.
+
+Do not copy `ImGuiScreen.nif` unchanged for another surface. Allocate the next
+texture name (for example `ImGui2.dds`), generate a NIF that already references
+that name, and keep the binding direct.
+
+### Thread and visibility lifecycle
+
+Independent surfaces keep Skyrim access and rendering separated:
+
+1. The game thread captures only plain values into a snapshot.
+2. It marks the surface data pending/dirty.
+3. Present consumes the snapshot and updates the surface document.
+4. The private context renders into that surface's RTV.
+5. The scene quad samples the corresponding SRV through its texture bridge.
+
+The status widget is visible only when the DragonBoard menu is open and no
+main page panel is active. Opening Inventory, Magic, Journal, Settings,
+Developer, Item Editor or an external page culls the status scene node.
+Returning Home unculls it without binding it to the page panel's document.
+Closing DragonBoard culls both surfaces.
+
+### Transform and grab behavior
+
+Place the surface root relative to the `DragonBoard` geometry transform, not
+relative to a hardcoded world position. `RmlSurfaceGrabController` operates on
+that root:
+
+- one grip controls position and rotation;
+- adding the second grip controls uniform scale;
+- releasing writes the resulting local transform to
+  `Data/SKSE/Plugins/DragonBoardVR_Layout.json`;
+- `SurfaceEvent` reports grab start, transform changes and grab end when a
+  callback is attached.
+
+Persisted independent surfaces use the reserved `RmlUiSurfaces` layout
+container and their stable surface id as the element id. On first creation the
+runtime registers the code-defined transform as the default. On later game
+sessions it restores position, rotation matrix and uniform scale before the
+surface is attached. Saving occurs once when grab ends, not on every movement
+frame.
+
+### Required capability contract
+
+`DragonBoardVR_API::DefaultSurfaceFeatures` is the baseline for every new
+independent surface:
+
+- `Visible`;
+- `Interactive` (ray-to-UV pointer state and `#vr-cursor`);
+- `RenderOnDirty`;
+- `Grabbable`;
+- `PersistTransform`.
+
+`SurfaceDescriptorV2` and the internal `SurfaceState` both default to
+this mask. New capabilities must be added to the shared runtime/base and then
+to this contract when they become mandatory; they must not be implemented only
+inside one widget. The existing main page surface predates this contract and is
+explicitly constructed without independent-surface flags.
+
+### Current public API boundary
+
+`IDragonBoardVR2` reserves `CreateSurface`, `BindPanelToSurface`, visibility and
+transform methods so the ABI will not need to be reshaped later. They are not
+enabled in the current build: `GetCapabilities()` does not advertise
+`IndependentSurfaces`, and the surface methods return failure/no-op values.
+
+Consequently, external mods can currently create page panels, but not arbitrary
+independent scene surfaces. New independent widgets must be implemented inside
+DragonBoardVR following the status-widget path until the generic surface
+registry, resource lifetime and panel-to-surface binding are completed.
+
+### Checklist for another built-in widget
+
+1. Add `<widget>.rml` and `<widget>.rcss` under `Assets/ui/rml/`, including a
+   `#vr-cursor` element with `pointer-events: none`.
+2. Compose `RmlSurface` inside the widget data adapter; provide a
+   globally unique context name, document candidates and logical dimensions.
+3. Add a `SurfaceState` entry with a stable internal handle.
+4. Allocate a dedicated D3D11 texture/RTV/SRV on Present.
+5. Generate a dedicated NIF with a new intrinsic diffuse path and install the
+   matching DDS placeholder during `after_build`.
+6. Bind the NIF's existing diffuse `NiSourceTexture` directly to that surface's
+   `RE::BSGraphics::Texture` bridge. Do not use `SetMaterial` for this binding.
+7. Capture Skyrim values on the game thread and pass only a snapshot to
+   Present.
+8. Define when the surface is visible and cull its scene node outside that
+   state.
+9. Add surface-specific ray-to-UV mapping and feed the shared surface pointer
+   state; do not create widget-specific pointer atomics.
+10. Call `RegisterAndApplySurfaceTransform()` after assigning the code-defined
+    local transform. Shared grab handling will save it on release.
+11. Test first open, page-to-Home return, repeated page switches, grab, scale,
+    board close/reopen and a full game restart.
 
 ## VR interaction contract
 
@@ -317,7 +495,9 @@ xmake build DragonBoardVR
 ```
 
 The build copies the DLL and built-in RML/RCSS files into
-`install_output/SKSE/Plugins/DragonBoardVR/`.
+`install_output/SKSE/Plugins/DragonBoardVR/`. It also generates the independent
+status NIF and installs its texture under `install_output/meshes/DragonBoardVR/`
+and `install_output/textures/`.
 
 ## Regression checklist
 
@@ -329,3 +509,12 @@ The build copies the DLL and built-in RML/RCSS files into
 6. Register an external panel, show it and update text from its callback.
 7. Confirm external `click` and `change` callbacks run on the game thread.
 8. Close/unregister the external panel and confirm the scene quad hides.
+9. Open DragonBoard on Home and confirm the status widget renders its RML
+   content on the first frame instead of the placeholder DDS.
+10. Open each main page and confirm the status widget hides.
+11. Return Home after each page and confirm the widget does not inherit the
+    last page texture.
+12. Grab the status widget with one hand, add the second hand to scale it, and
+    confirm the main panel transform remains unchanged.
+13. Close/reopen DragonBoard and restart Skyrim to exercise scene and render
+    resource recreation.

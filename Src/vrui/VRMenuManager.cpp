@@ -158,7 +158,7 @@ namespace vrui
         }
     }
 
-    void VRMenuManager::toggleMenu()
+    void VRMenuManager::toggleMenu(bool suppressToggleHaptic)
     {
         // Debounce: prevent multiple triggers from same gesture/frame
         if (!_menuToggleCooldown.TryConsume(0.5f)) return;
@@ -167,8 +167,9 @@ namespace vrui
         rmlHost.Close();
 
         if (auto* taskInterface = SKSE::GetTaskInterface()) {
-            taskInterface->AddTask([]() {
-                dragonboard::ui::menu::MenuLifecycleController::ApplyToggle(VRMenuManager::get());
+            taskInterface->AddTask([suppressToggleHaptic]() {
+                dragonboard::ui::menu::MenuLifecycleController::ApplyToggle(
+                    VRMenuManager::get(), suppressToggleHaptic);
             });
         }
     }

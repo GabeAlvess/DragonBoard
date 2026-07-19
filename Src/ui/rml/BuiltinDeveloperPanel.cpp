@@ -234,8 +234,8 @@ namespace dragonboard::ui::rml
             logger::warn(
                 "DragonBoardVR: map calibration point '{}' rejected because the player is not in an exterior worldspace.",
                 cityNames[cityIndex]);
-            _pendingRmlHapticCue.store(static_cast<std::uint8_t>(
-                DragonBoardRmlUi::HapticCue::kError), std::memory_order_release);
+            _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                DragonBoardRmlUi::HapticCue::kError));
             return;
         }
 
@@ -253,8 +253,8 @@ namespace dragonboard::ui::rml
         vrui::VRMenuManager::get().saveSettingsNow();
         CaptureDevGameInfoGameThread();
         _rmlDeveloperInfoSyncPending.store(true, std::memory_order_release);
-        _pendingRmlHapticCue.store(static_cast<std::uint8_t>(
-            DragonBoardRmlUi::HapticCue::kStrong), std::memory_order_release);
+        _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+            DragonBoardRmlUi::HapticCue::kStrong));
 
         vrui::MapCalibrationTransform calibration;
         const bool ready = vrui::FitMapCalibration(settings.mapCalibrationPoints, calibration);

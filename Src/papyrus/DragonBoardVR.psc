@@ -6,10 +6,10 @@ Scriptname DragonBoardVR Hidden
 
 Bool Function IsInstalled() Global Native
 
-Function ToggleMenu() Global
-    ToggleMenuForWheel(SpellWheelVR_PluginScript.GetLastActivatedWheelId())
-EndFunction
+; Generic DragonBoardVR toggle. This API has no dependency on another mod.
+Function ToggleMenu() Global Native
 
+; Compatibility entry point for integrations that know which radial wheel opened.
 Function ToggleMenuForWheel(Int wheelId) Global Native
 
 Int Function RegisterPanel(Alias receiver, String panelId, String documentPath) Global Native

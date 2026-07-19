@@ -1,9 +1,9 @@
 #include "papyrus/PapyrusPanelBridge.h"
 
 #include "DragonBoardVR_API.h"
+#include "integrations/spellwheel/SpellWheelIntegration.h"
 #include "ui/rml/RmlPanelHost.h"
 #include "vrui/VRMenuManager.h"
-#include "vrui/VRUISettings.h"
 
 #include <RE/B/BGSBaseAlias.h>
 #include <RE/B/BSFixedString.h>
@@ -69,43 +69,24 @@ namespace dragonboard::papyrus
             return true;
         }
 
-        void ToggleMenuForWheel(RE::StaticFunctionTag*, std::int32_t wheelId)
+        void ToggleMenu(RE::StaticFunctionTag*)
         {
             auto* tasks = SKSE::GetTaskInterface();
             if (!tasks) {
                 logger::error(
-                    "DragonBoardVR: Papyrus ToggleMenuForWheel failed; "
+                    "DragonBoardVR: Papyrus ToggleMenu failed; "
                     "SKSE task interface unavailable.");
                 return;
             }
 
-            const bool secondaryWheel = wheelId != 0;
-            logger::info(
-                "DragonBoardVR: Papyrus ToggleMenuForWheel requested (wheel={}).",
-                secondaryWheel ? "secondary" : "main");
-            tasks->AddTask([secondaryWheel]() {
-                bool leftHandedMode = false;
-                if (const auto* setting = RE::GetINISetting("bLeftHandedMode:VRInput")) {
-                    leftHandedMode = setting->GetBool();
-                } else {
-                    logger::warn(
-                        "DragonBoardVR: bLeftHandedMode:VRInput unavailable; "
-                        "assuming right-handed mode.");
-                }
-
-                // Spell Wheel: right-handed mode maps main=right and secondary=left.
-                // Skyrim's left-handed mode swaps those physical hands.
-                const bool useLeftHand = leftHandedMode ? !secondaryWheel : secondaryWheel;
-                vrui::VRUISettings::get().setUseLeftHandAsMenu(useLeftHand);
-
-                logger::info(
-                    "DragonBoardVR: Spell Wheel activation mapped to {} hand "
-                    "(wheel={}, leftHandedMode={}).",
-                    useLeftHand ? "left" : "right",
-                    secondaryWheel ? "secondary" : "main",
-                    leftHandedMode);
+            tasks->AddTask([]() {
                 vrui::VRMenuManager::get().toggleMenu();
             });
+        }
+
+        void ToggleMenuForWheel(RE::StaticFunctionTag*, std::int32_t wheelId)
+        {
+            integrations::spellwheel::ToggleMenuForWheel(wheelId);
         }
 
         std::int32_t RegisterPanel(
@@ -255,6 +236,7 @@ namespace dragonboard::papyrus
         if (!vm) return false;
 
         vm->RegisterFunction("IsInstalled", kPapyrusClass, IsInstalled);
+        vm->RegisterFunction("ToggleMenu", kPapyrusClass, ToggleMenu);
         vm->RegisterFunction("ToggleMenuForWheel", kPapyrusClass, ToggleMenuForWheel);
         vm->RegisterFunction("RegisterPanel", kPapyrusClass, RegisterPanel);
         vm->RegisterFunction("UnregisterPanel", kPapyrusClass, UnregisterPanel);

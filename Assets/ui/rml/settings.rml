@@ -69,6 +69,16 @@
                 <section id="page-position" class="page">
                     <h1>Position</h1>
                     <p class="lead">Place and orient the board relative to your hand.</p>
+                    <div class="settings-card compact">
+                        <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Pin board to world</span><span class="setting-help">Keep the whole DragonBoard at its current world position</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-world-pin" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-world-pin-state" class="toggle-state">Hand</span>
+                            </button>
+                        </div>
+                    </div>
                     <div class="group-label">POSITION</div>
                     <div class="settings-card compact">
                         <div class="setting-row"><div class="setting-copy"><span class="setting-label">X axis</span><span class="setting-help">Left / right</span></div><input id="menuOffsetX" type="range" class="range" min="-40" max="40" step="0.05" value="0.5" /><span id="value-menuOffsetX" class="value">0.50</span></div>

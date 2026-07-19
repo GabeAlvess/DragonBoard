@@ -109,7 +109,7 @@ namespace vrui
         float getBoardPinnedMenuScaleBase() const { return _boardPinState.GetMenuScaleBase(); }
 
         /// Toggle menu visibility (called by activation gesture)
-        void toggleMenu();
+        void toggleMenu(bool suppressToggleHaptic = false);
         void closeMenu();  // Only closes — never opens. Safe to call before console commands.
         void performArmorChangeSafely(std::function<void()> change);
 

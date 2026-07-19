@@ -1153,7 +1153,48 @@ namespace vrui
         const auto it = inventory.find(item);
         if (it == inventory.end() || it->second.first <= 0) return false;
 
-        player->DropObject(item, nullptr, 1, nullptr, nullptr);
+        auto* inventoryEntry = it->second.second.get();
+        const bool equipped = inventoryEntry && inventoryEntry->IsWorn();
+        RE::ExtraDataList* dropExtraList = nullptr;
+        if (equipped && inventoryEntry->extraLists) {
+            for (auto* candidate : *inventoryEntry->extraLists) {
+                if (candidate &&
+                    (candidate->HasType(RE::ExtraDataType::kWorn) ||
+                     candidate->HasType(RE::ExtraDataType::kWornLeft))) {
+                    dropExtraList = candidate;
+                    break;
+                }
+            }
+        }
+
+        // Skyrim VR cannot safely infer an equipped inventory instance from a
+        // null ExtraDataList.  Passing nullptr for a worn item enters
+        // Actor::RemoveItem with an invalid extra-data path and can crash in
+        // BSExtraDataList::GetExtraDataWithoutLocking.  Refuse the operation
+        // if the exact worn instance cannot be identified.
+        if (equipped && !dropExtraList) {
+            logger::warn(
+                "DragonBoardVR: refused to drop equipped {:08X} '{}' because "
+                "its worn ExtraDataList could not be resolved.",
+                formID,
+                item->GetName());
+            scheduleRefresh(0.05f);
+            return false;
+        }
+
+        logger::info(
+            "DragonBoardVR: dropping inventory item {:08X} '{}' "
+            "(equipped={}, matchedExtraList={}).",
+            formID,
+            item->GetName(),
+            equipped,
+            dropExtraList != nullptr);
+        player->DropObject(item, dropExtraList, 1, nullptr, nullptr);
+        if (equipped) {
+            VRMenuManager::get().notifyEquip();
+            VRMenuManager::get().scheduleEquipRefresh(0.15f);
+        }
+        invalidateRefreshCache();
         scheduleRefresh(0.1f);
         logger::trace("DragonBoardVR: Dropped from RmlUi inventory: {}", item->GetName());
         return true;

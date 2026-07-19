@@ -1,5 +1,6 @@
 #include "FrameUpdateController.h"
 
+#include "gameplay/CombatSlowTime.h"
 #include "ui/panels/BoardPinWatchdog.h"
 #include "ui/equipment/EquipInteractionController.h"
 #include "ui/input/InteractionInputController.h"
@@ -73,6 +74,10 @@ namespace dragonboard::ui::frame
             logger::trace(
                 "DragonBoardVR: INI file modification detected (real-time Edit Mode), reloading settings...");
             vrui::VRUISettings::get().load(iniPath);
+            const auto& settings = vrui::VRUISettings::get();
+            dragonboard::gameplay::CombatSlowTime::GetSingleton().Reconfigure(
+                settings.slowTimeOnOpen,
+                settings.slowTimeMultiplier);
             manager._refreshCoordinator.RequestAll();
         }
 

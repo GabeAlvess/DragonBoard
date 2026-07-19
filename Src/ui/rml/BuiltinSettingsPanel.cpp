@@ -1,5 +1,6 @@
 #include "ui/rml/RmlPanelHost.h"
 
+#include "vrui/VRMenuManager.h"
 #include "vrui/VRUISettings.h"
 
 namespace dragonboard::ui::rml
@@ -10,6 +11,7 @@ namespace dragonboard::ui::rml
         std::scoped_lock lock(_draftMutex);
         _draft.editModeEnabled = settings.editModeEnabled;
         _draft.showDevButton = settings.showDevButton;
+        _draft.worldPinned = vrui::VRMenuManager::get().isBoardWorldPinned();
         _draft.menuScale = settings.menuScale;
         _draft.buttonSpacingX = settings.buttonSpacingX;
         _draft.buttonSpacingY = settings.buttonSpacingY;

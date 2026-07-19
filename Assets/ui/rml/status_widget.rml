@@ -1,0 +1,22 @@
+<rml>
+<head>
+    <title>DragonBoard Status</title>
+    <link type="text/rcss" href="status_widget.rcss" />
+</head>
+<body>
+    <div class="status-panel">
+        <div id="status-location" class="location">SKYRIM</div>
+        <div class="separator"></div>
+        <div class="stat-block gold-block">
+            <span class="label">GOLD</span>
+            <span id="status-gold" class="value gold">0</span>
+        </div>
+        <div class="separator"></div>
+        <div class="stat-block weight-block">
+            <span class="label">WEIGHT</span>
+            <span id="status-weight" class="value">0 / 0</span>
+        </div>
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

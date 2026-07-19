@@ -75,6 +75,12 @@ namespace vrui
         bool editModeEnabled = true;        // Master switch for item editing (MCM)
 
         // -----------------------------------------------------------------------
+        // [Combat]
+        // -----------------------------------------------------------------------
+        bool slowTimeOnOpen = true;
+        float slowTimeMultiplier = 0.25f;
+
+        // -----------------------------------------------------------------------
         // [RmlUi]
         // -----------------------------------------------------------------------
         bool rmlRenderOnDirty = true;        // Reuse the last panel texture while unchanged

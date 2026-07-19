@@ -1,7 +1,13 @@
 #pragma once
 
 #include "DragonBoardVR_API.h"
+#include "ui/rml/RmlInputBridge.h"
+#include "ui/rml/RmlInventoryPresenter.h"
+#include "ui/rml/RmlJournalPresenter.h"
+#include "ui/rml/RmlMagicPresenter.h"
+#include "ui/rml/RmlPerformanceMetrics.h"
 #include "ui/rml/RmlRenderScheduler.h"
+#include "ui/rml/RmlSurfaceGrabController.h"
 #include "vrui/MapCalibration.h"
 
 #include <RE/Skyrim.h>
@@ -15,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 struct ID3D11Device;
@@ -34,6 +41,7 @@ namespace vrui
 namespace dragonboard::ui::rml
 {
     class DragonBoardRmlUi;
+    class StatusWidget;
     class RmlPanelHost
     {
     public:
@@ -70,6 +78,8 @@ namespace dragonboard::ui::rml
         bool ShowExternalPanel(DragonBoardVR_API::PanelHandle panel) noexcept;
         void HideExternalPanel(DragonBoardVR_API::PanelHandle panel) noexcept;
         [[nodiscard]] bool IsExternalPanelVisible(
+            DragonBoardVR_API::PanelHandle panel) const noexcept;
+        [[nodiscard]] DragonBoardVR_API::PanelState GetExternalPanelState(
             DragonBoardVR_API::PanelHandle panel) const noexcept;
         bool SetExternalElementText(
             DragonBoardVR_API::PanelHandle panel,
@@ -127,30 +137,13 @@ namespace dragonboard::ui::rml
             bool enabled = false;
         };
 
-        struct RmlPerformanceSample
-        {
-            float presentMs = 0.0f;
-            float updateMs = 0.0f;
-            float beginFrameMs = 0.0f;
-            float renderMs = 0.0f;
-            float endFrameMs = 0.0f;
-            float dx11StateMs = 0.0f;
-            float dx11RenderTargetsMs = 0.0f;
-            float dx11ViewportScissorMs = 0.0f;
-            float dx11RasterizerMs = 0.0f;
-            float dx11BlendDepthMs = 0.0f;
-            float dx11InputAssemblyMs = 0.0f;
-            float dx11ShadersMs = 0.0f;
-            float dx11ResourcesMs = 0.0f;
-            float totalMs = 0.0f;
-        };
-
         struct ExternalPanelClient
         {
             std::string id;
             std::string documentPath;
             DragonBoardVR_API::PanelEventCallback callback = nullptr;
             void* userData = nullptr;
+            DragonBoardVR_API::PanelState state = DragonBoardVR_API::PanelState::Queued;
         };
 
         struct ExternalEvent
@@ -247,6 +240,7 @@ namespace dragonboard::ui::rml
         {
             bool editModeEnabled = true;
             bool showDevButton = false;
+            bool worldPinned = false;
             float menuScale = 1.0f;
             float buttonSpacingX = 2.4f;
             float buttonSpacingY = 1.2f;
@@ -296,96 +290,15 @@ namespace dragonboard::ui::rml
             bool canPinToWorld = false;
         };
 
-        struct InventoryEntry
-        {
-            std::string name;
-            std::string category;
-            std::string description;
-            std::string equipmentMarker;
-            std::string equipmentState;
-            std::string editCategory;
-            std::string modelPath;
-            std::uint32_t formID = 0;
-            std::int32_t count = 0;
-            float attack = 0.0f;
-            float defense = 0.0f;
-            float weight = 0.0f;
-            std::int32_t value = 0;
-            float rotX = 0.0f;
-            float rotY = 0.0f;
-            float rotZ = 0.0f;
-            float xOff = 0.0f;
-            float yOff = 0.0f;
-            float zOff = 0.0f;
-            float scaleMult = 1.0f;
-            bool hasAttack = false;
-            bool hasDefense = false;
-            bool equipped = false;
-            bool equippedLeft = false;
-            bool equippedRight = false;
-            bool favorited = false;
-            bool canEquip = false;
-        };
+        using InventoryEntry = RmlInventoryPresenter::Entry;
 
-        struct MagicEntry
-        {
-            std::string name;
-            std::string category;
-            std::string description;
-            std::string modelPath;
-            std::string iconPath;
-            std::string castingType;
-            std::string delivery;
-            std::string skillLevel;
-            std::string duration;
-            std::string range;
-            std::uint32_t formID = 0;
-            float magickaCost = 0.0f;
-            float rotX = 0.0f;
-            float rotY = 0.0f;
-            float rotZ = 0.0f;
-            float xOff = 0.0f;
-            float yOff = 0.0f;
-            float zOff = 0.0f;
-            float scaleMult = 1.0f;
-            bool equipped = false;
-            bool equippedLeft = false;
-            bool equippedRight = false;
-            bool favorited = false;
-            bool canEquip = false;
-        };
+        using MagicEntry = RmlMagicPresenter::Entry;
 
-        struct JournalObjectiveEntry
-        {
-            std::uint16_t objectiveID = 0;
-            std::uint32_t instanceID = 0;
-            std::string text;
-            std::string state;
-            bool completed = false;
-            bool failed = false;
-            bool hasTargets = false;
-        };
+        using JournalObjectiveEntry = RmlJournalPresenter::Objective;
+        using JournalQuestEntry = RmlJournalPresenter::Quest;
+        using JournalStatEntry = RmlJournalPresenter::Stat;
 
-        struct JournalQuestEntry
-        {
-            std::uint32_t formID = 0;
-            std::uint32_t instanceID = 0;
-            std::string title;
-            std::string summary;
-            std::string type;
-            bool active = false;
-            bool completed = false;
-            bool failed = false;
-            std::vector<JournalObjectiveEntry> objectives;
-        };
-
-        struct JournalStatEntry
-        {
-            std::string label;
-            std::string value;
-        };
-
-        RmlPanelHost() = default;
+        RmlPanelHost();
         ~RmlPanelHost();
 
         // Render thread and physical DragonBoard host.
@@ -409,23 +322,12 @@ namespace dragonboard::ui::rml
         bool BeginInventorySearchKeyboardPresentThread();
         void UpdateInventorySearchKeyboardPresentThread();
         void ApplyInventorySearchQueryPresentThread(std::string query);
-        [[nodiscard]] bool TryMapInventoryVisibleIndex(
-            std::size_t visibleIndex,
-            std::size_t& inventoryIndex);
-        [[nodiscard]] static bool InventoryEntryMatchesSearch(
-            const InventoryEntry& entry,
-            std::string_view query);
-        bool ReconcileInventorySelectionForSearchLocked();
         bool BeginMagicSearchKeyboardPresentThread();
         void UpdateMagicSearchKeyboardPresentThread();
         void ApplyMagicSearchQueryPresentThread(std::string query);
         [[nodiscard]] bool TryMapMagicVisibleIndex(
             std::size_t visibleIndex,
             std::size_t& magicIndex);
-        [[nodiscard]] static bool MagicEntryMatchesSearch(
-            const MagicEntry& entry,
-            std::string_view query);
-        bool ReconcileMagicSelectionForSearchLocked();
         void ApplyRmlItemEditSliderChange(std::string_view id, float value);
         void ApplyItemEditDraftGameThread();
         void ExecuteItemEditActionGameThread(ItemEditAction action);
@@ -483,6 +385,12 @@ namespace dragonboard::ui::rml
 
         // Physical RmlUi surface attached to the DragonBoard scene graph.
         void UpdateSurfaceGameThread();
+        void UpdateStatusSurfaceHoverGameThread();
+        void UpdateSurfaceGrabsGameThread(float deltaTime);
+        void CaptureStatusSurfaceGameThread(float deltaTime);
+        void RenderStatusSurfacePresentThread();
+        bool EnsureStatusRenderTargetPresentThread();
+        bool UpdateStatusSceneSurfaceGameThread(RE::NiNode* backgroundNode);
         bool UpdateScenePanelGameThread(RE::NiNode* backgroundNode);
 
         ID3D11Device* _device = nullptr;
@@ -500,6 +408,7 @@ namespace dragonboard::ui::rml
         std::int64_t _rmlPrewarmTotalMs = 0;
         bool _rmlPrewarmComplete = false;
         std::unique_ptr<dragonboard::ui::rml::DragonBoardRmlUi> _rmlUi;
+        std::unique_ptr<dragonboard::ui::rml::StatusWidget> _statusWidget;
         std::atomic<bool> _rmlSettingsSyncPending{ true };
         std::atomic<bool> _rmlDeveloperSyncPending{ true };
         std::atomic<bool> _rmlDeveloperInfoSyncPending{ true };
@@ -508,12 +417,12 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _rmlInventorySyncPending{ true };
         std::atomic<bool> _rmlMagicSyncPending{ true };
         std::atomic<bool> _rmlJournalSyncPending{ true };
-        std::atomic<bool> _previewInteractionZoneHovered{ false };
-        std::atomic<std::uint8_t> _pendingRmlHapticCue{ 0 };
+        RmlInputBridge _inputBridge;
 
         std::atomic<bool> _visible{ false };
         std::atomic<bool> _applyPending{ false };
         std::atomic<bool> _savePending{ false };
+        std::atomic<bool> _worldPinTogglePending{ false };
         std::atomic<LocalPanelMode> _localPanelMode{ LocalPanelMode::kSettings };
         std::atomic<DragonBoardVR_API::PanelHandle> _activeExternalPanel{
             DragonBoardVR_API::InvalidPanel };
@@ -552,17 +461,7 @@ namespace dragonboard::ui::rml
         std::atomic<std::size_t> _modsRemovePending{ static_cast<std::size_t>(-1) };
         std::atomic<std::size_t> _modsHoveredIndex{ static_cast<std::size_t>(-1) };
         std::mutex _inventoryMutex;
-        std::vector<InventoryEntry> _inventoryItems;
-        std::vector<std::size_t> _inventoryVisibleIndices;
-        std::size_t _inventorySelectedIndex = 0;
-        std::uint32_t _inventorySelectedFormID = 0;
-        std::string _inventoryActiveFilter;
-        std::string _inventorySearchQuery;
-        std::string _inventoryPlayerName;
-        std::uint16_t _inventoryPlayerLevel = 1;
-        std::int32_t _inventoryGold = 0;
-        float _inventoryCurrentWeight = 0.0f;
-        float _inventoryCarryWeight = 0.0f;
+        RmlInventoryPresenter _inventoryPresenter;
         vrui::VRUIInventoryContainer* _inventoryBackend = nullptr;
         vrui::VRUIItemEditPanel* _inventoryPreviewBackend = nullptr;
         std::atomic<InventoryAction> _inventoryActionPending{ InventoryAction::kNone };
@@ -574,19 +473,8 @@ namespace dragonboard::ui::rml
         bool _inventoryKeyboardOpen = false;
         float _inventoryRefreshDelay = -1.0f;
         float _inventoryPollAccumulator = 0.0f;
-        std::uint64_t _inventoryStateSignature = 0;
-        bool _inventorySnapshotValid = false;
         std::mutex _magicMutex;
-        std::vector<MagicEntry> _magicItems;
-        std::vector<std::size_t> _magicVisibleIndices;
-        std::size_t _magicSelectedIndex = 0;
-        std::uint32_t _magicSelectedFormID = 0;
-        std::string _magicActiveFilter;
-        std::string _magicSearchQuery;
-        std::string _magicPlayerName;
-        std::uint16_t _magicPlayerLevel = 1;
-        float _magicCurrentMagicka = 0.0f;
-        float _magicMaximumMagicka = 0.0f;
+        RmlMagicPresenter _magicPresenter;
         vrui::VRUIMagicContainer* _magicBackend = nullptr;
         vrui::VRUIItemEditPanel* _magicPreviewBackend = nullptr;
         std::atomic<MagicAction> _magicActionPending{ MagicAction::kNone };
@@ -598,25 +486,13 @@ namespace dragonboard::ui::rml
         bool _magicKeyboardOpen = false;
         float _magicRefreshDelay = -1.0f;
         float _magicPollAccumulator = 0.0f;
-        std::uint64_t _magicStateSignature = 0;
-        bool _magicSnapshotValid = false;
-        std::mutex _journalMutex;
-        std::vector<JournalQuestEntry> _journalQuests;
-        std::vector<JournalStatEntry> _journalCharacterStats;
-        std::vector<JournalStatEntry> _journalSkills;
-        std::vector<JournalStatEntry> _journalGeneralStats;
-        std::size_t _journalSelectedIndex = 0;
-        std::uint32_t _journalSelectedFormID = 0;
-        std::uint32_t _journalSelectedInstanceID = 0;
-        std::string _journalPlayerName;
-        std::uint16_t _journalPlayerLevel = 1;
+        RmlJournalPresenter _journalPresenter;
         std::atomic<JournalAction> _journalActionPending{ JournalAction::kNone };
         std::atomic<std::uint32_t> _journalActionFormID{ 0 };
         std::atomic<std::uint32_t> _journalActionInstanceID{ 0 };
         std::atomic<std::uint32_t> _journalActionObjectiveInstanceID{ 0 };
         std::atomic<std::uint16_t> _journalActionObjectiveID{ 0 };
         float _journalPollAccumulator = 0.0f;
-        std::uint64_t _journalStateSignature = 0;
         float _questTargetResolveDelay = -1.0f;
         std::uint32_t _questTargetResolveFormID = 0;
         std::uint32_t _questTargetResolveInstanceID = 0;
@@ -639,54 +515,79 @@ namespace dragonboard::ui::rml
         float _devInfoRefreshAccumulator = 0.0f;
         float _developerInfoPresentAccumulator = 0.0f;
         int _selectedDevCommand = 0;
-        std::array<float, 20> _presentFrameTimeHistory{};
-        std::size_t _presentFrameTimeHistoryIndex = 0;
-        std::size_t _presentFrameTimeHistoryCount = 0;
-        float _presentFrameTimeHistorySum = 0.0f;
-        float _presentFps = 0.0f;
-        float _presentFrameMs = 0.0f;
-        int _panelDrawCalls = 0;
-        std::array<RmlPerformanceSample, 240> _rmlPerformanceHistory{};
-        std::size_t _rmlPerformanceHistoryIndex = 0;
-        std::size_t _rmlPerformanceHistoryCount = 0;
-        float _rmlRenderRateAccumulator = 0.0f;
-        std::uint32_t _rmlRendersInRateWindow = 0;
-        float _rmlRendersPerSecond = 0.0f;
-        std::uint64_t _rmlCachedFrames = 0;
-        std::size_t _rmlDomElements = 0;
-        int _rmlRenderWidth = 0;
-        int _rmlRenderHeight = 0;
-        std::string _rmlActiveDocument;
-        std::string _rmlDirtyReason{ "Open" };
+        RmlPerformanceMetrics _performanceMetrics;
         RmlRenderScheduler _renderScheduler;
         bool _rmlWasVisiblePresentThread = false;
         std::optional<LocalPanelMode> _lastRmlPanelModePresentThread;
         DragonBoardVR_API::PanelHandle _lastRmlExternalPanelPresentThread =
             DragonBoardVR_API::InvalidPanel;
-        bool _rmlInputStateInitialized = false;
-        bool _lastRmlPointerOnPanel = false;
-        float _lastRmlPointerU = 0.0f;
-        float _lastRmlPointerV = 0.0f;
-        bool _lastRmlTriggerDown = false;
-        bool _lastRmlGripDown = false;
-        float _lastRmlStickX = 0.0f;
-        float _lastRmlStickY = 0.0f;
-        bool _rmlPreviousTriggerDown = false;
         bool _deferredRmlTransformApply = false;
-        std::atomic<float> _pointerU{ 0.0f };
-        std::atomic<float> _pointerV{ 0.0f };
-        std::atomic<bool> _triggerDown{ false };
-        std::atomic<bool> _leftTriggerDown{ false };
-        std::atomic<bool> _rightTriggerDown{ false };
-        std::atomic<bool> _lastTriggerWasLeft{ false };
-        std::atomic<bool> _gripDown{ false };
-        std::atomic<float> _stickX{ 0.0f };
-        std::atomic<float> _stickY{ 0.0f };
         bool _scenePanelVisible = false;
-        std::atomic<bool> _pointerInHostedPanel{ false };
-        RE::NiPointer<RE::NiNode> _screenNode;
-        RE::NiPointer<RE::NiSourceTexture> _screenSourceTexture;
-        RE::BSGraphics::Texture* _originalRendererTexture = nullptr;
-        std::unique_ptr<RE::BSGraphics::Texture> _sceneTextureBridge;
+        struct StatusSurfaceSnapshot
+        {
+            std::int32_t gold = 0;
+            float weight = 0.0f;
+            float capacity = 0.0f;
+            std::string location = "SKYRIM";
+        };
+        std::mutex _statusSurfaceMutex;
+        StatusSurfaceSnapshot _statusSurfaceSnapshot;
+        std::atomic<bool> _statusSurfaceDataPending{ true };
+        std::atomic<bool> _statusSurfaceHomeVisible{ false };
+        float _statusSurfacePollAccumulator = 0.0f;
+        struct SurfacePointerState
+        {
+            std::atomic<float> u{ 0.5f };
+            std::atomic<float> v{ 0.5f };
+            std::atomic<bool> visible{ false };
+        };
+        struct SurfaceState
+        {
+            explicit SurfaceState(
+                std::string surfaceId,
+                std::uint32_t surfaceFlags = DragonBoardVR_API::DefaultSurfaceFeatures) :
+                id(std::move(surfaceId)),
+                flags(surfaceFlags),
+                pointer(std::make_unique<SurfacePointerState>())
+            {}
+            SurfaceState(SurfaceState&&) noexcept = default;
+            SurfaceState& operator=(SurfaceState&&) noexcept = default;
+            SurfaceState(const SurfaceState&) = delete;
+            SurfaceState& operator=(const SurfaceState&) = delete;
+
+            std::string id;
+            RE::NiPointer<RE::NiNode> node;
+            RE::NiPointer<RE::NiNode> visualNode;
+            RE::NiPointer<RE::BSLightingShaderProperty> shaderProperty;
+            RE::NiPointer<RE::NiSourceTexture> sourceTexture;
+            const void* geometryRendererData = nullptr;
+            RE::BSGraphics::Texture* originalRendererTexture = nullptr;
+            std::unique_ptr<RE::BSGraphics::Texture> textureBridge;
+            ID3D11Texture2D* renderTexture = nullptr;
+            ID3D11RenderTargetView* renderTarget = nullptr;
+            ID3D11ShaderResourceView* shaderResource = nullptr;
+            std::uint32_t textureWidth = 0;
+            std::uint32_t textureHeight = 0;
+            std::uint32_t flags = DragonBoardVR_API::DefaultSurfaceFeatures;
+            bool sceneVisible = false;
+            bool pointerHovered = false;
+            std::unique_ptr<SurfacePointerState> pointer;
+            RmlSurfaceGrabController grabController;
+            DragonBoardVR_API::SurfaceEventCallback callback = nullptr;
+            void* userData = nullptr;
+        };
+        static constexpr DragonBoardVR_API::SurfaceHandle kMainSurfaceHandle = 1;
+        static constexpr DragonBoardVR_API::SurfaceHandle kStatusSurfaceHandle = 2;
+        [[nodiscard]] SurfaceState& MainSceneSurface();
+        [[nodiscard]] const SurfaceState& MainSceneSurface() const;
+        [[nodiscard]] SurfaceState& StatusSceneSurface();
+        static bool HasSurfaceFlag(
+            const SurfaceState& surface,
+            DragonBoardVR_API::SurfaceFlags flag);
+        static void SetSurfacePointer(
+            SurfaceState& surface, float u, float v, bool visible);
+        static void RegisterAndApplySurfaceTransform(SurfaceState& surface);
+        static void PersistSurfaceTransform(const SurfaceState& surface);
+        std::unordered_map<DragonBoardVR_API::SurfaceHandle, SurfaceState> _sceneSurfaces;
     };
 }

@@ -415,6 +415,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool ConsumeSaveRequested();
         [[nodiscard]] bool ConsumeEditModeToggleRequested();
         [[nodiscard]] bool ConsumeDeveloperPanelToggleRequested();
+        [[nodiscard]] bool ConsumeWorldPinToggleRequested();
         [[nodiscard]] HapticCue ConsumeHapticCue();
         [[nodiscard]] std::optional<SliderChange> ConsumeSliderChange();
         [[nodiscard]] std::optional<std::size_t> ConsumeDeveloperCommandRequested();
@@ -439,12 +440,14 @@ namespace dragonboard::ui::rml
         void SetJournal(const JournalInfo& info);
         void SetEditModeEnabled(bool enabled);
         void SetDeveloperButtonEnabled(bool enabled);
+        void SetWorldPinned(bool pinned);
         void SetDeveloperCommands(
             std::vector<DeveloperCommand> commands,
             std::size_t selectedIndex = 0);
         void SetDeveloperInfo(const DeveloperInfo& info);
         [[nodiscard]] int GetLastDrawCallCount() const;
         [[nodiscard]] const RenderTiming& GetLastRenderTiming() const;
+        [[nodiscard]] DragonBoardRmlRenderer* GetRenderer() const { return _renderer.get(); }
 
     private:
         class UiEventListener;
@@ -520,6 +523,9 @@ namespace dragonboard::ui::rml
         void BeginTriggerScrollLock();
         void RestoreTriggerScrollLock();
         void TraceScrollState();
+        void CaptureGripScrollHoverLock();
+        void ApplyGripScrollHoverLock();
+        void ClearGripScrollHoverLock();
 
         std::unique_ptr<DragonBoardRmlRenderer> _renderer;
         std::unique_ptr<UiEventListener> _eventListener;
@@ -573,6 +579,14 @@ namespace dragonboard::ui::rml
         bool _triggerCaptureProgrammatic = false;
         std::vector<InteractiveBinding> _interactiveBindings;
         bool _gripScrollActive = false;
+        enum class GripScrollHoverList : std::uint8_t
+        {
+            kNone,
+            kInventory,
+            kMagic
+        };
+        GripScrollHoverList _gripScrollHoverList = GripScrollHoverList::kNone;
+        std::size_t _gripScrollHoverItemIndex = static_cast<std::size_t>(-1);
         Rml::Element* _gripScrollTarget = nullptr;
         int _gripScrollPointerY = 0;
         float _gripScrollTargetTop = 0.0f;
@@ -581,6 +595,7 @@ namespace dragonboard::ui::rml
         bool _saveRequested = false;
         bool _editModeToggleRequested = false;
         bool _developerPanelToggleRequested = false;
+        bool _worldPinToggleRequested = false;
         HapticCue _pendingHapticCue = HapticCue::kNone;
         std::string _hoveredElementId;
         std::string _modsListMarkup;

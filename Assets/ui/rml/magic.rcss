@@ -359,6 +359,12 @@ body {
     border-color: #5e6060;
 }
 
+.magic-list-item.grip-scroll-locked {
+    color: #eeeeee;
+    background-color: rgba(37, 38, 38, 220);
+    border-color: #5e6060;
+}
+
 .magic-list-item.active {
     color: #ffffff;
     background-color: rgba(49, 50, 50, 232);

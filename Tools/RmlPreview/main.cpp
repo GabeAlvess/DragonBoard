@@ -1,4 +1,6 @@
 #include "ui/rml/DragonBoardRmlRenderer.h"
+#include "ui/rml/RmlPerformanceMetrics.h"
+#include "ui/rml/RmlVirtualList.h"
 #include "RmlSourceEditor.h"
 #include "RmlVisualInspector.h"
 
@@ -31,6 +33,8 @@ namespace
 {
     using Microsoft::WRL::ComPtr;
     using dragonboard::ui::rml::DragonBoardRmlRenderer;
+    using dragonboard::ui::rml::RmlPerformanceMetrics;
+    using dragonboard::ui::rml::RmlVirtualList;
     using dragonboard::tools::RmlSourceEditor;
     using dragonboard::tools::RmlVisualInspector;
 
@@ -48,6 +52,7 @@ namespace
     constexpr UINT kCommandInspector = 1004;
     constexpr UINT kCommandEditor = 1005;
     constexpr UINT kCommandDocumentBase = 2000;
+    constexpr std::array<std::size_t, 3> kSyntheticDatasetSizes{ 25, 250, 1000 };
 
     constexpr std::array<const char*, 5> kSettingsPages{
         "general", "position", "visuals", "items", "labels"
@@ -204,17 +209,37 @@ namespace
                 }
                 if (_exitRequested) break;
 
+                const auto frameStart = std::chrono::steady_clock::now();
                 _inspector.Update();
                 CheckHotReload();
+                UpdateSyntheticVirtualRows(false);
+                const auto updateStart = std::chrono::steady_clock::now();
                 if (!_context->Update()) {
                     std::cerr << "RmlUi context update failed.\n";
                     break;
                 }
+                const auto updateEnd = std::chrono::steady_clock::now();
+                const auto beginStart = updateEnd;
                 if (!_renderer.BeginFrame(_renderTarget.Get(), kCanvasWidth, kCanvasHeight)) break;
+                const auto beginEnd = std::chrono::steady_clock::now();
+                const auto renderStart = beginEnd;
                 const bool rendered = _context->Render();
+                const auto renderEnd = std::chrono::steady_clock::now();
+                const auto endStart = renderEnd;
                 _renderer.EndFrame();
+                const auto endEnd = std::chrono::steady_clock::now();
                 if (!rendered) break;
                 _swapChain->Present(1, 0);
+                RecordPreviewPerformance(
+                    frameStart,
+                    updateStart,
+                    updateEnd,
+                    beginStart,
+                    beginEnd,
+                    renderStart,
+                    renderEnd,
+                    endStart,
+                    endEnd);
             }
             return 0;
         }
@@ -365,6 +390,10 @@ namespace
                     SwitchDocument(PreviewDocument::ItemEdit);
                 } else if (wParam == VK_F5) {
                     ReloadDocument();
+                } else if (wParam == VK_F6) {
+                    CycleSyntheticDataset();
+                } else if (wParam == VK_F7) {
+                    ToggleSyntheticEmptySearch();
                 } else if (wParam == 'O' && (GetKeyState(VK_CONTROL) & 0x8000)) {
                     const auto path = SelectDocumentWithDialog();
                     if (!path.empty()) LoadDocument(path);
@@ -650,6 +679,12 @@ namespace
             }
             _document = nextDocument;
             _documentPath = path;
+            _previewMetrics = {};
+            _previewMetrics.OnVisibilityChanged(true);
+            _lastPreviewFrame = std::chrono::steady_clock::now();
+            _lastPerformanceReport = _lastPreviewFrame;
+            _performanceSummary.clear();
+            _poolViolationReported = false;
             BindDocument();
             _document->Show();
             if (refreshSourceEditor) _sourceEditor.SetDocument(_documentPath);
@@ -767,20 +802,9 @@ namespace
 
             SetText("dev-fps", "90.0");
             SetText("dev-frame-time", "11.11 ms");
-            SetText("dev-present-timing", "11.11 / 11.12 / 11.30 / 11.52 ms");
-            SetText("dev-update-timing", "0.18 / 0.20 / 0.28 / 0.35 ms");
-            SetText("dev-begin-timing", "0.31 / 0.34 / 0.48 / 0.57 ms");
-            SetText("dev-render-timing", "1.62 / 1.71 / 2.10 / 2.44 ms");
-            SetText("dev-end-timing", "0.22 / 0.25 / 0.36 / 0.43 ms");
-            SetText("dev-dx11-timing", "0.41 / 0.46 / 0.66 / 0.79 ms");
-            SetText("dev-dx11-rt-timing", "0.04 / 0.05 / 0.07 / 0.09 ms");
-            SetText("dev-dx11-viewport-timing", "0.05 / 0.06 / 0.09 / 0.11 ms");
-            SetText("dev-dx11-raster-timing", "0.02 / 0.02 / 0.03 / 0.04 ms");
-            SetText("dev-dx11-blend-timing", "0.04 / 0.05 / 0.07 / 0.09 ms");
-            SetText("dev-dx11-ia-timing", "0.09 / 0.10 / 0.14 / 0.17 ms");
-            SetText("dev-dx11-shaders-timing", "0.11 / 0.12 / 0.17 / 0.20 ms");
-            SetText("dev-dx11-resources-timing", "0.06 / 0.06 / 0.09 / 0.09 ms");
-            SetText("dev-total-timing", "2.33 / 2.50 / 3.22 / 3.79 ms");
+            SetText("dev-update-timing", "0.20 / 0.28 ms");
+            SetText("dev-render-timing", "1.71 / 2.10 ms");
+            SetText("dev-total-timing", "2.50 / 3.22 ms");
             SetText("dev-draw-calls", "24");
             SetText("dev-dom-elements", "930");
             SetText("dev-renders-per-second", "90.0");
@@ -790,24 +814,248 @@ namespace
             SetText("dev-dirty-reason", "Pointer");
             SetText("dev-helper", "Connected");
             SetText("dev-version", "0.8 preview");
-            SetText("dev-feature-level", "0xB000");
-            SetText("dev-player-position", "X 1240.5   Y -832.0   Z 96.2");
-            SetText("dev-cell", "Whiterun");
-            SetText("dev-cell-form", "00018A56");
-            SetText("dev-worldspace", "Tamriel");
-            SetText("dev-worldspace-form", "0000003C");
+        }
+
+        static std::string SyntheticName(bool inventory, std::size_t index)
+        {
+            if (index % 9 == 0) {
+                return inventory ?
+                    "Nordic Greatsword of the Unrelenting Ancient Dragonborn Champion " +
+                        std::to_string(index + 1) :
+                    "Conjure Ancient Dragon Priest Guardian of the Forgotten Realm " +
+                        std::to_string(index + 1);
+            }
+            static constexpr std::array<const char*, 5> inventoryNames{
+                "Ebony Sword", "Dragonscale Armor", "Potion of Ultimate Healing",
+                "Black Soul Gem", "Elven Bow"
+            };
+            static constexpr std::array<const char*, 5> magicNames{
+                "Flames", "Fast Healing", "Oakflesh", "Clairvoyance", "Fireball"
+            };
+            const auto& names = inventory ? inventoryNames : magicNames;
+            return std::string(names[index % names.size()]) + " " +
+                std::to_string(index + 1);
+        }
+
+        static float Milliseconds(
+            std::chrono::steady_clock::time_point start,
+            std::chrono::steady_clock::time_point end)
+        {
+            return std::chrono::duration<float, std::milli>(end - start).count();
+        }
+
+        static std::size_t CountDomElements(const Rml::Element* element)
+        {
+            if (!element) return 0;
+            std::size_t count = 1;
+            const int childCount = element->GetNumChildren(false);
+            for (int index = 0; index < childCount; ++index) {
+                count += CountDomElements(element->GetChild(index));
+            }
+            return count;
+        }
+
+        static std::size_t CountElementsWithIdPrefix(
+            const Rml::Element* element,
+            std::string_view prefix)
+        {
+            if (!element) return 0;
+            std::size_t count =
+                element->GetTagName() == "button" &&
+                element->GetId().starts_with(prefix) ? 1 : 0;
+            const int childCount = element->GetNumChildren(false);
+            for (int index = 0; index < childCount; ++index) {
+                count += CountElementsWithIdPrefix(element->GetChild(index), prefix);
+            }
+            return count;
+        }
+
+        void RecordPreviewPerformance(
+            std::chrono::steady_clock::time_point frameStart,
+            std::chrono::steady_clock::time_point updateStart,
+            std::chrono::steady_clock::time_point updateEnd,
+            std::chrono::steady_clock::time_point beginStart,
+            std::chrono::steady_clock::time_point beginEnd,
+            std::chrono::steady_clock::time_point renderStart,
+            std::chrono::steady_clock::time_point renderEnd,
+            std::chrono::steady_clock::time_point endStart,
+            std::chrono::steady_clock::time_point endEnd)
+        {
+            const auto now = std::chrono::steady_clock::now();
+            const float frameSeconds = std::chrono::duration<float>(
+                now - _lastPreviewFrame).count();
+            _lastPreviewFrame = now;
+            _previewMetrics.AdvanceRateWindow(frameSeconds);
+
+            RmlPerformanceMetrics::RenderTiming timing;
+            timing.updateMs = Milliseconds(updateStart, updateEnd);
+            timing.beginFrameMs = Milliseconds(beginStart, beginEnd);
+            timing.renderMs = Milliseconds(renderStart, renderEnd);
+            timing.endFrameMs = Milliseconds(endStart, endEnd);
+            timing.totalMs = Milliseconds(frameStart, endEnd);
+            timing.domElements = CountDomElements(_document);
+            timing.width = kCanvasWidth;
+            timing.height = kCanvasHeight;
+            timing.activeDocument = _documentPath.filename().string();
+            _previewMetrics.RecordRenderedFrame(
+                frameSeconds,
+                _renderer.GetDrawCallCount(),
+                timing,
+                "Preview");
+
+            if (now - _lastPerformanceReport < std::chrono::seconds(1)) return;
+            _lastPerformanceReport = now;
+            const auto snapshot = _previewMetrics.GetSnapshot();
+            const auto fileName = _documentPath.filename().string();
+            const std::string_view rowPrefix = fileName == "inventory.rml" ?
+                "inventory-item-" : fileName == "magic.rml" ?
+                "magic-spell-" : "";
+            const auto materializedRows = rowPrefix.empty() ? 0 :
+                CountElementsWithIdPrefix(_document, rowPrefix);
+            if (!rowPrefix.empty() && materializedRows > 10 && !_poolViolationReported) {
+                logger::error(
+                    "Synthetic virtual-list DOM limit exceeded: {} rows.",
+                    materializedRows);
+                _poolViolationReported = true;
+            }
+            _performanceSummary = std::format(
+                "DOM {}  Rows {}  Update avg/p95 {:.2f}/{:.2f} ms  "
+                "Render avg/p95 {:.2f}/{:.2f} ms  Draws {}{}",
+                snapshot.domElements,
+                materializedRows,
+                snapshot.update.averageMs,
+                snapshot.update.p95Ms,
+                snapshot.render.averageMs,
+                snapshot.render.p95Ms,
+                snapshot.panelDrawCalls,
+                _poolViolationReported ? "  POOL VIOLATION" : "");
+            RefreshWindowTitle();
+        }
+
+        void UpdateSyntheticVirtualRows(bool force)
+        {
+            if (!_document) return;
+            const auto fileName = _documentPath.filename().string();
+            const bool inventory = fileName == "inventory.rml";
+            const bool magic = fileName == "magic.rml";
+            if (!inventory && !magic) return;
+
+            const char* listId = inventory ? "inventory-item-list" : "magic-spell-list";
+            auto* listElement = _document->GetElementById(listId);
+            if (!listElement) return;
+
+            if (_syntheticEmptySearch) {
+                if (!force) return;
+                (inventory ? _inventoryPreviewList : _magicPreviewList).Reset();
+                listElement->SetInnerRML(inventory ?
+                    "<div class=\"inventory-empty\">No matching items</div>" :
+                    "<div class=\"magic-empty\">No matching spells</div>");
+                SetText(inventory ? "inventory-item-count" : "magic-spell-count", "0");
+                return;
+            }
+
+            const auto itemCount = kSyntheticDatasetSizes[_syntheticDatasetIndex];
+            auto& virtualList = inventory ? _inventoryPreviewList : _magicPreviewList;
+            virtualList.SetItemCount(itemCount);
+            const float scrollTop = listElement->GetScrollTop();
+            const bool windowChanged = virtualList.Update(scrollTop);
+            if (!force && !windowChanged) return;
+
+            const auto& window = virtualList.GetWindow();
+            const char* contentClass = inventory ?
+                "inventory-virtual-content" : "magic-virtual-content";
+            std::string markup = "<div class=\"" + std::string(contentClass) +
+                "\" style=\"height: " + std::to_string(static_cast<int>(window.totalHeight)) +
+                "px;\">";
+            for (std::size_t slot = 0; slot < window.rowCount; ++slot) {
+                const auto itemIndex = window.firstIndex + slot;
+                std::string marker;
+                if (itemIndex % 8 == 0) marker = "[L/R]";
+                else if (itemIndex % 8 == 1) marker = "[L]";
+                else if (itemIndex % 8 == 2) marker = "[R]";
+
+                std::string classes = inventory ?
+                    "inventory-list-item" : "magic-list-item";
+                if (itemIndex == window.firstIndex + window.rowCount / 2) {
+                    classes += " active";
+                }
+                if (!marker.empty()) classes += " equipped";
+                if (itemIndex % 5 == 0) classes += " favorited";
+
+                const auto indexText = std::to_string(itemIndex);
+                markup += "<button id=\"" +
+                    std::string(inventory ? "inventory-item-" : "magic-spell-") +
+                    indexText + "\" class=\"" + classes + "\" style=\"top: " +
+                    std::to_string(static_cast<int>(virtualList.GetRowOffset(itemIndex))) +
+                    "px;\">";
+                markup += "<span class=\"" +
+                    std::string(inventory ? "item-state-mark" : "spell-state-mark") +
+                    "\">" + marker + "</span>";
+                markup += "<span class=\"" +
+                    std::string(inventory ? "item-name" : "spell-name") +
+                    "\"><span class=\"" +
+                    std::string(inventory ? "item-name-track" : "spell-name-track") +
+                    "\">" + SyntheticName(inventory, itemIndex) + "</span></span>";
+                if (inventory) {
+                    markup += "<span class=\"item-stack\">";
+                    if (itemIndex % 6 == 0) markup += "x" + std::to_string(itemIndex % 4 + 2);
+                    markup += "</span>";
+                }
+                markup += "</button>";
+            }
+            markup += "</div>";
+            listElement->SetInnerRML(markup);
+            listElement->SetScrollTop(scrollTop);
+            SetText(
+                inventory ? "inventory-item-count" : "magic-spell-count",
+                std::to_string(itemCount));
+        }
+
+        void CycleSyntheticDataset()
+        {
+            _syntheticDatasetIndex =
+                (_syntheticDatasetIndex + 1) % kSyntheticDatasetSizes.size();
+            _syntheticEmptySearch = false;
+            _inventoryPreviewList.Reset();
+            _magicPreviewList.Reset();
+            if (_document) {
+                if (auto* list = _document->GetElementById("inventory-item-list")) {
+                    list->SetScrollTop(0.0f);
+                }
+                if (auto* list = _document->GetElementById("magic-spell-list")) {
+                    list->SetScrollTop(0.0f);
+                }
+            }
+            UpdateSyntheticVirtualRows(true);
+            SetStatus(
+                "Synthetic dataset: " +
+                std::to_string(kSyntheticDatasetSizes[_syntheticDatasetIndex]) +
+                " entries, max 10 DOM rows");
+        }
+
+        void ToggleSyntheticEmptySearch()
+        {
+            const auto fileName = _documentPath.filename().string();
+            if (fileName != "inventory.rml" && fileName != "magic.rml") {
+                SetStatus("F7 empty-search scenario requires Inventory or Magic");
+                return;
+            }
+            _syntheticEmptySearch = !_syntheticEmptySearch;
+            if (!_syntheticEmptySearch) {
+                _inventoryPreviewList.Reset();
+                _magicPreviewList.Reset();
+            }
+            UpdateSyntheticVirtualRows(true);
+            SetStatus(_syntheticEmptySearch ?
+                "Synthetic search: no results" :
+                "Synthetic search cleared");
         }
 
         void PopulateInventoryDocument()
         {
-            if (auto* list = _document->GetElementById("inventory-item-list")) {
-                list->SetInnerRML(
-                    "<button id=\"inventory-item-0\" class=\"inventory-list-item equipped\"><span class=\"item-state-mark\">[L]</span><span id=\"inventory-item-name-0\" class=\"item-name\"><span id=\"inventory-item-name-track-0\" class=\"item-name-track\">Ebony Sword</span></span><span class=\"item-stack\"></span></button>"
-                    "<button id=\"inventory-item-1\" class=\"inventory-list-item active equipped favorited\"><span class=\"item-state-mark\">[R]</span><span id=\"inventory-item-name-1\" class=\"item-name\"><span id=\"inventory-item-name-track-1\" class=\"item-name-track\">Nordic Bow of the Ancient Dragonborn Champion</span></span><span class=\"item-stack\"></span></button>"
-                    "<button id=\"inventory-item-2\" class=\"inventory-list-item favorited\"><span class=\"item-state-mark\"></span><span id=\"inventory-item-name-2\" class=\"item-name\"><span id=\"inventory-item-name-track-2\" class=\"item-name-track\">Potion of Ultimate Healing</span></span><span class=\"item-stack\">x4</span></button>"
-                    "<button id=\"inventory-item-3\" class=\"inventory-list-item\"><span class=\"item-state-mark\"></span><span id=\"inventory-item-name-3\" class=\"item-name\"><span id=\"inventory-item-name-track-3\" class=\"item-name-track\">Dragonscale Armor</span></span><span class=\"item-stack\"></span></button>"
-                    "<button id=\"inventory-item-4\" class=\"inventory-list-item\"><span class=\"item-state-mark\"></span><span id=\"inventory-item-name-4\" class=\"item-name\"><span id=\"inventory-item-name-track-4\" class=\"item-name-track\">Black Soul Gem</span></span><span class=\"item-stack\">x2</span></button>");
-            }
+            _syntheticEmptySearch = false;
+            _inventoryPreviewList.Reset();
+            UpdateSyntheticVirtualRows(true);
             if (auto* filter = _document->GetElementById("inventory-filter-weapons")) {
                 filter->SetClass("active", true);
             }
@@ -815,7 +1063,9 @@ namespace
             SetText("inventory-player-level", "42");
             SetText("inventory-gold", "12.840");
             SetText("inventory-carry-weight", "218.5 / 420");
-            SetText("inventory-item-count", "47");
+            SetText(
+                "inventory-item-count",
+                std::to_string(kSyntheticDatasetSizes[_syntheticDatasetIndex]));
             SetText("inventory-selected-category", "WEAPON");
             SetText(
                 "inventory-selected-name",
@@ -837,20 +1087,17 @@ namespace
 
         void PopulateMagicDocument()
         {
-            if (auto* list = _document->GetElementById("magic-spell-list")) {
-                list->SetInnerRML(
-                    "<button id=\"magic-spell-0\" class=\"magic-list-item equipped\"><span class=\"spell-state-mark\">[L]</span><span id=\"magic-spell-name-0\" class=\"spell-name\"><span id=\"magic-spell-name-track-0\" class=\"spell-name-track\">Flames</span></span></button>"
-                    "<button id=\"magic-spell-1\" class=\"magic-list-item active equipped favorited\"><span class=\"spell-state-mark\">[R]</span><span id=\"magic-spell-name-1\" class=\"spell-name\"><span id=\"magic-spell-name-track-1\" class=\"spell-name-track\">Conjure Ancient Dragon Priest Guardian</span></span></button>"
-                    "<button id=\"magic-spell-2\" class=\"magic-list-item favorited\"><span class=\"spell-state-mark\"></span><span id=\"magic-spell-name-2\" class=\"spell-name\"><span id=\"magic-spell-name-track-2\" class=\"spell-name-track\">Fast Healing</span></span></button>"
-                    "<button id=\"magic-spell-3\" class=\"magic-list-item\"><span class=\"spell-state-mark\"></span><span id=\"magic-spell-name-3\" class=\"spell-name\"><span id=\"magic-spell-name-track-3\" class=\"spell-name-track\">Oakflesh</span></span></button>"
-                    "<button id=\"magic-spell-4\" class=\"magic-list-item\"><span class=\"spell-state-mark\"></span><span id=\"magic-spell-name-4\" class=\"spell-name\"><span id=\"magic-spell-name-track-4\" class=\"spell-name-track\">Clairvoyance</span></span></button>");
-            }
+            _syntheticEmptySearch = false;
+            _magicPreviewList.Reset();
+            UpdateSyntheticVirtualRows(true);
             if (auto* filter = _document->GetElementById("magic-filter-conjuration")) {
                 filter->SetClass("active", true);
             }
             SetText("magic-player-name", "Arthas");
             SetText("magic-player-level", "42");
-            SetText("magic-spell-count", "18");
+            SetText(
+                "magic-spell-count",
+                std::to_string(kSyntheticDatasetSizes[_syntheticDatasetIndex]));
             SetText("magic-selected-category", "CONJURATION");
             SetText("magic-selected-name", "Conjure Ancient Dragon Priest Guardian");
             SetText("magic-cost", "176");
@@ -1014,10 +1261,16 @@ namespace
         void SetStatus(std::string status)
         {
             _status = std::move(status);
+            RefreshWindowTitle();
+        }
+
+        void RefreshWindowTitle()
+        {
             const std::string document = _documentPath.empty() ?
                 "No document" : _documentPath.filename().string();
             const std::string title = "DragonBoard Rml Preview - " + document + " - " + _status +
-                " | Ctrl+O Open  F5 Reload  F9 Inspector  F10 Editor";
+                (_performanceSummary.empty() ? "" : " | " + _performanceSummary) +
+                " | Ctrl+O Open  F5 Reload  F6 Dataset  F7 Empty Search  F9 Inspector  F10 Editor";
             SetWindowTextA(_window, title.c_str());
         }
 
@@ -1041,7 +1294,16 @@ namespace
         std::filesystem::file_time_type _lastObservedWrite{};
         std::chrono::steady_clock::time_point _lastReloadCheck{};
         std::size_t _selectedMockCommand = 0;
+        std::size_t _syntheticDatasetIndex = 0;
+        RmlVirtualList _inventoryPreviewList{ 548.0f, 108.0f, 4 };
+        RmlVirtualList _magicPreviewList{ 548.0f, 108.0f, 4 };
+        RmlPerformanceMetrics _previewMetrics;
         std::string _status;
+        std::string _performanceSummary;
+        std::chrono::steady_clock::time_point _lastPreviewFrame{};
+        std::chrono::steady_clock::time_point _lastPerformanceReport{};
+        bool _syntheticEmptySearch = false;
+        bool _poolViolationReported = false;
         bool _developerButtonEnabled = true;
         bool _editModeEnabled = true;
         bool _rmlInitialized = false;

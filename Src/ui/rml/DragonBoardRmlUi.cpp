@@ -377,6 +377,7 @@ namespace dragonboard::ui::rml
                 BindClick(_settingsDocument, "close");
                 BindClick(_settingsDocument, "toggle-edit-mode");
                 BindClick(_settingsDocument, "toggle-dev-panel");
+                BindClick(_settingsDocument, "toggle-world-pin");
                 SelectSettingsPage("general");
                 _settingsDocument->Hide();
                 logger::info("DragonBoardVR: external RmlUi settings loaded from '{}'.", path);
@@ -519,6 +520,7 @@ namespace dragonboard::ui::rml
         _triggerCaptureProgrammatic = false;
         _pointerSmoothingInitialized = false;
         _interactiveBindings.clear();
+        ClearGripScrollHoverLock();
         _gripScrollActive = false;
         _gripScrollTarget = nullptr;
         _gripScrollTargetTop = 0.0f;
@@ -830,6 +832,11 @@ namespace dragonboard::ui::rml
 
         _currentTriggerDown = triggerDown;
         _currentGripDown = gripDown;
+        const bool scrollArmed = gripDown && !triggerDown;
+        if (!scrollArmed && _gripScrollActive) {
+            ClearGripScrollHoverLock();
+            _gripScrollActive = false;
+        }
 
         const int rawPointerX = std::clamp(
             static_cast<int>(std::lround(std::clamp(pointerU, 0.0f, 1.0f) * width)), 0, width - 1);
@@ -936,7 +943,6 @@ namespace dragonboard::ui::rml
         // Keep the global DragonBoard grip mapping intact. Smooth the scroll
         // locally while grip is held, then discard all pending motion on
         // release so the next trigger press can never inherit inertia.
-        const bool scrollArmed = gripDown && !triggerDown;
         if (scrollArmed && pointerOnPanel) {
             if (!_gripScrollActive) {
                 _gripScrollActive = true;
@@ -949,6 +955,7 @@ namespace dragonboard::ui::rml
                 }
                 _gripScrollTargetTop = _gripScrollTarget ?
                     _gripScrollTarget->GetScrollTop() : 0.0f;
+                CaptureGripScrollHoverLock();
             } else {
                 const float pointerDelta = static_cast<float>(pointerY - _gripScrollPointerY);
                 _gripScrollPointerY = pointerY;
@@ -980,6 +987,7 @@ namespace dragonboard::ui::rml
                 }
             }
         } else {
+            if (_gripScrollActive) ClearGripScrollHoverLock();
             _gripScrollActive = false;
             _gripScrollTarget = nullptr;
             _gripScrollTargetTop = 0.0f;
@@ -990,6 +998,7 @@ namespace dragonboard::ui::rml
         } else if (_activeDocument == _magicDocument && _magicVirtualInitialized) {
             UpdateMagicVirtualRows();
         }
+        ApplyGripScrollHoverLock();
 
         if (triggerDown != _previousTriggerDown) {
             logger::info(
@@ -1083,6 +1092,85 @@ namespace dragonboard::ui::rml
         UpdateInventoryLongPress(deltaTime);
 
         (void)stickX;
+    }
+
+    void DragonBoardRmlUi::CaptureGripScrollHoverLock()
+    {
+        ClearGripScrollHoverLock();
+        const std::string_view hoveredId(_hoveredElementId);
+        std::string_view suffix;
+        if (_activeDocument == _inventoryDocument &&
+            hoveredId.starts_with("inventory-item-")) {
+            _gripScrollHoverList = GripScrollHoverList::kInventory;
+            suffix = hoveredId.substr(std::string_view("inventory-item-").size());
+        } else if (_activeDocument == _magicDocument &&
+                   hoveredId.starts_with("magic-spell-")) {
+            _gripScrollHoverList = GripScrollHoverList::kMagic;
+            suffix = hoveredId.substr(std::string_view("magic-spell-").size());
+        } else {
+            return;
+        }
+
+        std::uint32_t itemIndex = 0;
+        if (!ParseDecimal(suffix, itemIndex)) {
+            _gripScrollHoverList = GripScrollHoverList::kNone;
+            return;
+        }
+        _gripScrollHoverItemIndex = static_cast<std::size_t>(itemIndex);
+        if (auto* list = _gripScrollHoverList == GripScrollHoverList::kInventory ?
+                _inventoryDocument->GetElementById("inventory-item-list") :
+                _magicDocument->GetElementById("magic-spell-list")) {
+            list->SetProperty("pointer-events", "none");
+        }
+    }
+
+    void DragonBoardRmlUi::ApplyGripScrollHoverLock()
+    {
+        if (!_gripScrollActive) return;
+        for (auto& row : _inventoryVirtualRows) {
+            if (!row.button) continue;
+            const bool locked =
+                _gripScrollHoverList == GripScrollHoverList::kInventory &&
+                row.itemIndex == _gripScrollHoverItemIndex;
+            row.button->SetPseudoClass("hover", false);
+            row.button->SetClass("grip-scroll-locked", locked);
+        }
+        for (auto& row : _magicVirtualRows) {
+            if (!row.button) continue;
+            const bool locked =
+                _gripScrollHoverList == GripScrollHoverList::kMagic &&
+                row.itemIndex == _gripScrollHoverItemIndex;
+            row.button->SetPseudoClass("hover", false);
+            row.button->SetClass("grip-scroll-locked", locked);
+        }
+    }
+
+    void DragonBoardRmlUi::ClearGripScrollHoverLock()
+    {
+        for (auto& row : _inventoryVirtualRows) {
+            if (row.button) {
+                row.button->SetPseudoClass("hover", false);
+                row.button->SetClass("grip-scroll-locked", false);
+            }
+        }
+        for (auto& row : _magicVirtualRows) {
+            if (row.button) {
+                row.button->SetPseudoClass("hover", false);
+                row.button->SetClass("grip-scroll-locked", false);
+            }
+        }
+        if (_inventoryDocument) {
+            if (auto* list = _inventoryDocument->GetElementById("inventory-item-list")) {
+                list->RemoveProperty("pointer-events");
+            }
+        }
+        if (_magicDocument) {
+            if (auto* list = _magicDocument->GetElementById("magic-spell-list")) {
+                list->RemoveProperty("pointer-events");
+            }
+        }
+        _gripScrollHoverList = GripScrollHoverList::kNone;
+        _gripScrollHoverItemIndex = static_cast<std::size_t>(-1);
     }
 
     bool DragonBoardRmlUi::RequiresContinuousRendering() const
@@ -1603,6 +1691,11 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ConsumeEditModeToggleRequested()
     {
         return std::exchange(_editModeToggleRequested, false);
+    }
+
+    bool DragonBoardRmlUi::ConsumeWorldPinToggleRequested()
+    {
+        return std::exchange(_worldPinToggleRequested, false);
     }
 
     DragonBoardRmlUi::HapticCue DragonBoardRmlUi::ConsumeHapticCue()
@@ -2580,6 +2673,17 @@ namespace dragonboard::ui::rml
         }
     }
 
+    void DragonBoardRmlUi::SetWorldPinned(bool pinned)
+    {
+        if (!_settingsDocument) return;
+        if (auto* toggle = _settingsDocument->GetElementById("toggle-world-pin")) {
+            toggle->SetClass("enabled", pinned);
+        }
+        if (auto* state = _settingsDocument->GetElementById("toggle-world-pin-state")) {
+            state->SetInnerRML(pinned ? "World" : "Hand");
+        }
+    }
+
     void DragonBoardRmlUi::SetDeveloperCommands(
         std::vector<DeveloperCommand> commands,
         std::size_t selectedIndex)
@@ -2621,28 +2725,15 @@ namespace dragonboard::ui::rml
         };
         const auto formatTiming = [](const DeveloperInfo::TimingStats& stats) {
             return Rml::CreateString(
-                "%.2f / %.2f / %.2f / %.2f ms",
-                stats.lastMs,
+                "%.2f / %.2f ms",
                 stats.averageMs,
-                stats.p95Ms,
-                stats.p99Ms);
+                stats.p95Ms);
         };
 
         setText("dev-fps", Rml::CreateString("%.1f", info.fps));
         setText("dev-frame-time", Rml::CreateString("%.2f ms", info.frameTimeMs));
-        setText("dev-present-timing", formatTiming(info.present));
         setText("dev-update-timing", formatTiming(info.update));
-        setText("dev-begin-timing", formatTiming(info.beginFrame));
         setText("dev-render-timing", formatTiming(info.render));
-        setText("dev-end-timing", formatTiming(info.endFrame));
-        setText("dev-dx11-timing", formatTiming(info.dx11State));
-        setText("dev-dx11-rt-timing", formatTiming(info.dx11RenderTargets));
-        setText("dev-dx11-viewport-timing", formatTiming(info.dx11ViewportScissor));
-        setText("dev-dx11-raster-timing", formatTiming(info.dx11Rasterizer));
-        setText("dev-dx11-blend-timing", formatTiming(info.dx11BlendDepth));
-        setText("dev-dx11-ia-timing", formatTiming(info.dx11InputAssembly));
-        setText("dev-dx11-shaders-timing", formatTiming(info.dx11Shaders));
-        setText("dev-dx11-resources-timing", formatTiming(info.dx11Resources));
         setText("dev-total-timing", formatTiming(info.total));
         setText("dev-draw-calls", std::to_string(info.panelDrawCalls));
         setText("dev-dom-elements", std::to_string(info.domElements));
@@ -2654,14 +2745,6 @@ namespace dragonboard::ui::rml
             "dev-texture-size",
             Rml::CreateString("%d x %d", info.renderWidth, info.renderHeight));
         setText("dev-version", info.pluginVersion);
-        setText("dev-feature-level", Rml::CreateString("0x%X", info.d3dFeatureLevel));
-        setText("dev-player-position", Rml::CreateString(
-            "X %.1f   Y %.1f   Z %.1f", info.playerX, info.playerY, info.playerZ));
-        setText("dev-cell", info.cellName.empty() ? "<none>" : info.cellName);
-        setText("dev-cell-form", Rml::CreateString("%08X", info.cellFormId));
-        setText("dev-worldspace", info.worldspaceName.empty() ? "<interior or none>" : info.worldspaceName);
-        setText("dev-worldspace-form", info.worldspaceFormId == 0 ? "--------" :
-            Rml::CreateString("%08X", info.worldspaceFormId));
         for (std::size_t city = 0; city < kMapCalibrationCities.size(); ++city) {
             setText(
                 ("dev-cal-status-" + std::to_string(city)).c_str(),
@@ -2871,6 +2954,8 @@ namespace dragonboard::ui::rml
             _editModeToggleRequested = true;
         } else if (value == "toggle-dev-panel") {
             _developerPanelToggleRequested = true;
+        } else if (value == "toggle-world-pin") {
+            _worldPinToggleRequested = true;
         } else if (value.starts_with("tab-")) {
             SelectSettingsPage(id + 4);
         } else if (value.starts_with("dev-tab-")) {
@@ -2916,6 +3001,10 @@ namespace dragonboard::ui::rml
     {
         if (!id || !*id || _hoveredElementId == id) return;
         _hoveredElementId = id;
+        // Grip without trigger is the RmlUi scroll gesture.  Keep hover state
+        // and visuals current, but do not vibrate for every row crossed by the
+        // smoothed pointer while the list moves underneath it.
+        if (_currentGripDown && !_currentTriggerDown) return;
         const auto now = std::chrono::steady_clock::now();
         if (now - _lastHoverHaptic < std::chrono::milliseconds(45)) return;
         _lastHoverHaptic = now;

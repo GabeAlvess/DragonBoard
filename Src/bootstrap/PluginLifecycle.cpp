@@ -1,7 +1,9 @@
 #include "bootstrap/PluginLifecycle.h"
 
 #include "bootstrap/HotkeyResolver.h"
+#include "gameplay/CombatSlowTime.h"
 #include "higgsinterface001.h"
+#include "integrations/spellwheel/SpellWheelIntegration.h"
 #include "keyhandler/keyhandler.h"
 #include "plugin.h"
 #include "papyrus/PapyrusPanelBridge.h"
@@ -40,6 +42,7 @@ namespace dragonboard::bootstrap
         switch (message->type) {
         case SKSE::MessagingInterface::kPostPostLoad:
             logger::trace("DragonBoardVR: ===== kPostPostLoad =====");
+            dragonboard::integrations::spellwheel::Initialize();
             g_higgsInterface = HiggsPluginAPI::GetHiggsInterface001(
                 SKSE::GetPluginHandle(), SKSE::GetMessagingInterface());
             if (g_higgsInterface) {
@@ -67,6 +70,7 @@ namespace dragonboard::bootstrap
         case SKSE::MessagingInterface::kDataLoaded: {
             logger::trace("DragonBoardVR: ===== kDataLoaded =====");
             ModActionManager::get().initialize();
+            dragonboard::integrations::spellwheel::RegisterPlayerEventSink();
 
             if (auto* modEventSource = SKSE::GetModCallbackEventSource()) {
                 modEventSource->AddEventSink(ModCallbackEventHandler::GetSingleton());
@@ -107,11 +111,13 @@ namespace dragonboard::bootstrap
         }
 
         case SKSE::MessagingInterface::kPreLoadGame:
+            dragonboard::gameplay::CombatSlowTime::GetSingleton().Close();
             dragonboard::papyrus::ResetPapyrusPanels();
             break;
 
         case SKSE::MessagingInterface::kPostLoadGame:
             logger::trace("DragonBoardVR: ===== kPostLoadGame =====");
+            dragonboard::integrations::spellwheel::RegisterPlayerEventSink();
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestQuestMarkerRestore();
             VRFrameUpdater::Register();
@@ -119,6 +125,7 @@ namespace dragonboard::bootstrap
 
         case SKSE::MessagingInterface::kNewGame:
             logger::trace("DragonBoardVR: ===== kNewGame =====");
+            dragonboard::integrations::spellwheel::RegisterPlayerEventSink();
             dragonboard::papyrus::ResetPapyrusPanels();
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestRmlWarmup();
             dragonboard::ui::rml::RmlPanelHost::GetSingleton().RequestQuestMarkerRestore();

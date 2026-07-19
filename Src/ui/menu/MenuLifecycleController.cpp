@@ -2,6 +2,7 @@
 
 #include "MenuPanelPresenter.h"
 #include "MenuStartupFlow.h"
+#include "gameplay/CombatSlowTime.h"
 #include "runtime/vr/GameMenuActions.h"
 #include "ui/pointer/PointerVisualController.h"
 #include "ui/rml/RmlPanelHost.h"
@@ -16,12 +17,15 @@ namespace dragonboard::ui::menu
     {
         if (!manager._menuSession.Close()) return;
 
+        dragonboard::gameplay::CombatSlowTime::GetSingleton().Close();
         logger::trace("DragonBoardVR: Menu closed (safe close for command execution)");
         MenuPanelPresenter::DetachAll(manager._panelRegistry.GetPanels());
         dragonboard::ui::pointer::PointerVisualController::Hide(manager);
     }
 
-    void MenuLifecycleController::ApplyToggle(vrui::VRMenuManager& manager)
+    void MenuLifecycleController::ApplyToggle(
+        vrui::VRMenuManager& manager,
+        bool suppressToggleHaptic)
     {
         const auto toggleStarted = std::chrono::steady_clock::now();
         auto* player = RE::PlayerCharacter::GetSingleton();
@@ -43,6 +47,15 @@ namespace dragonboard::ui::menu
         auto* skeletonRoot = manager.getPlayerSkeletonRoot();
         auto* pinnedAttachNode = manager.resolvePinnedAttachNode(skeletonRoot);
         auto& settings = vrui::VRUISettings::get();
+
+        if (menuOpen) {
+            dragonboard::gameplay::CombatSlowTime::GetSingleton().Open(
+                player->IsInCombat(),
+                settings.slowTimeOnOpen,
+                settings.slowTimeMultiplier);
+        } else {
+            dragonboard::gameplay::CombatSlowTime::GetSingleton().Close();
+        }
 
         if (menuOpen) {
             for (int i = 0; i < vrui::VRUISettings::kMaxSlots; ++i) {
@@ -107,7 +120,9 @@ namespace dragonboard::ui::menu
             dragonboard::ui::pointer::PointerVisualController::Hide(manager);
         }
 
-        manager.triggerHaptic(false, 0.5f, 0.2f);
+        if (!suppressToggleHaptic) {
+            manager.triggerHaptic(false, 0.5f, 0.2f);
+        }
         const auto toggleMs = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - toggleStarted).count();
         logger::info(

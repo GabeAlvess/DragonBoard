@@ -73,6 +73,9 @@ target('DragonBoardVR')
     add_installfiles('Assets/scripts/DragonBoardVR.pex', {
         prefixdir = 'Scripts'
     })
+    add_installfiles('Assets/integrations/spellwheel/SKSE/Plugins/SpellWheelVR_CustomConsoleCommand_DragonBoardVR.ini', {
+        prefixdir = 'SKSE/Plugins'
+    })
     add_installfiles('Assets/meshes/DragonBoardVR/ImGuiScreen.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
@@ -112,8 +115,16 @@ target('DragonBoardVR')
         os.mkdir(path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.mkdir(path.join(installRoot, 'textures'))
         os.cp(screenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'ImGuiScreen.nif'))
+        os.vrunv('powershell', {
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', path.join(os.projectdir(), 'Tools', 'GenerateStatusScreen.ps1'),
+            '-Source', screenNif,
+            '-Destination', path.join(installRoot, 'meshes', 'DragonBoardVR', 'StatusScreen.nif')
+        })
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui0.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui1.dds'))
         os.cp(spellWheelTextures, path.join(installRoot, 'textures'))
         local rmlUiDir = path.join(os.projectdir(), 'Assets', 'ui', 'rml')
         local installedRmlUiDir = path.join(outputDir, 'DragonBoardVR', 'ui')
@@ -136,6 +147,19 @@ target('DragonBoardVR')
         else
             cprint('${yellow}Papyrus runtime stub not found:${clear} %s', papyrusPex)
         end
+        local spellWheelIni = path.join(
+            os.projectdir(),
+            'Assets',
+            'integrations',
+            'spellwheel',
+            'SKSE',
+            'Plugins',
+            'SpellWheelVR_CustomConsoleCommand_DragonBoardVR.ini')
+        os.cp(spellWheelIni, path.join(
+            installRoot,
+            'SKSE',
+            'Plugins',
+            'SpellWheelVR_CustomConsoleCommand_DragonBoardVR.ini'))
         cprint('${green}synced install_output:${clear} %s', installFile)
     end)
 
@@ -153,7 +177,9 @@ target('DragonBoardRmlPreview')
         'Tools/RmlPreview/RmlSourceEditor.cpp',
         'Tools/RmlPreview/RmlVisualInspector.cpp',
         'Src/ui/rml/D3D11StateGuard.cpp',
-        'Src/ui/rml/DragonBoardRmlRenderer.cpp'
+        'Src/ui/rml/DragonBoardRmlRenderer.cpp',
+        'Src/ui/rml/RmlPerformanceMetrics.cpp',
+        'Src/ui/rml/RmlVirtualList.cpp'
     )
     add_includedirs('Src', 'Tools/RmlPreview')
     set_pcxxheader('Tools/RmlPreview/pch.h')
