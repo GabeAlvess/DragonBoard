@@ -87,6 +87,13 @@ namespace dragonboard::ui::rml
             TimingStats render;
             TimingStats endFrame;
             TimingStats dx11State;
+            TimingStats dx11RenderTargets;
+            TimingStats dx11ViewportScissor;
+            TimingStats dx11Rasterizer;
+            TimingStats dx11BlendDepth;
+            TimingStats dx11InputAssembly;
+            TimingStats dx11Shaders;
+            TimingStats dx11Resources;
             TimingStats total;
             int panelDrawCalls = 0;
             std::size_t domElements = 0;
@@ -115,6 +122,14 @@ namespace dragonboard::ui::rml
             float beginFrameMs = 0.0f;
             float renderMs = 0.0f;
             float endFrameMs = 0.0f;
+            float dx11StateMs = 0.0f;
+            float dx11RenderTargetsMs = 0.0f;
+            float dx11ViewportScissorMs = 0.0f;
+            float dx11RasterizerMs = 0.0f;
+            float dx11BlendDepthMs = 0.0f;
+            float dx11InputAssemblyMs = 0.0f;
+            float dx11ShadersMs = 0.0f;
+            float dx11ResourcesMs = 0.0f;
             float totalMs = 0.0f;
             int drawCalls = 0;
             std::size_t domElements = 0;

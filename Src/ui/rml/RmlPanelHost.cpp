@@ -2563,7 +2563,14 @@ namespace dragonboard::ui::rml
                 sample.beginFrameMs = timing.beginFrameMs;
                 sample.renderMs = timing.renderMs;
                 sample.endFrameMs = timing.endFrameMs;
-                sample.dx11StateMs = timing.beginFrameMs + timing.endFrameMs;
+                sample.dx11StateMs = timing.dx11StateMs;
+                sample.dx11RenderTargetsMs = timing.dx11RenderTargetsMs;
+                sample.dx11ViewportScissorMs = timing.dx11ViewportScissorMs;
+                sample.dx11RasterizerMs = timing.dx11RasterizerMs;
+                sample.dx11BlendDepthMs = timing.dx11BlendDepthMs;
+                sample.dx11InputAssemblyMs = timing.dx11InputAssemblyMs;
+                sample.dx11ShadersMs = timing.dx11ShadersMs;
+                sample.dx11ResourcesMs = timing.dx11ResourcesMs;
                 sample.totalMs = timing.totalMs;
                 _rmlPerformanceHistoryIndex =
                     (_rmlPerformanceHistoryIndex + 1) % _rmlPerformanceHistory.size();
@@ -2722,6 +2729,13 @@ namespace dragonboard::ui::rml
         info.render = summarize(&RmlPerformanceSample::renderMs);
         info.endFrame = summarize(&RmlPerformanceSample::endFrameMs);
         info.dx11State = summarize(&RmlPerformanceSample::dx11StateMs);
+        info.dx11RenderTargets = summarize(&RmlPerformanceSample::dx11RenderTargetsMs);
+        info.dx11ViewportScissor = summarize(&RmlPerformanceSample::dx11ViewportScissorMs);
+        info.dx11Rasterizer = summarize(&RmlPerformanceSample::dx11RasterizerMs);
+        info.dx11BlendDepth = summarize(&RmlPerformanceSample::dx11BlendDepthMs);
+        info.dx11InputAssembly = summarize(&RmlPerformanceSample::dx11InputAssemblyMs);
+        info.dx11Shaders = summarize(&RmlPerformanceSample::dx11ShadersMs);
+        info.dx11Resources = summarize(&RmlPerformanceSample::dx11ResourcesMs);
         info.total = summarize(&RmlPerformanceSample::totalMs);
         info.panelDrawCalls = _panelDrawCalls;
         info.domElements = _rmlDomElements;

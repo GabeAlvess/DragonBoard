@@ -181,55 +181,7 @@ float4 main(PSInput input) : SV_TARGET
         int drawCallCount = 0;
         Rml::Rectanglei scissorRegion{};
         bool frameActive = false;
-
-        ComPtr<ID3D11RenderTargetView> oldRtv;
-        ComPtr<ID3D11DepthStencilView> oldDsv;
-        D3D11_VIEWPORT oldViewports[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE]{};
-        UINT oldViewportCount = 0;
-        D3D11_RECT oldScissors[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE]{};
-        UINT oldScissorCount = 0;
-        ComPtr<ID3D11RasterizerState> oldRasterState;
-        ComPtr<ID3D11BlendState> oldBlendState;
-        FLOAT oldBlendFactor[4]{};
-        UINT oldSampleMask = 0;
-        ComPtr<ID3D11DepthStencilState> oldDepthState;
-        UINT oldStencilRef = 0;
-        ComPtr<ID3D11InputLayout> oldInputLayout;
-        ComPtr<ID3D11Buffer> oldVertexBuffer;
-        UINT oldVertexStride = 0;
-        UINT oldVertexOffset = 0;
-        ComPtr<ID3D11Buffer> oldIndexBuffer;
-        DXGI_FORMAT oldIndexFormat = DXGI_FORMAT_UNKNOWN;
-        UINT oldIndexOffset = 0;
-        D3D11_PRIMITIVE_TOPOLOGY oldTopology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
-        ComPtr<ID3D11VertexShader> oldVertexShader;
-        ComPtr<ID3D11PixelShader> oldPixelShader;
-        ComPtr<ID3D11GeometryShader> oldGeometryShader;
-        ComPtr<ID3D11HullShader> oldHullShader;
-        ComPtr<ID3D11DomainShader> oldDomainShader;
-        ComPtr<ID3D11Buffer> oldVsConstantBuffer;
-        ComPtr<ID3D11ShaderResourceView> oldPsSrv;
-        ComPtr<ID3D11SamplerState> oldPsSampler;
-
-        void ResetBackup()
-        {
-            oldRtv.Reset();
-            oldDsv.Reset();
-            oldRasterState.Reset();
-            oldBlendState.Reset();
-            oldDepthState.Reset();
-            oldInputLayout.Reset();
-            oldVertexBuffer.Reset();
-            oldIndexBuffer.Reset();
-            oldVertexShader.Reset();
-            oldPixelShader.Reset();
-            oldGeometryShader.Reset();
-            oldHullShader.Reset();
-            oldDomainShader.Reset();
-            oldVsConstantBuffer.Reset();
-            oldPsSrv.Reset();
-            oldPsSampler.Reset();
-        }
+        D3D11StateGuard stateGuard;
     };
 
     DragonBoardRmlRenderer::DragonBoardRmlRenderer() :
@@ -394,29 +346,10 @@ float4 main(PSInput input) : SV_TARGET
         _impl->logicalHeight = logicalHeight;
         _impl->frameActive = true;
 
-        context->OMGetRenderTargets(1, _impl->oldRtv.GetAddressOf(), _impl->oldDsv.GetAddressOf());
-        _impl->oldViewportCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-        context->RSGetViewports(&_impl->oldViewportCount, _impl->oldViewports);
-        _impl->oldScissorCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-        context->RSGetScissorRects(&_impl->oldScissorCount, _impl->oldScissors);
-        context->RSGetState(_impl->oldRasterState.GetAddressOf());
-        context->OMGetBlendState(
-            _impl->oldBlendState.GetAddressOf(), _impl->oldBlendFactor, &_impl->oldSampleMask);
-        context->OMGetDepthStencilState(_impl->oldDepthState.GetAddressOf(), &_impl->oldStencilRef);
-        context->IAGetInputLayout(_impl->oldInputLayout.GetAddressOf());
-        context->IAGetVertexBuffers(
-            0, 1, _impl->oldVertexBuffer.GetAddressOf(), &_impl->oldVertexStride, &_impl->oldVertexOffset);
-        context->IAGetIndexBuffer(
-            _impl->oldIndexBuffer.GetAddressOf(), &_impl->oldIndexFormat, &_impl->oldIndexOffset);
-        context->IAGetPrimitiveTopology(&_impl->oldTopology);
-        context->VSGetShader(_impl->oldVertexShader.GetAddressOf(), nullptr, nullptr);
-        context->PSGetShader(_impl->oldPixelShader.GetAddressOf(), nullptr, nullptr);
-        context->GSGetShader(_impl->oldGeometryShader.GetAddressOf(), nullptr, nullptr);
-        context->HSGetShader(_impl->oldHullShader.GetAddressOf(), nullptr, nullptr);
-        context->DSGetShader(_impl->oldDomainShader.GetAddressOf(), nullptr, nullptr);
-        context->VSGetConstantBuffers(0, 1, _impl->oldVsConstantBuffer.GetAddressOf());
-        context->PSGetShaderResources(0, 1, _impl->oldPsSrv.GetAddressOf());
-        context->PSGetSamplers(0, 1, _impl->oldPsSampler.GetAddressOf());
+        if (!_impl->stateGuard.Capture(context)) {
+            _impl->frameActive = false;
+            return false;
+        }
 
         context->OMSetRenderTargets(1, &renderTarget, nullptr);
         const float clear[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -449,41 +382,8 @@ float4 main(PSInput input) : SV_TARGET
     void DragonBoardRmlRenderer::EndFrame()
     {
         if (!_impl || !_impl->frameActive || !_impl->context) return;
-        auto* context = _impl->context.Get();
-
-        auto* oldRtv = _impl->oldRtv.Get();
-        context->OMSetRenderTargets(1, &oldRtv, _impl->oldDsv.Get());
-        if (_impl->oldViewportCount > 0) {
-            context->RSSetViewports(_impl->oldViewportCount, _impl->oldViewports);
-        }
-        if (_impl->oldScissorCount > 0) {
-            context->RSSetScissorRects(_impl->oldScissorCount, _impl->oldScissors);
-        }
-        context->RSSetState(_impl->oldRasterState.Get());
-        context->OMSetBlendState(
-            _impl->oldBlendState.Get(), _impl->oldBlendFactor, _impl->oldSampleMask);
-        context->OMSetDepthStencilState(_impl->oldDepthState.Get(), _impl->oldStencilRef);
-        context->IASetInputLayout(_impl->oldInputLayout.Get());
-        auto* oldVertexBuffer = _impl->oldVertexBuffer.Get();
-        context->IASetVertexBuffers(
-            0, 1, &oldVertexBuffer, &_impl->oldVertexStride, &_impl->oldVertexOffset);
-        context->IASetIndexBuffer(
-            _impl->oldIndexBuffer.Get(), _impl->oldIndexFormat, _impl->oldIndexOffset);
-        context->IASetPrimitiveTopology(_impl->oldTopology);
-        context->VSSetShader(_impl->oldVertexShader.Get(), nullptr, 0);
-        context->PSSetShader(_impl->oldPixelShader.Get(), nullptr, 0);
-        context->GSSetShader(_impl->oldGeometryShader.Get(), nullptr, 0);
-        context->HSSetShader(_impl->oldHullShader.Get(), nullptr, 0);
-        context->DSSetShader(_impl->oldDomainShader.Get(), nullptr, 0);
-        auto* oldVsCb = _impl->oldVsConstantBuffer.Get();
-        auto* oldPsSrv = _impl->oldPsSrv.Get();
-        auto* oldPsSampler = _impl->oldPsSampler.Get();
-        context->VSSetConstantBuffers(0, 1, &oldVsCb);
-        context->PSSetShaderResources(0, 1, &oldPsSrv);
-        context->PSSetSamplers(0, 1, &oldPsSampler);
-
+        _impl->stateGuard.Restore();
         _impl->frameActive = false;
-        _impl->ResetBackup();
     }
 
     bool DragonBoardRmlRenderer::IsReady() const
@@ -495,6 +395,12 @@ float4 main(PSInput input) : SV_TARGET
     int DragonBoardRmlRenderer::GetDrawCallCount() const
     {
         return _impl ? _impl->drawCallCount : 0;
+    }
+
+    const D3D11StateTiming& DragonBoardRmlRenderer::GetLastStateTiming() const
+    {
+        static const D3D11StateTiming empty{};
+        return _impl ? _impl->stateGuard.GetLastTiming() : empty;
     }
 
     Rml::CompiledGeometryHandle DragonBoardRmlRenderer::CompileGeometry(

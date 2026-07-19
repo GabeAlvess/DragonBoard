@@ -574,13 +574,25 @@
 
 .performance-card .info-row,
 .runtime-card .info-row {
-    min-height: 39px;
     padding: 2px 6px;
+}
+
+.runtime-card .info-row {
+    min-height: 39px;
     font-size: 24px;
 }
 
+.performance-card .info-row {
+    min-height: 30px;
+    font-size: 20px;
+}
+
 .performance-card .timing-row {
-    font-size: 21px;
+    font-size: 18px;
+}
+
+.performance-card .dx11-group-row {
+    color: #a4a6a6;
 }
 
 .timing-header {

@@ -135,6 +135,13 @@ namespace dragonboard::ui::rml
             float renderMs = 0.0f;
             float endFrameMs = 0.0f;
             float dx11StateMs = 0.0f;
+            float dx11RenderTargetsMs = 0.0f;
+            float dx11ViewportScissorMs = 0.0f;
+            float dx11RasterizerMs = 0.0f;
+            float dx11BlendDepthMs = 0.0f;
+            float dx11InputAssemblyMs = 0.0f;
+            float dx11ShadersMs = 0.0f;
+            float dx11ResourcesMs = 0.0f;
             float totalMs = 0.0f;
         };
 

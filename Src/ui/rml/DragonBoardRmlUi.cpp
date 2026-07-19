@@ -1544,6 +1544,17 @@ namespace dragonboard::ui::rml
                 _lastRenderTiming.updateMs + _lastRenderTiming.beginFrameMs;
             return false;
         }
+        const auto storeStateTiming = [this] {
+            const auto& timing = _renderer->GetLastStateTiming();
+            _lastRenderTiming.dx11StateMs = timing.totalMs;
+            _lastRenderTiming.dx11RenderTargetsMs = timing.renderTargetsMs;
+            _lastRenderTiming.dx11ViewportScissorMs = timing.viewportScissorMs;
+            _lastRenderTiming.dx11RasterizerMs = timing.rasterizerMs;
+            _lastRenderTiming.dx11BlendDepthMs = timing.blendDepthMs;
+            _lastRenderTiming.dx11InputAssemblyMs = timing.inputAssemblyMs;
+            _lastRenderTiming.dx11ShadersMs = timing.shadersMs;
+            _lastRenderTiming.dx11ResourcesMs = timing.resourcesMs;
+        };
         try {
             const auto renderStarted = std::chrono::steady_clock::now();
             const bool rendered = _context->Render();
@@ -1554,6 +1565,7 @@ namespace dragonboard::ui::rml
             _renderer->EndFrame();
             const auto endEnded = std::chrono::steady_clock::now();
             _lastRenderTiming.endFrameMs = Milliseconds(endStarted, endEnded);
+            storeStateTiming();
             _lastRenderTiming.totalMs = _lastRenderTiming.updateMs +
                 _lastRenderTiming.beginFrameMs + _lastRenderTiming.renderMs +
                 _lastRenderTiming.endFrameMs;
@@ -1564,6 +1576,7 @@ namespace dragonboard::ui::rml
             _renderer->EndFrame();
             const auto endEnded = std::chrono::steady_clock::now();
             _lastRenderTiming.endFrameMs = Milliseconds(endStarted, endEnded);
+            storeStateTiming();
             _lastRenderTiming.totalMs = _lastRenderTiming.updateMs +
                 _lastRenderTiming.beginFrameMs + _lastRenderTiming.renderMs +
                 _lastRenderTiming.endFrameMs;
@@ -2623,6 +2636,13 @@ namespace dragonboard::ui::rml
         setText("dev-render-timing", formatTiming(info.render));
         setText("dev-end-timing", formatTiming(info.endFrame));
         setText("dev-dx11-timing", formatTiming(info.dx11State));
+        setText("dev-dx11-rt-timing", formatTiming(info.dx11RenderTargets));
+        setText("dev-dx11-viewport-timing", formatTiming(info.dx11ViewportScissor));
+        setText("dev-dx11-raster-timing", formatTiming(info.dx11Rasterizer));
+        setText("dev-dx11-blend-timing", formatTiming(info.dx11BlendDepth));
+        setText("dev-dx11-ia-timing", formatTiming(info.dx11InputAssembly));
+        setText("dev-dx11-shaders-timing", formatTiming(info.dx11Shaders));
+        setText("dev-dx11-resources-timing", formatTiming(info.dx11Resources));
         setText("dev-total-timing", formatTiming(info.total));
         setText("dev-draw-calls", std::to_string(info.panelDrawCalls));
         setText("dev-dom-elements", std::to_string(info.domElements));

@@ -152,6 +152,7 @@ target('DragonBoardRmlPreview')
         'Tools/RmlPreview/main.cpp',
         'Tools/RmlPreview/RmlSourceEditor.cpp',
         'Tools/RmlPreview/RmlVisualInspector.cpp',
+        'Src/ui/rml/D3D11StateGuard.cpp',
         'Src/ui/rml/DragonBoardRmlRenderer.cpp'
     )
     add_includedirs('Src', 'Tools/RmlPreview')

@@ -67,7 +67,14 @@
                             <div class="info-row timing-row"><span>BeginFrame</span><span id="dev-begin-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
                             <div class="info-row timing-row"><span>Rml Render</span><span id="dev-render-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
                             <div class="info-row timing-row"><span>EndFrame</span><span id="dev-end-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
-                            <div class="info-row timing-row"><span>DX11 State</span><span id="dev-dx11-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row"><span>DX11 Guard total</span><span id="dev-dx11-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row dx11-group-row"><span>DX11 Render targets</span><span id="dev-dx11-rt-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row dx11-group-row"><span>DX11 Viewport/scissor</span><span id="dev-dx11-viewport-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row dx11-group-row"><span>DX11 Rasterizer</span><span id="dev-dx11-raster-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row dx11-group-row"><span>DX11 Blend/depth</span><span id="dev-dx11-blend-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row dx11-group-row"><span>DX11 Input assembly</span><span id="dev-dx11-ia-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row dx11-group-row"><span>DX11 Shaders</span><span id="dev-dx11-shaders-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
+                            <div class="info-row timing-row dx11-group-row"><span>DX11 Resources</span><span id="dev-dx11-resources-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
                             <div class="info-row timing-row"><span>Rml Total</span><span id="dev-total-timing" class="info-value">0 / 0 / 0 / 0 ms</span></div>
                             <div class="info-row"><span>Panel draw calls</span><span id="dev-draw-calls" class="info-value">0</span></div>
                             <div class="info-row"><span>DOM elements</span><span id="dev-dom-elements" class="info-value">0</span></div>

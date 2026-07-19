@@ -772,7 +772,14 @@ namespace
             SetText("dev-begin-timing", "0.31 / 0.34 / 0.48 / 0.57 ms");
             SetText("dev-render-timing", "1.62 / 1.71 / 2.10 / 2.44 ms");
             SetText("dev-end-timing", "0.22 / 0.25 / 0.36 / 0.43 ms");
-            SetText("dev-dx11-timing", "0.53 / 0.59 / 0.84 / 1.00 ms");
+            SetText("dev-dx11-timing", "0.41 / 0.46 / 0.66 / 0.79 ms");
+            SetText("dev-dx11-rt-timing", "0.04 / 0.05 / 0.07 / 0.09 ms");
+            SetText("dev-dx11-viewport-timing", "0.05 / 0.06 / 0.09 / 0.11 ms");
+            SetText("dev-dx11-raster-timing", "0.02 / 0.02 / 0.03 / 0.04 ms");
+            SetText("dev-dx11-blend-timing", "0.04 / 0.05 / 0.07 / 0.09 ms");
+            SetText("dev-dx11-ia-timing", "0.09 / 0.10 / 0.14 / 0.17 ms");
+            SetText("dev-dx11-shaders-timing", "0.11 / 0.12 / 0.17 / 0.20 ms");
+            SetText("dev-dx11-resources-timing", "0.06 / 0.06 / 0.09 / 0.09 ms");
             SetText("dev-total-timing", "2.33 / 2.50 / 3.22 / 3.79 ms");
             SetText("dev-draw-calls", "24");
             SetText("dev-dom-elements", "930");
