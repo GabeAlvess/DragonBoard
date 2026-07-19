@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/rml/RmlVirtualList.h"
+
 #include <memory>
 #include <optional>
 #include <chrono>
@@ -417,7 +419,7 @@ namespace dragonboard::ui::rml
         void SetSliderValue(const char* id, float value);
         void SetItemEditInfo(const ItemEditInfo& info);
         void SetMods(const std::vector<std::string>& labels);
-        void SetInventory(const InventoryInfo& info);
+        void SetInventory(InventoryInfo info);
         void SetMagic(const MagicInfo& info);
         void SetJournal(const JournalInfo& info);
         void SetEditModeEnabled(bool enabled);
@@ -455,6 +457,18 @@ namespace dragonboard::ui::rml
             Rml::ElementDocument* document = nullptr;
         };
 
+        struct InventoryVirtualRow
+        {
+            Rml::Element* button = nullptr;
+            Rml::Element* state = nullptr;
+            Rml::Element* nameViewport = nullptr;
+            Rml::Element* nameTrack = nullptr;
+            Rml::Element* stack = nullptr;
+            std::size_t itemIndex = static_cast<std::size_t>(-1);
+            std::string contentKey;
+            std::string classNames;
+        };
+
         void BindClick(Rml::ElementDocument* document, const char* id);
         void BindSlider(Rml::ElementDocument* document, const char* id);
         void HandleClick(const char* id);
@@ -482,6 +496,8 @@ namespace dragonboard::ui::rml
         void UpdateCapturedSlider(int pointerX);
         void UpdateInventoryMarquee(float deltaTime);
         void ResetInventoryMarquee();
+        void UpdateInventoryVirtualRows(bool refreshVisibleRows = false);
+        void ResetInventoryVirtualRows();
         void UpdateInventoryLongPress(float deltaTime);
         void ResetInventoryLongPress();
         void BeginTriggerScrollLock();
@@ -553,12 +569,15 @@ namespace dragonboard::ui::rml
         std::string _modsListMarkup;
         std::string _developerCommandListMarkup;
         std::string _inventoryMarqueeElementId;
-        std::string _inventoryListMarkup;
         std::string _magicListMarkup;
-        std::size_t _inventoryListSelectedIndex = static_cast<std::size_t>(-1);
         std::size_t _magicListSelectedIndex = static_cast<std::size_t>(-1);
-        bool _inventoryListInitialized = false;
         bool _magicListInitialized = false;
+        RmlVirtualList _inventoryVirtualList{ 548.0f, 108.0f, 4 };
+        std::vector<InventoryItemInfo> _inventoryVirtualItems;
+        std::vector<InventoryVirtualRow> _inventoryVirtualRows;
+        std::size_t _inventoryVirtualSelectedIndex = static_cast<std::size_t>(-1);
+        std::string _inventoryVirtualContextKey;
+        bool _inventoryVirtualInitialized = false;
         std::string _journalQuestListMarkup;
         std::vector<std::uint64_t> _journalActiveQuestOrder;
         float _inventoryMarqueeOffset = 0.0f;

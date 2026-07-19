@@ -2859,7 +2859,7 @@ namespace dragonboard::ui::rml
             }
             if (!selectedVisible) info.selectedIndex = 0;
         }
-        _rmlUi->SetInventory(info);
+        _rmlUi->SetInventory(std::move(info));
     }
 
     void RmlPanelHost::SyncRmlMagic()

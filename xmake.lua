@@ -156,3 +156,12 @@ target('DragonBoardRmlPreview')
     )
     add_includedirs('Src', 'Tools/RmlPreview')
     set_pcxxheader('Tools/RmlPreview/pch.h')
+
+target('RmlVirtualListTests')
+    set_kind('binary')
+    set_default(false)
+    add_files(
+        'Tools/RmlPreview/RmlVirtualListTests.cpp',
+        'Src/ui/rml/RmlVirtualList.cpp'
+    )
+    add_includedirs('Src')

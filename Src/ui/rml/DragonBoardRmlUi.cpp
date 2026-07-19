@@ -533,11 +533,11 @@ namespace dragonboard::ui::rml
         _activeDocument = nullptr;
         _modsListMarkup.clear();
         _developerCommandListMarkup.clear();
-        _inventoryListMarkup.clear();
+        ResetInventoryVirtualRows();
+        _inventoryVirtualItems.clear();
+        _inventoryVirtualContextKey.clear();
         _magicListMarkup.clear();
-        _inventoryListSelectedIndex = static_cast<std::size_t>(-1);
         _magicListSelectedIndex = static_cast<std::size_t>(-1);
-        _inventoryListInitialized = false;
         _magicListInitialized = false;
         _journalQuestListMarkup.clear();
         _journalActiveQuestOrder.clear();
@@ -984,6 +984,9 @@ namespace dragonboard::ui::rml
             _gripScrollTarget = nullptr;
             _gripScrollTargetTop = 0.0f;
             _gripPointerScrollAccumulator = 0.0f;
+        }
+        if (_activeDocument == _inventoryDocument && _inventoryVirtualInitialized) {
+            UpdateInventoryVirtualRows();
         }
 
         if (triggerDown != _previousTriggerDown) {
@@ -1698,7 +1701,162 @@ namespace dragonboard::ui::rml
         }
     }
 
-    void DragonBoardRmlUi::SetInventory(const InventoryInfo& info)
+    void DragonBoardRmlUi::ResetInventoryVirtualRows()
+    {
+        ResetInventoryMarquee();
+        _inventoryVirtualRows.clear();
+        _inventoryVirtualList.Reset();
+        _inventoryVirtualSelectedIndex = static_cast<std::size_t>(-1);
+        _inventoryVirtualInitialized = false;
+        if (_hoveredElementId.starts_with("inventory-item-")) {
+            _hoveredElementId.clear();
+        }
+    }
+
+    void DragonBoardRmlUi::UpdateInventoryVirtualRows(bool refreshVisibleRows)
+    {
+        if (!_inventoryDocument || _inventoryVirtualItems.empty()) return;
+        auto* list = _inventoryDocument->GetElementById("inventory-item-list");
+        if (!list) return;
+
+        _inventoryVirtualList.SetItemCount(_inventoryVirtualItems.size());
+        const auto poolSize = _inventoryVirtualList.GetPoolSize();
+        auto* content = _inventoryDocument->GetElementById("inventory-virtual-content");
+        if (!_inventoryVirtualInitialized || !content ||
+            _inventoryVirtualRows.size() != poolSize) {
+            ResetInventoryMarquee();
+            std::string markup =
+                "<div id=\"inventory-virtual-content\" class=\"inventory-virtual-content\">";
+            for (std::size_t slot = 0; slot < poolSize; ++slot) {
+                const auto suffix = std::to_string(slot);
+                markup +=
+                    "<button id=\"inventory-virtual-row-slot-" + suffix +
+                    "\" class=\"inventory-list-item\" style=\"display: none;\">"
+                    "<span id=\"inventory-virtual-state-slot-" + suffix +
+                    "\" class=\"item-state-mark\"></span>"
+                    "<span id=\"inventory-virtual-name-slot-" + suffix +
+                    "\" class=\"item-name\"><span id=\"inventory-virtual-track-slot-" +
+                    suffix + "\" class=\"item-name-track\"></span></span>"
+                    "<span id=\"inventory-virtual-stack-slot-" + suffix +
+                    "\" class=\"item-stack\"></span></button>";
+            }
+            markup += "</div>";
+            list->SetInnerRML(markup);
+            content = _inventoryDocument->GetElementById("inventory-virtual-content");
+            _inventoryVirtualRows.clear();
+            _inventoryVirtualRows.reserve(poolSize);
+            for (std::size_t slot = 0; slot < poolSize; ++slot) {
+                const auto suffix = std::to_string(slot);
+                InventoryVirtualRow row;
+                row.button = _inventoryDocument->GetElementById(
+                    "inventory-virtual-row-slot-" + suffix);
+                row.state = _inventoryDocument->GetElementById(
+                    "inventory-virtual-state-slot-" + suffix);
+                row.nameViewport = _inventoryDocument->GetElementById(
+                    "inventory-virtual-name-slot-" + suffix);
+                row.nameTrack = _inventoryDocument->GetElementById(
+                    "inventory-virtual-track-slot-" + suffix);
+                row.stack = _inventoryDocument->GetElementById(
+                    "inventory-virtual-stack-slot-" + suffix);
+                if (row.button) {
+                    row.button->AddEventListener("click", _eventListener.get());
+                }
+                _inventoryVirtualRows.push_back(std::move(row));
+            }
+            _inventoryVirtualInitialized = true;
+            refreshVisibleRows = true;
+            logger::info(
+                "DragonBoardVR: virtualized Inventory uses {} pooled rows for {} items.",
+                _inventoryVirtualRows.size(),
+                _inventoryVirtualItems.size());
+        }
+        if (!content) return;
+
+        const bool windowChanged = _inventoryVirtualList.Update(list->GetScrollTop());
+        const auto& window = _inventoryVirtualList.GetWindow();
+        if (!windowChanged && !refreshVisibleRows) return;
+        content->SetProperty(
+            "height", Rml::CreateString("%.0fpx", window.totalHeight));
+        if (windowChanged) {
+            ResetInventoryMarquee();
+            if (_hoveredElementId.starts_with("inventory-item-")) {
+                _hoveredElementId.clear();
+            }
+        }
+
+        if (windowChanged) {
+            // Move every pooled element to a temporary id first, avoiding
+            // duplicates while the real item indices change after scrolling.
+            for (std::size_t slot = 0; slot < _inventoryVirtualRows.size(); ++slot) {
+                auto& row = _inventoryVirtualRows[slot];
+                const auto suffix = std::to_string(slot);
+                if (row.button) row.button->SetId("inventory-virtual-row-slot-" + suffix);
+                if (row.nameViewport) {
+                    row.nameViewport->SetId("inventory-virtual-name-slot-" + suffix);
+                }
+                if (row.nameTrack) {
+                    row.nameTrack->SetId("inventory-virtual-track-slot-" + suffix);
+                }
+            }
+        }
+
+        for (std::size_t slot = 0; slot < _inventoryVirtualRows.size(); ++slot) {
+            auto& row = _inventoryVirtualRows[slot];
+            const auto itemIndex = window.firstIndex + slot;
+            if (!row.button || itemIndex >= _inventoryVirtualItems.size() ||
+                slot >= window.rowCount) {
+                if (row.button) row.button->SetProperty("display", "none");
+                row.itemIndex = static_cast<std::size_t>(-1);
+                row.contentKey.clear();
+                row.classNames.clear();
+                continue;
+            }
+
+            const auto& item = _inventoryVirtualItems[itemIndex];
+            const auto indexText = std::to_string(itemIndex);
+            if (windowChanged) {
+                row.button->SetId("inventory-item-" + indexText);
+                if (row.nameViewport) {
+                    row.nameViewport->SetId("inventory-item-name-" + indexText);
+                }
+                if (row.nameTrack) {
+                    row.nameTrack->SetId("inventory-item-name-track-" + indexText);
+                }
+                row.button->RemoveProperty("display");
+                row.button->SetProperty(
+                    "top",
+                    Rml::CreateString(
+                        "%.0fpx", _inventoryVirtualList.GetRowOffset(itemIndex)));
+            }
+
+            std::string classes = "inventory-list-item";
+            if (itemIndex == _inventoryVirtualSelectedIndex) classes += " active";
+            if (item.equipped) classes += " equipped";
+            if (item.favorited) classes += " favorited";
+            if (classes != row.classNames) {
+                row.button->SetClassNames(classes);
+                row.classNames = std::move(classes);
+            }
+
+            std::string contentKey = item.equipmentMarker;
+            contentKey.push_back('\x1f');
+            contentKey += item.name;
+            contentKey.push_back('\x1f');
+            contentKey += std::to_string(item.count);
+            if (contentKey != row.contentKey || row.itemIndex != itemIndex) {
+                if (row.state) row.state->SetInnerRML(EscapeRml(item.equipmentMarker));
+                if (row.nameTrack) row.nameTrack->SetInnerRML(EscapeRml(item.name));
+                if (row.stack) {
+                    row.stack->SetInnerRML(
+                        item.count > 1 ? "x" + std::to_string(item.count) : "");
+                }
+                row.contentKey = std::move(contentKey);
+            }
+            row.itemIndex = itemIndex;
+        }
+    }
+
+    void DragonBoardRmlUi::SetInventory(InventoryInfo info)
     {
         if (!_inventoryDocument) return;
 
@@ -1742,70 +1900,29 @@ namespace dragonboard::ui::rml
             }
         }
 
+        const std::string contextKey = info.activeFilter + "\n" + info.searchQuery;
+        const bool resetScroll = !_inventoryVirtualInitialized ||
+            contextKey != _inventoryVirtualContextKey;
+        _inventoryVirtualContextKey = contextKey;
+        _inventoryVirtualSelectedIndex = info.items.empty() ?
+            static_cast<std::size_t>(-1) :
+            std::min(info.selectedIndex, info.items.size() - 1);
+        _inventoryVirtualItems = std::move(info.items);
+
         if (auto* list = _inventoryDocument->GetElementById("inventory-item-list")) {
-            std::string markup;
-            if (info.items.empty()) {
-                markup = info.searchQuery.empty() ?
+            if (_inventoryVirtualItems.empty()) {
+                ResetInventoryVirtualRows();
+                list->SetInnerRML(info.searchQuery.empty() ?
                     "<div class=\"inventory-empty\">Inventory is empty</div>" :
-                    "<div class=\"inventory-empty\">No matching items</div>";
+                    "<div class=\"inventory-empty\">No matching items</div>");
             } else {
-                for (std::size_t index = 0; index < info.items.size(); ++index) {
-                    const auto& item = info.items[index];
-                    std::string classes = "inventory-list-item";
-                    if (item.equipped) classes += " equipped";
-                    if (item.favorited) classes += " favorited";
-                    markup += "<button id=\"inventory-item-" + std::to_string(index) +
-                        "\" class=\"" + classes + "\">"
-                        "<span class=\"item-state-mark\">" +
-                        EscapeRml(item.equipmentMarker) +
-                        "</span><span id=\"inventory-item-name-" +
-                        std::to_string(index) + "\" class=\"item-name\">" +
-                        "<span id=\"inventory-item-name-track-" +
-                        std::to_string(index) + "\" class=\"item-name-track\">" +
-                        EscapeRml(item.name) +
-                        "</span></span><span class=\"item-stack\">" +
-                        (item.count > 1 ? "x" + std::to_string(item.count) : "") +
-                        "</span></button>";
-                }
-            }
-
-            const bool rebuildList =
-                !_inventoryListInitialized || markup != _inventoryListMarkup;
-            if (rebuildList) {
-                ResetInventoryMarquee();
-                list->SetInnerRML(markup);
-                for (std::size_t index = 0; index < info.items.size(); ++index) {
-                    BindClick(
-                        _inventoryDocument,
-                        ("inventory-item-" + std::to_string(index)).c_str());
-                }
-                _inventoryListMarkup = std::move(markup);
-                _inventoryListInitialized = true;
-                _inventoryListSelectedIndex = static_cast<std::size_t>(-1);
-            }
-
-            const auto selectedIndex = info.items.empty() ?
-                static_cast<std::size_t>(-1) :
-                std::min(info.selectedIndex, info.items.size() - 1);
-            if (_inventoryListSelectedIndex != selectedIndex) {
-                if (_inventoryListSelectedIndex != static_cast<std::size_t>(-1)) {
-                    if (auto* previous = _inventoryDocument->GetElementById(
-                            ("inventory-item-" +
-                             std::to_string(_inventoryListSelectedIndex)).c_str())) {
-                        previous->SetClass("active", false);
-                    }
-                }
-                if (selectedIndex != static_cast<std::size_t>(-1)) {
-                    if (auto* selected = _inventoryDocument->GetElementById(
-                            ("inventory-item-" + std::to_string(selectedIndex)).c_str())) {
-                        selected->SetClass("active", true);
-                    }
-                }
-                _inventoryListSelectedIndex = selectedIndex;
+                _inventoryVirtualList.SetItemCount(_inventoryVirtualItems.size());
+                if (resetScroll) list->SetScrollTop(0.0f);
+                UpdateInventoryVirtualRows(true);
             }
         }
 
-        if (info.items.empty()) {
+        if (_inventoryVirtualItems.empty()) {
             setText("inventory-selected-category", "ITEM");
             setText("inventory-selected-name", "Inventory is empty");
             setText("inventory-attack", "--");
@@ -1833,8 +1950,9 @@ namespace dragonboard::ui::rml
             return;
         }
 
-        const auto selectedIndex = std::min(info.selectedIndex, info.items.size() - 1);
-        const auto& selected = info.items[selectedIndex];
+        const auto selectedIndex = std::min(
+            _inventoryVirtualSelectedIndex, _inventoryVirtualItems.size() - 1);
+        const auto& selected = _inventoryVirtualItems[selectedIndex];
         setText("inventory-selected-category", selected.category);
         setText("inventory-selected-name", selected.name);
         setText(
