@@ -29,8 +29,6 @@ namespace dragonboard::ui::rml
 {
     namespace
     {
-        constexpr std::uint32_t kPanelWidth = 1920;
-        constexpr std::uint32_t kPanelHeight = 1080;
         constexpr float kSceneScreenSizeScale = 0.85f;
         constexpr float kScenePlaneExtent = 170.666656f;
         constexpr const char* kInventoryKeyboardOverlayKey =
@@ -1738,8 +1736,8 @@ namespace dragonboard::ui::rml
 
             logger::info(
                 "DragonBoardVR: RmlUi texture bound to scene screen ({}x{}).",
-                kPanelWidth,
-                kPanelHeight);
+                _panelWidth,
+                _panelHeight);
         }
 
         if (_screenNode->parent != backgroundNode) {
@@ -1856,9 +1854,13 @@ namespace dragonboard::ui::rml
         device->AddRef();
         context->AddRef();
 
+        const auto& settings = vrui::VRUISettings::get();
+        const auto requestedWidth = static_cast<std::uint32_t>(settings.rmlRenderWidth);
+        const auto requestedHeight = static_cast<std::uint32_t>(settings.rmlRenderHeight);
+
         D3D11_TEXTURE2D_DESC desc{};
-        desc.Width = kPanelWidth;
-        desc.Height = kPanelHeight;
+        desc.Width = requestedWidth;
+        desc.Height = requestedHeight;
         desc.MipLevels = 1;
         desc.ArraySize = 1;
         desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -1872,7 +1874,10 @@ namespace dragonboard::ui::rml
         if (FAILED(device->CreateTexture2D(&desc, nullptr, &texture)) ||
             FAILED(device->CreateRenderTargetView(texture, nullptr, &rtv)) ||
             FAILED(device->CreateShaderResourceView(texture, nullptr, &srv))) {
-            logger::error("DragonBoardVR: failed to create the 1920x1080 RmlUi render texture.");
+            logger::error(
+                "DragonBoardVR: failed to create the {}x{} RmlUi render texture.",
+                requestedWidth,
+                requestedHeight);
             if (srv) srv->Release();
             if (rtv) rtv->Release();
             if (texture) texture->Release();
@@ -1898,12 +1903,82 @@ namespace dragonboard::ui::rml
         _panelRenderTexture = texture;
         _panelRenderTarget = rtv;
         _panelShaderResource = srv;
+        _panelWidth = requestedWidth;
+        _panelHeight = requestedHeight;
         _rmlPrewarmStep = 0;
         _rmlPrewarmFrameCount = 0;
         _rmlPrewarmTotalMs = 0;
         _rmlPrewarmComplete = false;
         _rendererReady.store(true);
-        logger::info("DragonBoardVR: RmlUi panel host initialized at 1920x1080.");
+        logger::info(
+            "DragonBoardVR: RmlUi panel host initialized at {}x{}.",
+            _panelWidth,
+            _panelHeight);
+        return true;
+    }
+
+    bool RmlPanelHost::EnsureRenderTargetSizePresentThread(
+        std::uint32_t width,
+        std::uint32_t height)
+    {
+        if (!_device || width == 0 || height == 0 || width * 9 != height * 16) {
+            return false;
+        }
+        if (_panelRenderTexture && _panelRenderTarget && _panelShaderResource &&
+            _panelWidth == width && _panelHeight == height) {
+            return true;
+        }
+
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = width;
+        desc.Height = height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+        ID3D11Texture2D* texture = nullptr;
+        ID3D11RenderTargetView* renderTarget = nullptr;
+        ID3D11ShaderResourceView* shaderResource = nullptr;
+        if (FAILED(_device->CreateTexture2D(&desc, nullptr, &texture)) ||
+            FAILED(_device->CreateRenderTargetView(texture, nullptr, &renderTarget)) ||
+            FAILED(_device->CreateShaderResourceView(texture, nullptr, &shaderResource))) {
+            if (shaderResource) shaderResource->Release();
+            if (renderTarget) renderTarget->Release();
+            if (texture) texture->Release();
+            logger::error(
+                "DragonBoardVR: failed to resize the RmlUi render texture to {}x{}; "
+                "keeping {}x{}.",
+                width,
+                height,
+                _panelWidth,
+                _panelHeight);
+            return false;
+        }
+
+        auto* oldTexture = _panelRenderTexture;
+        auto* oldRenderTarget = _panelRenderTarget;
+        auto* oldShaderResource = _panelShaderResource;
+        _panelRenderTexture = texture;
+        _panelRenderTarget = renderTarget;
+        _panelShaderResource = shaderResource;
+        _panelWidth = width;
+        _panelHeight = height;
+        if (_sceneTextureBridge) {
+            _sceneTextureBridge->texture = _panelRenderTexture;
+            _sceneTextureBridge->resourceView = _panelShaderResource;
+        }
+        if (oldShaderResource) oldShaderResource->Release();
+        if (oldRenderTarget) oldRenderTarget->Release();
+        if (oldTexture) oldTexture->Release();
+
+        _renderScheduler.MarkDirty(RmlDirtyReason::kResolution);
+        logger::info(
+            "DragonBoardVR: resized the RmlUi render texture to {}x{}.",
+            _panelWidth,
+            _panelHeight);
         return true;
     }
 
@@ -1962,8 +2037,8 @@ namespace dragonboard::ui::rml
             if (shown) {
                 rendered = _rmlUi->Render(
                     _panelRenderTarget,
-                    static_cast<int>(kPanelWidth),
-                    static_cast<int>(kPanelHeight));
+                    static_cast<int>(_panelWidth),
+                    static_cast<int>(_panelHeight));
             }
         } catch (const std::exception& error) {
             logger::warn(
@@ -2001,6 +2076,16 @@ namespace dragonboard::ui::rml
     void RmlPanelHost::RenderPanel(float deltaTime)
     {
         if (!_visible.load() || !InitializeRenderer()) return;
+        const auto& settings = vrui::VRUISettings::get();
+        const auto requestedWidth = static_cast<std::uint32_t>(settings.rmlRenderWidth);
+        const auto requestedHeight = static_cast<std::uint32_t>(settings.rmlRenderHeight);
+        if ((_panelWidth != requestedWidth || _panelHeight != requestedHeight) &&
+            !EnsureRenderTargetSizePresentThread(requestedWidth, requestedHeight)) {
+            logger::warn(
+                "DragonBoardVR: continuing with the existing RmlUi render size {}x{}.",
+                _panelWidth,
+                _panelHeight);
+        }
         const float presentSeconds = std::clamp(deltaTime, 1.0f / 240.0f, 0.1f);
         _rmlRenderRateAccumulator += presentSeconds;
         if (_rmlRenderRateAccumulator >= 1.0f) {
@@ -2104,8 +2189,8 @@ namespace dragonboard::ui::rml
             const float stickY = _stickY.load();
             const bool pointerChanged = !_rmlInputStateInitialized ||
                 pointerOnPanel != _lastRmlPointerOnPanel ||
-                std::abs(pointerU - _lastRmlPointerU) >= (0.5f / static_cast<float>(kPanelWidth)) ||
-                std::abs(pointerV - _lastRmlPointerV) >= (0.5f / static_cast<float>(kPanelHeight)) ||
+                std::abs(pointerU - _lastRmlPointerU) >= (0.5f / static_cast<float>(_panelWidth)) ||
+                std::abs(pointerV - _lastRmlPointerV) >= (0.5f / static_cast<float>(_panelHeight)) ||
                 triggerDown != _lastRmlTriggerDown;
             const bool scrollChanged = !_rmlInputStateInitialized ||
                 gripDown != _lastRmlGripDown ||
@@ -2129,8 +2214,8 @@ namespace dragonboard::ui::rml
                 gripDown,
                 stickX,
                 stickY,
-                static_cast<int>(kPanelWidth),
-                static_cast<int>(kPanelHeight),
+                static_cast<int>(_panelWidth),
+                static_cast<int>(_panelHeight),
                 deltaTime);
             if (inventoryRmlActive || magicRmlActive) {
                 _previewInteractionZoneHovered.store(
@@ -2433,8 +2518,8 @@ namespace dragonboard::ui::rml
 
             const bool rendered = _rmlUi->Render(
                 _panelRenderTarget,
-                static_cast<int>(kPanelWidth),
-                static_cast<int>(kPanelHeight));
+                static_cast<int>(_panelWidth),
+                static_cast<int>(_panelHeight));
             if (rendered) {
                 _renderScheduler.OnRendered();
                 _rmlDirtyReason = _renderScheduler.DescribeLastRenderedReasons();

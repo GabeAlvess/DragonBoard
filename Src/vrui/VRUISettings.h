@@ -79,6 +79,8 @@ namespace vrui
         // -----------------------------------------------------------------------
         bool rmlRenderOnDirty = true;        // Reuse the last panel texture while unchanged
         int rmlMaxActiveFPS = 60;             // Maximum texture refresh rate during interaction
+        int rmlRenderWidth = 1920;
+        int rmlRenderHeight = 1080;
 
         // -----------------------------------------------------------------------
         // [Activation]

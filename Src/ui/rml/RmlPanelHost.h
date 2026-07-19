@@ -384,6 +384,7 @@ namespace dragonboard::ui::rml
         // Render thread and physical DragonBoard host.
         bool EnsurePresentHookInstalled();
         bool InitializeRenderer();
+        bool EnsureRenderTargetSizePresentThread(std::uint32_t width, std::uint32_t height);
         void AdvanceRmlPrewarmPresentThread();
         void RenderPanel(float deltaTime);
         void SyncRmlSettingsFromDraft();
@@ -482,6 +483,8 @@ namespace dragonboard::ui::rml
         ID3D11Texture2D* _panelRenderTexture = nullptr;
         ID3D11RenderTargetView* _panelRenderTarget = nullptr;
         ID3D11ShaderResourceView* _panelShaderResource = nullptr;
+        std::uint32_t _panelWidth = 1920;
+        std::uint32_t _panelHeight = 1080;
         std::atomic<bool> _rendererReady{ false };
         std::atomic<bool> _rmlWarmupRequested{ false };
         std::atomic<bool> _rmlWarmupAttempted{ false };

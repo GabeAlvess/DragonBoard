@@ -78,6 +78,23 @@ namespace vrui
             static_cast<int>(ini.GetLongValue("RmlUi", "iMaxActiveFPS", rmlMaxActiveFPS)),
             15,
             240);
+        const int requestedRmlWidth = static_cast<int>(
+            ini.GetLongValue("RmlUi", "iRenderWidth", rmlRenderWidth));
+        const int requestedRmlHeight = static_cast<int>(
+            ini.GetLongValue("RmlUi", "iRenderHeight", rmlRenderHeight));
+        if (requestedRmlWidth >= 320 && requestedRmlWidth <= 4096 &&
+            requestedRmlHeight >= 180 && requestedRmlHeight <= 2304 &&
+            requestedRmlWidth * 9 == requestedRmlHeight * 16) {
+            rmlRenderWidth = requestedRmlWidth;
+            rmlRenderHeight = requestedRmlHeight;
+        } else {
+            rmlRenderWidth = 1920;
+            rmlRenderHeight = 1080;
+            logger::warn(
+                "DragonBoardVR: invalid RmlUi render size {}x{}; using 1920x1080 (16:9 required).",
+                requestedRmlWidth,
+                requestedRmlHeight);
+        }
 
         // [Activation]
         activationMode = static_cast<ActivationMode>(ini.GetLongValue("Activation", "iActivationMode", static_cast<int>(activationMode)));
@@ -460,6 +477,10 @@ namespace vrui
             "; Reuse the last RmlUi texture while the active document is unchanged");
         ini.SetLongValue("RmlUi", "iMaxActiveFPS", rmlMaxActiveFPS,
             "; Maximum RmlUi texture refresh rate during pointer, scroll, or animation activity");
+        ini.SetLongValue("RmlUi", "iRenderWidth", rmlRenderWidth,
+            "; RmlUi render-target width; must form an exact 16:9 pair with iRenderHeight");
+        ini.SetLongValue("RmlUi", "iRenderHeight", rmlRenderHeight,
+            "; RmlUi render-target height; supported examples: 1920x1080, 1280x720, 960x540");
 
         // [Activation]
         ini.SetLongValue  ("Activation", "iActivationMode",      static_cast<int>(activationMode), "; 0=Grip, 1=Trigger, 2=Thumbstick, 3=GripPlusThumbstick, 4=GripPlusY, 5=GripPlusB, 6=Hotkey8");
