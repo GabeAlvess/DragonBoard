@@ -2362,6 +2362,33 @@ namespace dragonboard::ui::rml
                 _presentFps = averageFrameSeconds > 0.0f ?
                     1.0f / averageFrameSeconds : 0.0f;
                 _panelDrawCalls = _rmlUi->GetLastDrawCallCount();
+                const auto& timing = _rmlUi->GetLastRenderTiming();
+                auto& sample = _rmlPerformanceHistory[_rmlPerformanceHistoryIndex];
+                sample.presentMs = frameSeconds * 1000.0f;
+                sample.updateMs = timing.updateMs;
+                sample.beginFrameMs = timing.beginFrameMs;
+                sample.renderMs = timing.renderMs;
+                sample.endFrameMs = timing.endFrameMs;
+                sample.dx11StateMs = timing.beginFrameMs + timing.endFrameMs;
+                sample.totalMs = timing.totalMs;
+                _rmlPerformanceHistoryIndex =
+                    (_rmlPerformanceHistoryIndex + 1) % _rmlPerformanceHistory.size();
+                _rmlPerformanceHistoryCount = std::min(
+                    _rmlPerformanceHistoryCount + 1,
+                    _rmlPerformanceHistory.size());
+
+                _rmlDomElements = timing.domElements;
+                _rmlRenderWidth = timing.width;
+                _rmlRenderHeight = timing.height;
+                _rmlActiveDocument = timing.activeDocument;
+                _rmlRenderRateAccumulator += frameSeconds;
+                ++_rmlRendersInRateWindow;
+                if (_rmlRenderRateAccumulator >= 1.0f) {
+                    _rmlRendersPerSecond = static_cast<float>(_rmlRendersInRateWindow) /
+                        _rmlRenderRateAccumulator;
+                    _rmlRenderRateAccumulator = 0.0f;
+                    _rmlRendersInRateWindow = 0;
+                }
                 return;
             }
 
@@ -2476,7 +2503,48 @@ namespace dragonboard::ui::rml
         dragonboard::ui::rml::DragonBoardRmlUi::DeveloperInfo info;
         info.fps = _presentFps;
         info.frameTimeMs = _presentFrameMs;
+        const auto summarize = [this](auto member) {
+            DragonBoardRmlUi::DeveloperInfo::TimingStats result;
+            if (_rmlPerformanceHistoryCount == 0) return result;
+
+            std::vector<float> values;
+            values.reserve(_rmlPerformanceHistoryCount);
+            float sum = 0.0f;
+            for (std::size_t index = 0; index < _rmlPerformanceHistoryCount; ++index) {
+                const float value = _rmlPerformanceHistory[index].*member;
+                values.push_back(value);
+                sum += value;
+            }
+            std::sort(values.begin(), values.end());
+            const auto percentile = [&values](float percentileValue) {
+                const auto rank = static_cast<std::size_t>(std::ceil(
+                    percentileValue * static_cast<float>(values.size()))) - 1;
+                return values[std::min(rank, values.size() - 1)];
+            };
+            const std::size_t lastIndex =
+                (_rmlPerformanceHistoryIndex + _rmlPerformanceHistory.size() - 1) %
+                _rmlPerformanceHistory.size();
+            result.lastMs = _rmlPerformanceHistory[lastIndex].*member;
+            result.averageMs = sum / static_cast<float>(_rmlPerformanceHistoryCount);
+            result.p95Ms = percentile(0.95f);
+            result.p99Ms = percentile(0.99f);
+            return result;
+        };
+        info.present = summarize(&RmlPerformanceSample::presentMs);
+        info.update = summarize(&RmlPerformanceSample::updateMs);
+        info.beginFrame = summarize(&RmlPerformanceSample::beginFrameMs);
+        info.render = summarize(&RmlPerformanceSample::renderMs);
+        info.endFrame = summarize(&RmlPerformanceSample::endFrameMs);
+        info.dx11State = summarize(&RmlPerformanceSample::dx11StateMs);
+        info.total = summarize(&RmlPerformanceSample::totalMs);
         info.panelDrawCalls = _panelDrawCalls;
+        info.domElements = _rmlDomElements;
+        info.rendersPerSecond = _rmlRendersPerSecond;
+        info.cachedFrames = _rmlCachedFrames;
+        info.renderWidth = _rmlRenderWidth;
+        info.renderHeight = _rmlRenderHeight;
+        info.activeDocument = _rmlActiveDocument;
+        info.dirtyReason = _rmlDirtyReason;
         info.pluginVersion = Plugin::VERSION.string();
         info.d3dFeatureLevel = _device ? static_cast<std::uint32_t>(_device->GetFeatureLevel()) : 0;
         info.playerX = snapshot.playerX;

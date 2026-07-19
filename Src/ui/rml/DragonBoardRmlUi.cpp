@@ -173,6 +173,24 @@ namespace dragonboard::ui::rml
             return escaped;
         }
 
+        float Milliseconds(
+            std::chrono::steady_clock::time_point start,
+            std::chrono::steady_clock::time_point end)
+        {
+            return std::chrono::duration<float, std::milli>(end - start).count();
+        }
+
+        std::size_t CountDomElements(const Rml::Element* element)
+        {
+            if (!element) return 0;
+            std::size_t count = 1;
+            const int childCount = element->GetNumChildren(false);
+            for (int index = 0; index < childCount; ++index) {
+                count += CountDomElements(element->GetChild(index));
+            }
+            return count;
+        }
+
     }
 
     class DragonBoardRmlUi::UiEventListener final : public Rml::EventListener
@@ -1444,20 +1462,83 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::Render(ID3D11RenderTargetView* renderTarget, int width, int height)
     {
         if (!IsReady()) return false;
+        _lastRenderTiming = {};
+        _lastRenderTiming.width = width;
+        _lastRenderTiming.height = height;
+        if (_activeDocument == _settingsDocument) _lastRenderTiming.activeDocument = "Settings";
+        else if (_activeDocument == _developerDocument) _lastRenderTiming.activeDocument = "Developer";
+        else if (_activeDocument == _itemEditDocument) _lastRenderTiming.activeDocument = "Item Editor";
+        else if (_activeDocument == _modsDocument) _lastRenderTiming.activeDocument = "Mods";
+        else if (_activeDocument == _inventoryDocument) _lastRenderTiming.activeDocument = "Inventory";
+        else if (_activeDocument == _magicDocument) _lastRenderTiming.activeDocument = "Magic";
+        else if (_activeDocument == _journalDocument) _lastRenderTiming.activeDocument = "Journal";
+        else if (const auto handle = FindPanelHandle(_activeDocument); handle != 0) {
+            if (const auto* panel = FindPanel(handle)) {
+                _lastRenderTiming.activeDocument = panel->id;
+            }
+        }
+        if (_lastRenderTiming.activeDocument.empty()) {
+            _lastRenderTiming.activeDocument = "<none>";
+        }
+
         const Rml::Vector2i dimensions(width, height);
         if (_context->GetDimensions() != dimensions) {
             _context->SetDimensions(dimensions);
         }
-        if (!_context->Update()) return false;
+        const auto updateStarted = std::chrono::steady_clock::now();
+        const bool updated = _context->Update();
+        const auto updateEnded = std::chrono::steady_clock::now();
+        _lastRenderTiming.updateMs = Milliseconds(updateStarted, updateEnded);
+        if (!updated) {
+            _lastRenderTiming.totalMs = _lastRenderTiming.updateMs;
+            return false;
+        }
         RestoreTriggerScrollLock();
         TraceScrollState();
-        if (!_renderer->BeginFrame(renderTarget, width, height)) return false;
+
+        const auto now = std::chrono::steady_clock::now();
+        if (_activeDocument != _lastDomCountDocument ||
+            _lastDomCountSample.time_since_epoch().count() == 0 ||
+            now - _lastDomCountSample >= std::chrono::milliseconds(250)) {
+            _lastDomElementCount = CountDomElements(_activeDocument);
+            _lastDomCountDocument = _activeDocument;
+            _lastDomCountSample = now;
+        }
+        _lastRenderTiming.domElements = _lastDomElementCount;
+
+        const auto beginStarted = std::chrono::steady_clock::now();
+        const bool beganFrame = _renderer->BeginFrame(renderTarget, width, height);
+        const auto beginEnded = std::chrono::steady_clock::now();
+        _lastRenderTiming.beginFrameMs = Milliseconds(beginStarted, beginEnded);
+        if (!beganFrame) {
+            _lastRenderTiming.totalMs =
+                _lastRenderTiming.updateMs + _lastRenderTiming.beginFrameMs;
+            return false;
+        }
         try {
+            const auto renderStarted = std::chrono::steady_clock::now();
             const bool rendered = _context->Render();
+            const auto renderEnded = std::chrono::steady_clock::now();
+            _lastRenderTiming.renderMs = Milliseconds(renderStarted, renderEnded);
+
+            const auto endStarted = std::chrono::steady_clock::now();
             _renderer->EndFrame();
+            const auto endEnded = std::chrono::steady_clock::now();
+            _lastRenderTiming.endFrameMs = Milliseconds(endStarted, endEnded);
+            _lastRenderTiming.totalMs = _lastRenderTiming.updateMs +
+                _lastRenderTiming.beginFrameMs + _lastRenderTiming.renderMs +
+                _lastRenderTiming.endFrameMs;
+            _lastRenderTiming.drawCalls = _renderer->GetDrawCallCount();
             return rendered;
         } catch (...) {
+            const auto endStarted = std::chrono::steady_clock::now();
             _renderer->EndFrame();
+            const auto endEnded = std::chrono::steady_clock::now();
+            _lastRenderTiming.endFrameMs = Milliseconds(endStarted, endEnded);
+            _lastRenderTiming.totalMs = _lastRenderTiming.updateMs +
+                _lastRenderTiming.beginFrameMs + _lastRenderTiming.renderMs +
+                _lastRenderTiming.endFrameMs;
+            _lastRenderTiming.drawCalls = _renderer->GetDrawCallCount();
             throw;
         }
     }
@@ -2273,11 +2354,33 @@ namespace dragonboard::ui::rml
                 }
             }
         };
+        const auto formatTiming = [](const DeveloperInfo::TimingStats& stats) {
+            return Rml::CreateString(
+                "%.2f / %.2f / %.2f / %.2f ms",
+                stats.lastMs,
+                stats.averageMs,
+                stats.p95Ms,
+                stats.p99Ms);
+        };
 
         setText("dev-fps", Rml::CreateString("%.1f", info.fps));
         setText("dev-frame-time", Rml::CreateString("%.2f ms", info.frameTimeMs));
+        setText("dev-present-timing", formatTiming(info.present));
+        setText("dev-update-timing", formatTiming(info.update));
+        setText("dev-begin-timing", formatTiming(info.beginFrame));
+        setText("dev-render-timing", formatTiming(info.render));
+        setText("dev-end-timing", formatTiming(info.endFrame));
+        setText("dev-dx11-timing", formatTiming(info.dx11State));
+        setText("dev-total-timing", formatTiming(info.total));
         setText("dev-draw-calls", std::to_string(info.panelDrawCalls));
-        setText("dev-texture-size", "1920 x 1080");
+        setText("dev-dom-elements", std::to_string(info.domElements));
+        setText("dev-renders-per-second", Rml::CreateString("%.1f", info.rendersPerSecond));
+        setText("dev-cached-frames", std::to_string(info.cachedFrames));
+        setText("dev-dirty-reason", info.dirtyReason.empty() ? "<none>" : info.dirtyReason);
+        setText("dev-active-document", info.activeDocument.empty() ? "<none>" : info.activeDocument);
+        setText(
+            "dev-texture-size",
+            Rml::CreateString("%d x %d", info.renderWidth, info.renderHeight));
         setText("dev-version", info.pluginVersion);
         setText("dev-feature-level", Rml::CreateString("0x%X", info.d3dFeatureLevel));
         setText("dev-player-position", Rml::CreateString(
@@ -2298,6 +2401,11 @@ namespace dragonboard::ui::rml
     int DragonBoardRmlUi::GetLastDrawCallCount() const
     {
         return _renderer ? _renderer->GetDrawCallCount() : 0;
+    }
+
+    const DragonBoardRmlUi::RenderTiming& DragonBoardRmlUi::GetLastRenderTiming() const
+    {
+        return _lastRenderTiming;
     }
 
     void DragonBoardRmlUi::BindClick(Rml::ElementDocument* document, const char* id)

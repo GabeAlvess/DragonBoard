@@ -560,6 +560,44 @@
     border-radius: 3px;
 }
 
+.performance-card,
+.runtime-card {
+    height: 725px;
+    min-height: 725px;
+}
+
+.performance-card .subheading,
+.runtime-card .subheading {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+}
+
+.performance-card .info-row,
+.runtime-card .info-row {
+    min-height: 39px;
+    padding: 2px 6px;
+    font-size: 24px;
+}
+
+.performance-card .timing-row {
+    font-size: 21px;
+}
+
+.timing-header {
+    width: 100%;
+    min-height: 32px;
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 6px;
+    color: #8f9191;
+    font-size: 18px;
+    letter-spacing: 1px;
+}
+
+.location-subheading {
+    margin-top: 24px;
+}
+
 .last-info-card {
     margin-right: 0;
 }

@@ -126,6 +126,17 @@ namespace dragonboard::ui::rml
             bool enabled = false;
         };
 
+        struct RmlPerformanceSample
+        {
+            float presentMs = 0.0f;
+            float updateMs = 0.0f;
+            float beginFrameMs = 0.0f;
+            float renderMs = 0.0f;
+            float endFrameMs = 0.0f;
+            float dx11StateMs = 0.0f;
+            float totalMs = 0.0f;
+        };
+
         struct ExternalPanelClient
         {
             std::string id;
@@ -624,6 +635,18 @@ namespace dragonboard::ui::rml
         float _presentFps = 0.0f;
         float _presentFrameMs = 0.0f;
         int _panelDrawCalls = 0;
+        std::array<RmlPerformanceSample, 240> _rmlPerformanceHistory{};
+        std::size_t _rmlPerformanceHistoryIndex = 0;
+        std::size_t _rmlPerformanceHistoryCount = 0;
+        float _rmlRenderRateAccumulator = 0.0f;
+        std::uint32_t _rmlRendersInRateWindow = 0;
+        float _rmlRendersPerSecond = 0.0f;
+        std::uint64_t _rmlCachedFrames = 0;
+        std::size_t _rmlDomElements = 0;
+        int _rmlRenderWidth = 0;
+        int _rmlRenderHeight = 0;
+        std::string _rmlActiveDocument;
+        std::string _rmlDirtyReason{ "Every frame (baseline)" };
         bool _rmlPreviousTriggerDown = false;
         bool _deferredRmlTransformApply = false;
         std::atomic<float> _pointerU{ 0.0f };

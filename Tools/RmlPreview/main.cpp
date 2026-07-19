@@ -767,7 +767,20 @@ namespace
 
             SetText("dev-fps", "90.0");
             SetText("dev-frame-time", "11.11 ms");
+            SetText("dev-present-timing", "11.11 / 11.12 / 11.30 / 11.52 ms");
+            SetText("dev-update-timing", "0.18 / 0.20 / 0.28 / 0.35 ms");
+            SetText("dev-begin-timing", "0.31 / 0.34 / 0.48 / 0.57 ms");
+            SetText("dev-render-timing", "1.62 / 1.71 / 2.10 / 2.44 ms");
+            SetText("dev-end-timing", "0.22 / 0.25 / 0.36 / 0.43 ms");
+            SetText("dev-dx11-timing", "0.53 / 0.59 / 0.84 / 1.00 ms");
+            SetText("dev-total-timing", "2.33 / 2.50 / 3.22 / 3.79 ms");
             SetText("dev-draw-calls", "24");
+            SetText("dev-dom-elements", "930");
+            SetText("dev-renders-per-second", "90.0");
+            SetText("dev-cached-frames", "0");
+            SetText("dev-texture-size", "1920 x 1080");
+            SetText("dev-active-document", "Developer");
+            SetText("dev-dirty-reason", "Every frame (baseline)");
             SetText("dev-helper", "Connected");
             SetText("dev-version", "0.8 preview");
             SetText("dev-feature-level", "0xB000");

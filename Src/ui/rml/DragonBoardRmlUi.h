@@ -69,9 +69,31 @@ namespace dragonboard::ui::rml
 
         struct DeveloperInfo
         {
+            struct TimingStats
+            {
+                float lastMs = 0.0f;
+                float averageMs = 0.0f;
+                float p95Ms = 0.0f;
+                float p99Ms = 0.0f;
+            };
+
             float fps = 0.0f;
             float frameTimeMs = 0.0f;
+            TimingStats present;
+            TimingStats update;
+            TimingStats beginFrame;
+            TimingStats render;
+            TimingStats endFrame;
+            TimingStats dx11State;
+            TimingStats total;
             int panelDrawCalls = 0;
+            std::size_t domElements = 0;
+            float rendersPerSecond = 0.0f;
+            std::uint64_t cachedFrames = 0;
+            int renderWidth = 0;
+            int renderHeight = 0;
+            std::string activeDocument;
+            std::string dirtyReason;
             std::string pluginVersion;
             std::uint32_t d3dFeatureLevel = 0;
             float playerX = 0.0f;
@@ -83,6 +105,20 @@ namespace dragonboard::ui::rml
             std::uint32_t worldspaceFormId = 0;
             std::array<std::string, 5> mapCalibrationStatus{};
             std::string mapCalibrationSummary;
+        };
+
+        struct RenderTiming
+        {
+            float updateMs = 0.0f;
+            float beginFrameMs = 0.0f;
+            float renderMs = 0.0f;
+            float endFrameMs = 0.0f;
+            float totalMs = 0.0f;
+            int drawCalls = 0;
+            std::size_t domElements = 0;
+            int width = 0;
+            int height = 0;
+            std::string activeDocument;
         };
 
         struct MapCalibrationRequest
@@ -385,6 +421,7 @@ namespace dragonboard::ui::rml
             std::size_t selectedIndex = 0);
         void SetDeveloperInfo(const DeveloperInfo& info);
         [[nodiscard]] int GetLastDrawCallCount() const;
+        [[nodiscard]] const RenderTiming& GetLastRenderTiming() const;
 
     private:
         class UiEventListener;
@@ -546,5 +583,9 @@ namespace dragonboard::ui::rml
         std::uint16_t _journalActionObjectiveID = 0;
         std::uint32_t _journalSelectedFormID = 0;
         std::uint32_t _journalSelectedInstanceID = 0;
+        RenderTiming _lastRenderTiming;
+        std::chrono::steady_clock::time_point _lastDomCountSample{};
+        std::size_t _lastDomElementCount = 0;
+        Rml::ElementDocument* _lastDomCountDocument = nullptr;
     };
 }
