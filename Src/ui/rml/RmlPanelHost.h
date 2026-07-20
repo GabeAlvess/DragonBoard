@@ -6,6 +6,7 @@
 #include "ui/rml/RmlJournalPresenter.h"
 #include "ui/rml/RmlMagicPresenter.h"
 #include "ui/rml/RmlPerformanceMetrics.h"
+#include "ui/rml/RmlEntranceAnimation.h"
 #include "ui/rml/RmlRenderScheduler.h"
 #include "ui/rml/RmlSurfaceGrabController.h"
 #include "vrui/MapCalibration.h"
@@ -113,6 +114,8 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsOpen() const { return _visible.load(); }
         [[nodiscard]] bool IsSettingsOpen() const;
         [[nodiscard]] bool IsDeveloperOpen() const;
+        [[nodiscard]] bool IsInventoryOpen() const;
+        [[nodiscard]] bool IsMagicOpen() const;
         [[nodiscard]] bool IsJournalOpen() const;
         void RequestQuestMarkerRestore();
 
@@ -537,8 +540,10 @@ namespace dragonboard::ui::rml
         float _developerInfoPresentAccumulator = 0.0f;
         int _selectedDevCommand = 0;
         RmlPerformanceMetrics _performanceMetrics;
+        RmlEntranceAnimation _entranceAnimation;
         RmlRenderScheduler _renderScheduler;
         bool _rmlWasVisiblePresentThread = false;
+        bool _entranceInputSuppressedPresentThread = false;
         std::optional<LocalPanelMode> _lastRmlPanelModePresentThread;
         DragonBoardVR_API::PanelHandle _lastRmlExternalPanelPresentThread =
             DragonBoardVR_API::InvalidPanel;

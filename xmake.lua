@@ -192,3 +192,12 @@ target('RmlVirtualListTests')
         'Src/ui/rml/RmlVirtualList.cpp'
     )
     add_includedirs('Src')
+
+target('RmlEntranceAnimationTests')
+    set_kind('binary')
+    set_default(false)
+    add_files(
+        'Tools/RmlPreview/RmlEntranceAnimationTests.cpp',
+        'Src/ui/rml/RmlEntranceAnimation.cpp'
+    )
+    add_includedirs('Src')

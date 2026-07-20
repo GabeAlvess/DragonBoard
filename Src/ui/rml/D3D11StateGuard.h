@@ -64,6 +64,7 @@ namespace dragonboard::ui::rml
         Microsoft::WRL::ComPtr<ID3D11HullShader> _hullShader;
         Microsoft::WRL::ComPtr<ID3D11DomainShader> _domainShader;
         Microsoft::WRL::ComPtr<ID3D11Buffer> _vertexConstantBuffer;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> _pixelConstantBuffer;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _pixelShaderResource;
         Microsoft::WRL::ComPtr<ID3D11SamplerState> _pixelSampler;
     };

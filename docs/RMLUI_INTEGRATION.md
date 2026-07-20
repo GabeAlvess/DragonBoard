@@ -73,6 +73,19 @@ its DOM on Present, and renders only when that snapshot marks it dirty.
 
 No RmlUi event listener may call CommonLib or Skyrim gameplay APIs directly.
 
+### Page-panel button contract
+
+Buttons that target a DragonBoard page use toggle semantics consistently:
+
+- when the requested page is closed, the button opens it;
+- when that same page is already open, the button closes it and returns Home;
+- when a different page is open, the button switches directly to the requested page.
+
+This contract applies to built-in fixed buttons and configurable slots that
+target Inventory, Magic, Journal, Settings, Developer, Mods or another native
+DragonBoard panel. Navigation, quick actions and buttons that deliberately open
+a Skyrim game menu keep their action-specific behavior.
+
 ## Built-in documents
 
 Built-in document lookup uses this order:
@@ -174,6 +187,24 @@ main page panel is active. Opening Inventory, Magic, Journal, Settings,
 Developer, Item Editor or an external page culls the status scene node.
 Returning Home unculls it without binding it to the page panel's document.
 Closing DragonBoard culls both surfaces.
+
+### Main page entrance reveal
+
+When the main page surface changes from hidden to visible, `RmlPanelHost`
+starts a short center-out entrance reveal. The effect is a renderer post-pass
+over the fully composed render target, so it does not reflow, scale or otherwise
+change the active RML document. Built-in and external page panels receive the
+same reveal. Switching documents while the page surface is already visible
+does not restart it, and independent widgets/status surfaces are unaffected.
+
+The dirty scheduler renders continuously only for the configured duration and
+then resumes cached frames. Pointer, trigger and grip input are suppressed while
+the reveal is active so invisible controls cannot be activated. Runtime INI
+controls under `[RmlUi]` are:
+
+- `bEntranceAnimation` (default `true`);
+- `fEntranceDuration` (default `0.25`, clamped to `0.05`-`2.0` seconds);
+- `fEntranceFeather` (default `0.10`, clamped to `0.0`-`0.5`).
 
 ### Transform and grab behavior
 

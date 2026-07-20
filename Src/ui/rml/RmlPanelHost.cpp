@@ -1,5 +1,6 @@
 #include "ui/rml/RmlPanelHost.h"
 #include "ui/rml/DragonBoardRmlUi.h"
+#include "ui/rml/DragonBoardRmlRenderer.h"
 #include "ui/rml/RmlPresentBridge.h"
 #include "ui/rml/StatusWidget.h"
 
@@ -34,6 +35,7 @@ namespace dragonboard::ui::rml
     {
         constexpr float kSceneScreenSizeScale = 0.85f;
         constexpr float kScenePlaneExtent = 170.666656f;
+        constexpr float kSceneScreenSurfaceDepth = 0.50f;
         // Keep CSS layout and pointer coordinates stable while allowing the
         // backing texture to render at a lower physical resolution.
         constexpr int kPanelLogicalWidth = 1920;
@@ -1011,6 +1013,16 @@ namespace dragonboard::ui::rml
     bool RmlPanelHost::IsSettingsOpen() const
     {
         return _visible.load() && _localPanelMode.load() == LocalPanelMode::kSettings;
+    }
+
+    bool RmlPanelHost::IsInventoryOpen() const
+    {
+        return _visible.load() && _localPanelMode.load() == LocalPanelMode::kInventory;
+    }
+
+    bool RmlPanelHost::IsMagicOpen() const
+    {
+        return _visible.load() && _localPanelMode.load() == LocalPanelMode::kMagic;
     }
 
     bool RmlPanelHost::IsJournalOpen() const
@@ -2040,7 +2052,7 @@ namespace dragonboard::ui::rml
             // IconPlane2's geometry is a 170.666-unit XY square. Fit a 16:9
             // screen inside the Tablet.nif face and lift it just above the
             // parchment to avoid z-fighting.
-            surface.node->local.translate = { 0.0f, 0.0f, 0.72f };
+            surface.node->local.translate = { 0.0f, 0.0f, kSceneScreenSurfaceDepth };
             surface.node->local.rotate = RE::NiMatrix3{};
             surface.node->local.scale = 1.0f;
 
@@ -2119,7 +2131,7 @@ namespace dragonboard::ui::rml
             hasBoardRelativeTransform = ancestor == backgroundNode;
         }
 
-        const RE::NiPoint3 screenSurfaceOffset{ 0.0f, 0.0f, 0.72f };
+        const RE::NiPoint3 screenSurfaceOffset{ 0.0f, 0.0f, kSceneScreenSurfaceDepth };
         if (hasBoardRelativeTransform) {
             surface.node->local.translate = boardRelative.translate +
                 (boardRelative.rotate * screenSurfaceOffset) * boardRelative.scale;
@@ -2365,16 +2377,30 @@ namespace dragonboard::ui::rml
         }
         const auto& settings = vrui::VRUISettings::get();
         _renderScheduler.Configure(settings.rmlRenderOnDirty, settings.rmlMaxActiveFPS);
+        const bool entranceConfigurationChanged = _entranceAnimation.Configure(
+            settings.rmlEntranceAnimation,
+            settings.rmlEntranceDuration,
+            settings.rmlEntranceFeather);
         const bool visible = _visible.load(std::memory_order_acquire);
         if (visible != _rmlWasVisiblePresentThread) {
             _rmlWasVisiblePresentThread = visible;
             _renderScheduler.SetVisible(visible);
+            if (visible) {
+                _entranceAnimation.Start();
+                _entranceInputSuppressedPresentThread = _entranceAnimation.IsActive();
+            } else {
+                _entranceAnimation.Stop();
+                _entranceInputSuppressedPresentThread = false;
+            }
             _inputBridge.ResetPresentTracking();
             _lastRmlPanelModePresentThread.reset();
             _lastRmlExternalPanelPresentThread = DragonBoardVR_API::InvalidPanel;
             _performanceMetrics.OnVisibilityChanged(visible);
         }
         if (visible) {
+            if (entranceConfigurationChanged || _entranceAnimation.Advance(deltaTime)) {
+                _renderScheduler.MarkDirty(RmlDirtyReason::kAnimation);
+            }
             RenderPanel(deltaTime);
         }
         if (_statusSurfaceHomeVisible.load(std::memory_order_acquire)) {
@@ -2801,11 +2827,11 @@ namespace dragonboard::ui::rml
                 _renderScheduler.MarkDirty(RmlDirtyReason::kScroll);
             }
             _rmlUi->ProcessInput(
-                input.state.pointerOnPanel,
+                input.state.pointerOnPanel && !_entranceInputSuppressedPresentThread,
                 input.state.pointerU,
                 input.state.pointerV,
-                input.state.triggerDown,
-                input.state.gripDown,
+                input.state.triggerDown && !_entranceInputSuppressedPresentThread,
+                input.state.gripDown && !_entranceInputSuppressedPresentThread,
                 input.state.stickX,
                 input.state.stickY,
                 kPanelLogicalWidth,
@@ -3101,19 +3127,28 @@ namespace dragonboard::ui::rml
 
             const bool shouldRender = _renderScheduler.ShouldRender(
                 deltaTime,
-                _rmlUi->RequiresContinuousRendering());
+                _entranceAnimation.IsActive() || _rmlUi->RequiresContinuousRendering());
             if (!shouldRender) {
                 _performanceMetrics.RecordCachedFrame();
                 return;
             }
 
+            auto* renderer = _rmlUi->GetRenderer();
+            renderer->SetEntranceEffect(
+                _entranceAnimation.GetProgress(),
+                _entranceAnimation.GetFeather());
             const bool rendered = _rmlUi->Render(
                 _panelRenderTarget,
                 static_cast<int>(_panelWidth),
                 static_cast<int>(_panelHeight),
                 kPanelLogicalWidth,
                 kPanelLogicalHeight);
+            renderer->SetEntranceEffect(1.0f, _entranceAnimation.GetFeather());
             if (rendered) {
+                if (!_entranceAnimation.IsActive() &&
+                    _entranceAnimation.GetProgress() >= 0.9999f) {
+                    _entranceInputSuppressedPresentThread = false;
+                }
                 _renderScheduler.OnRendered();
                 const float frameSeconds =
                     std::clamp(deltaTime, 1.0f / 240.0f, 0.1f);

@@ -95,6 +95,9 @@ namespace vrui
         /// Switch active panel without closing menu
         void switchToPanel(const std::string& panelName);
 
+        /// Open a panel, or return to MainPanel when that same panel is already open.
+        void togglePanel(const std::string& panelName);
+
         /// Find a registered panel by name
         std::shared_ptr<VRUIPanel> findPanelByName(const std::string& name);
 

@@ -102,6 +102,18 @@ namespace vrui
             static_cast<int>(ini.GetLongValue("RmlUi", "iMaxActiveFPS", rmlMaxActiveFPS)),
             15,
             240);
+        rmlEntranceAnimation = ini.GetBoolValue(
+            "RmlUi", "bEntranceAnimation", rmlEntranceAnimation);
+        rmlEntranceDuration = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "RmlUi", "fEntranceDuration", rmlEntranceDuration)),
+            0.05f,
+            2.0f);
+        rmlEntranceFeather = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "RmlUi", "fEntranceFeather", rmlEntranceFeather)),
+            0.0f,
+            0.5f);
         const int requestedRmlWidth = static_cast<int>(
             ini.GetLongValue("RmlUi", "iRenderWidth", rmlRenderWidth));
         const int requestedRmlHeight = static_cast<int>(
@@ -584,6 +596,12 @@ namespace vrui
             "; RmlUi render-target width; must form an exact 16:9 pair with iRenderHeight");
         ini.SetLongValue("RmlUi", "iRenderHeight", rmlRenderHeight,
             "; RmlUi render-target height; supported examples: 1920x1080, 1280x720, 960x540");
+        ini.SetBoolValue("RmlUi", "bEntranceAnimation", rmlEntranceAnimation,
+            "; Reveal the RmlUi page from the center whenever the Board opens");
+        ini.SetDoubleValue("RmlUi", "fEntranceDuration", rmlEntranceDuration,
+            "; Entrance reveal duration in seconds (0.05 to 2.0)");
+        ini.SetDoubleValue("RmlUi", "fEntranceFeather", rmlEntranceFeather,
+            "; Width of the soft reveal edge relative to the panel diagonal (0.0 to 0.5)");
 
         // [Activation]
         ini.SetLongValue  ("Activation", "iActivationMode",      static_cast<int>(activationMode), "; 0=Grip, 1=Trigger, 2=Thumbstick, 3=GripPlusThumbstick, 4=GripPlusY, 5=GripPlusB, 6=Hotkey8");

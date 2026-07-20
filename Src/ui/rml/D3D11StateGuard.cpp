@@ -64,6 +64,7 @@ namespace dragonboard::ui::rml
         });
         Measure(_timing.resourcesMs, [&] {
             context->VSGetConstantBuffers(0, 1, _vertexConstantBuffer.GetAddressOf());
+            context->PSGetConstantBuffers(0, 1, _pixelConstantBuffer.GetAddressOf());
             context->PSGetShaderResources(0, 1, _pixelShaderResource.GetAddressOf());
             context->PSGetSamplers(0, 1, _pixelSampler.GetAddressOf());
         });
@@ -116,9 +117,11 @@ namespace dragonboard::ui::rml
         });
         Measure(_timing.resourcesMs, [&] {
             auto* vertexConstantBuffer = _vertexConstantBuffer.Get();
+            auto* pixelConstantBuffer = _pixelConstantBuffer.Get();
             auto* pixelShaderResource = _pixelShaderResource.Get();
             auto* pixelSampler = _pixelSampler.Get();
             context->VSSetConstantBuffers(0, 1, &vertexConstantBuffer);
+            context->PSSetConstantBuffers(0, 1, &pixelConstantBuffer);
             context->PSSetShaderResources(0, 1, &pixelShaderResource);
             context->PSSetSamplers(0, 1, &pixelSampler);
         });
@@ -156,6 +159,7 @@ namespace dragonboard::ui::rml
         _hullShader.Reset();
         _domainShader.Reset();
         _vertexConstantBuffer.Reset();
+        _pixelConstantBuffer.Reset();
         _pixelShaderResource.Reset();
         _pixelSampler.Reset();
     }

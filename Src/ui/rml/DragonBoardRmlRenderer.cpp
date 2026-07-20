@@ -87,6 +87,61 @@ float4 main(PSInput input) : SV_TARGET
 }
 )";
 
+        constexpr char kEntranceVertexShader[] = R"(
+struct PSInput
+{
+    float4 position : SV_POSITION;
+};
+
+PSInput main(uint vertex_id : SV_VertexID)
+{
+    PSInput output;
+    float2 uv = float2((vertex_id << 1) & 2, vertex_id & 2);
+    output.position = float4(
+        uv.x * 2.0 - 1.0,
+        1.0 - uv.y * 2.0,
+        0.0,
+        1.0);
+    return output;
+}
+)";
+
+        constexpr char kEntrancePixelShader[] = R"(
+cbuffer EntranceConstants : register(b0)
+{
+    float2 render_size;
+    float entrance_progress;
+    float entrance_feather;
+};
+
+struct PSInput
+{
+    float4 position : SV_POSITION;
+};
+
+float4 main(PSInput input) : SV_TARGET
+{
+    // Work in normalized panel coordinates. This intentionally produces an
+    // ellipse on a widescreen panel so the reveal reaches all four borders at
+    // the same perceived speed without changing the document layout.
+    float2 panel_uv = input.position.xy / max(render_size, float2(1.0, 1.0));
+    float distance_from_center = length(panel_uv * 2.0 - 1.0);
+    const float corner_radius = 1.41421356237;
+    float radius = entrance_progress * corner_radius;
+    float soft_edge = max(entrance_feather * corner_radius, 0.0001);
+    float radial_reveal = 1.0 - smoothstep(
+        radius,
+        radius + soft_edge,
+        distance_from_center);
+    float initial_fade = smoothstep(0.0, 0.18, entrance_progress);
+    float reveal = radial_reveal * initial_fade;
+
+    // The dedicated blend state multiplies the fully composed render target by
+    // this source alpha. RGB is intentionally zero and ignored by that state.
+    return float4(0.0, 0.0, 0.0, reveal);
+}
+)";
+
         bool CompileHlslShader(
             const char* source,
             const char* profile,
@@ -161,13 +216,24 @@ float4 main(PSInput input) : SV_TARGET
             float translation[2];
         };
 
+        struct EntranceConstants
+        {
+            float renderSize[2];
+            float entranceProgress;
+            float entranceFeather;
+        };
+
         ComPtr<ID3D11Device> device;
         ComPtr<ID3D11DeviceContext> context;
         ComPtr<ID3D11VertexShader> vertexShader;
         ComPtr<ID3D11PixelShader> pixelShader;
+        ComPtr<ID3D11VertexShader> entranceVertexShader;
+        ComPtr<ID3D11PixelShader> entrancePixelShader;
         ComPtr<ID3D11InputLayout> inputLayout;
         ComPtr<ID3D11Buffer> constants;
+        ComPtr<ID3D11Buffer> entranceConstants;
         ComPtr<ID3D11BlendState> blendState;
+        ComPtr<ID3D11BlendState> entranceBlendState;
         ComPtr<ID3D11RasterizerState> rasterState;
         ComPtr<ID3D11DepthStencilState> depthState;
         ComPtr<ID3D11SamplerState> sampler;
@@ -180,6 +246,8 @@ float4 main(PSInput input) : SV_TARGET
         bool scissorEnabled = false;
         int drawCallCount = 0;
         Rml::Rectanglei scissorRegion{};
+        float entranceProgress = 1.0f;
+        float entranceFeather = 0.10f;
         bool frameActive = false;
         D3D11StateGuard stateGuard;
     };
@@ -203,8 +271,18 @@ float4 main(PSInput input) : SV_TARGET
 
         ComPtr<ID3DBlob> vertexBytecode;
         ComPtr<ID3DBlob> pixelBytecode;
+        ComPtr<ID3DBlob> entranceVertexBytecode;
+        ComPtr<ID3DBlob> entrancePixelBytecode;
         if (!CompileHlslShader(kVertexShader, "vs_4_0", vertexBytecode.GetAddressOf()) ||
-            !CompileHlslShader(kPixelShader, "ps_4_0", pixelBytecode.GetAddressOf())) {
+            !CompileHlslShader(kPixelShader, "ps_4_0", pixelBytecode.GetAddressOf()) ||
+            !CompileHlslShader(
+                kEntranceVertexShader,
+                "vs_4_0",
+                entranceVertexBytecode.GetAddressOf()) ||
+            !CompileHlslShader(
+                kEntrancePixelShader,
+                "ps_4_0",
+                entrancePixelBytecode.GetAddressOf())) {
             Shutdown();
             return false;
         }
@@ -214,7 +292,17 @@ float4 main(PSInput input) : SV_TARGET
                 _impl->vertexShader.GetAddressOf())) ||
             FAILED(device->CreatePixelShader(
                 pixelBytecode->GetBufferPointer(), pixelBytecode->GetBufferSize(), nullptr,
-                _impl->pixelShader.GetAddressOf()))) {
+                _impl->pixelShader.GetAddressOf())) ||
+            FAILED(device->CreateVertexShader(
+                entranceVertexBytecode->GetBufferPointer(),
+                entranceVertexBytecode->GetBufferSize(),
+                nullptr,
+                _impl->entranceVertexShader.GetAddressOf())) ||
+            FAILED(device->CreatePixelShader(
+                entrancePixelBytecode->GetBufferPointer(),
+                entrancePixelBytecode->GetBufferSize(),
+                nullptr,
+                _impl->entrancePixelShader.GetAddressOf()))) {
             Shutdown();
             return false;
         }
@@ -238,7 +326,13 @@ float4 main(PSInput input) : SV_TARGET
         constantsDesc.ByteWidth = sizeof(Impl::Constants);
         constantsDesc.Usage = D3D11_USAGE_DEFAULT;
         constantsDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        if (FAILED(device->CreateBuffer(&constantsDesc, nullptr, _impl->constants.GetAddressOf()))) {
+        D3D11_BUFFER_DESC entranceConstantsDesc = constantsDesc;
+        entranceConstantsDesc.ByteWidth = sizeof(Impl::EntranceConstants);
+        if (FAILED(device->CreateBuffer(&constantsDesc, nullptr, _impl->constants.GetAddressOf())) ||
+            FAILED(device->CreateBuffer(
+                &entranceConstantsDesc,
+                nullptr,
+                _impl->entranceConstants.GetAddressOf()))) {
             Shutdown();
             return false;
         }
@@ -253,6 +347,17 @@ float4 main(PSInput input) : SV_TARGET
         blend.DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
         blend.BlendOpAlpha = D3D11_BLEND_OP_ADD;
         blend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+        D3D11_BLEND_DESC entranceBlendDesc{};
+        auto& entranceBlend = entranceBlendDesc.RenderTarget[0];
+        entranceBlend.BlendEnable = TRUE;
+        entranceBlend.SrcBlend = D3D11_BLEND_ZERO;
+        entranceBlend.DestBlend = D3D11_BLEND_SRC_ALPHA;
+        entranceBlend.BlendOp = D3D11_BLEND_OP_ADD;
+        entranceBlend.SrcBlendAlpha = D3D11_BLEND_ZERO;
+        entranceBlend.DestBlendAlpha = D3D11_BLEND_SRC_ALPHA;
+        entranceBlend.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        entranceBlend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
         D3D11_RASTERIZER_DESC rasterDesc{};
         rasterDesc.FillMode = D3D11_FILL_SOLID;
@@ -273,6 +378,9 @@ float4 main(PSInput input) : SV_TARGET
         samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
         if (FAILED(device->CreateBlendState(&blendDesc, _impl->blendState.GetAddressOf())) ||
+            FAILED(device->CreateBlendState(
+                &entranceBlendDesc,
+                _impl->entranceBlendState.GetAddressOf())) ||
             FAILED(device->CreateRasterizerState(&rasterDesc, _impl->rasterState.GetAddressOf())) ||
             FAILED(device->CreateDepthStencilState(&depthDesc, _impl->depthState.GetAddressOf())) ||
             FAILED(device->CreateSamplerState(&samplerDesc, _impl->sampler.GetAddressOf()))) {
@@ -311,11 +419,15 @@ float4 main(PSInput input) : SV_TARGET
         _impl->sampler.Reset();
         _impl->depthState.Reset();
         _impl->rasterState.Reset();
+        _impl->entranceBlendState.Reset();
         _impl->blendState.Reset();
+        _impl->entranceConstants.Reset();
         _impl->constants.Reset();
         _impl->inputLayout.Reset();
         _impl->pixelShader.Reset();
         _impl->vertexShader.Reset();
+        _impl->entrancePixelShader.Reset();
+        _impl->entranceVertexShader.Reset();
         _impl->context.Reset();
         _impl->device.Reset();
     }
@@ -382,6 +494,41 @@ float4 main(PSInput input) : SV_TARGET
     void DragonBoardRmlRenderer::EndFrame()
     {
         if (!_impl || !_impl->frameActive || !_impl->context) return;
+        if (_impl->entranceProgress < 0.9999f) {
+            auto* context = _impl->context.Get();
+            Impl::EntranceConstants constants{
+                { static_cast<float>(_impl->renderWidth), static_cast<float>(_impl->renderHeight) },
+                _impl->entranceProgress,
+                _impl->entranceFeather
+            };
+            context->UpdateSubresource(
+                _impl->entranceConstants.Get(),
+                0,
+                nullptr,
+                &constants,
+                0,
+                0);
+
+            D3D11_RECT fullTarget{
+                0,
+                0,
+                static_cast<LONG>(_impl->renderWidth),
+                static_cast<LONG>(_impl->renderHeight)
+            };
+            context->RSSetScissorRects(1, &fullTarget);
+            context->OMSetBlendState(
+                _impl->entranceBlendState.Get(),
+                nullptr,
+                0xFFFFFFFFu);
+            context->IASetInputLayout(nullptr);
+            context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            context->VSSetShader(_impl->entranceVertexShader.Get(), nullptr, 0);
+            context->PSSetShader(_impl->entrancePixelShader.Get(), nullptr, 0);
+            auto* constantBuffer = _impl->entranceConstants.Get();
+            context->PSSetConstantBuffers(0, 1, &constantBuffer);
+            context->Draw(3, 0);
+            ++_impl->drawCallCount;
+        }
         _impl->stateGuard.Restore();
         _impl->frameActive = false;
     }
@@ -389,7 +536,10 @@ float4 main(PSInput input) : SV_TARGET
     bool DragonBoardRmlRenderer::IsReady() const
     {
         return _impl && _impl->device && _impl->context && _impl->vertexShader &&
-               _impl->pixelShader && _impl->inputLayout;
+               _impl->pixelShader && _impl->entranceVertexShader &&
+               _impl->entrancePixelShader && _impl->inputLayout &&
+               _impl->constants && _impl->entranceConstants &&
+               _impl->entranceBlendState;
     }
 
     int DragonBoardRmlRenderer::GetDrawCallCount() const
@@ -401,6 +551,13 @@ float4 main(PSInput input) : SV_TARGET
     {
         static const D3D11StateTiming empty{};
         return _impl ? _impl->stateGuard.GetLastTiming() : empty;
+    }
+
+    void DragonBoardRmlRenderer::SetEntranceEffect(float progress, float feather)
+    {
+        if (!_impl) return;
+        _impl->entranceProgress = std::clamp(progress, 0.0f, 1.0f);
+        _impl->entranceFeather = std::clamp(feather, 0.0f, 0.5f);
     }
 
     Rml::CompiledGeometryHandle DragonBoardRmlRenderer::CompileGeometry(

@@ -31,6 +31,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsReady() const;
         [[nodiscard]] int GetDrawCallCount() const;
         [[nodiscard]] const D3D11StateTiming& GetLastStateTiming() const;
+        void SetEntranceEffect(float progress, float feather);
 
         Rml::CompiledGeometryHandle CompileGeometry(
             Rml::Span<const Rml::Vertex> vertices,

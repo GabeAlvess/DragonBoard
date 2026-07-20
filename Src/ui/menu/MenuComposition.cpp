@@ -322,22 +322,22 @@ static VRUIButton::PressCallback resolveFixedButtonAction(const std::string& act
     }
     if (lower == "inventorypanel") {
         ensureDynamicPanel("InventoryPanel", "Inventory");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("InventoryPanel"); };
+        return [](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("InventoryPanel"); };
     }
     if (lower == "magicpanel") {
         ensureDynamicPanel("MagicPanel", "Magic");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("MagicPanel"); };
+        return [](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("MagicPanel"); };
     }
     // Old INIs may still name FavoritesPanel. Route that retired action to the
     // replacement RmlUi Journal instead of recreating the removed container.
     if (lower == "favoritespanel")                          return openJournalPanel();
     if (lower == "bookspanel") {
         ensureDynamicPanel("BooksPanel", "Books");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("BooksPanel"); };
+        return [](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("BooksPanel"); };
     }
     if (lower == "modspanel") {
         ensureDynamicPanel("ModsPanel", "Mods");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("ModsPanel"); };
+        return [](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("ModsPanel"); };
     }
     if (lower == "devpanel" || lower == "dev") {
         return [](VRUIButton*, EquipHand) {
@@ -734,17 +734,25 @@ void dragonboard::ui::menu::Create()
             btn->setOnPressHandler(openGameMenu("MagicMenu"));
         } else if (lowerAction == "tweenmenu") {
             btn->setOnPressHandler(openGameMenu("TweenMenu"));
-        } else if (lowerAction == "container:inventory" || lowerAction == "inventory_dyn") {
+        } else if (lowerAction == "inventorypanel" ||
+                   lowerAction == "container:inventory" || lowerAction == "inventory_dyn") {
             ensureDynamicPanel("InventoryPanel", "Inventory");
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("InventoryPanel"); });
-        } else if (lowerAction == "container:magic" || lowerAction == "magic_dyn") {
+            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("InventoryPanel"); });
+        } else if (lowerAction == "magicpanel" ||
+                   lowerAction == "container:magic" || lowerAction == "magic_dyn") {
             ensureDynamicPanel("MagicPanel", "Magic");
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("MagicPanel"); });
-        } else if (lowerAction == "container:favorites" || lowerAction == "favorites_dyn") {
+            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("MagicPanel"); });
+        } else if (lowerAction == "favoritespanel" ||
+                   lowerAction == "container:favorites" || lowerAction == "favorites_dyn") {
             btn->setOnPressHandler(openJournalPanel());
-        } else if (lowerAction == "container:books" || lowerAction == "books_dyn") {
+        } else if (lowerAction == "bookspanel" ||
+                   lowerAction == "container:books" || lowerAction == "books_dyn") {
             ensureDynamicPanel("BooksPanel", "Books");
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().switchToPanel("BooksPanel"); });
+            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("BooksPanel"); });
+        } else if (lowerAction == "modspanel" || lowerAction == "mods" ||
+                   lowerAction == "container:mods" || lowerAction == "mods_dyn") {
+            ensureDynamicPanel("ModsPanel", "Mods");
+            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("ModsPanel"); });
         } else if (lowerAction == "save") {
             btn->setOnPressHandler([](VRUIButton*, EquipHand) {
                 VRMenuManager::get().toggleMenu();

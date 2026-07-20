@@ -116,6 +116,35 @@ namespace vrui
         dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);
     }
 
+    void VRMenuManager::togglePanel(const std::string& panelName)
+    {
+        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+        bool targetIsOpen = false;
+
+        if (panelName == "InventoryPanel") {
+            targetIsOpen = rmlHost.IsInventoryOpen();
+        } else if (panelName == "MagicPanel") {
+            targetIsOpen = rmlHost.IsMagicOpen();
+        } else if (panelName == "ModsPanel") {
+            targetIsOpen = rmlHost.IsModsOpen();
+        } else if (!rmlHost.IsOpen()) {
+            const auto target = findPanelByName(panelName);
+            targetIsOpen = target && target->isActive() && target->isShown();
+        }
+
+        if (targetIsOpen) {
+            rmlHost.Close();
+            navigateHome();
+            dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, "MainPanel");
+            logger::trace(
+                "DragonBoardVR: toggled active panel '{}' closed; returned to MainPanel.",
+                panelName);
+            return;
+        }
+
+        switchToPanel(panelName);
+    }
+
     std::shared_ptr<VRUIPanel> VRMenuManager::findPanelByName(const std::string& name)
     {
         return dragonboard::ui::panels::PanelManagementController::FindByName(*this, name);

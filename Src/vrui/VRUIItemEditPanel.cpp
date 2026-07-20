@@ -22,7 +22,9 @@ namespace vrui
         // In the transformed RmlUi preview, X maps visually to the vertical
         // direction. Calibrated in-game after confirming the axis mapping.
         inline constexpr float kInventoryPreviewAnchorX = 0.50f;
-        inline constexpr float kInventoryPreviewAnchorY = 2.2f;
+        // Follow the RmlUi surface depth reduction from 0.72 to 0.50 without
+        // modifying per-item offsets or the Item Editor layout.
+        inline constexpr float kInventoryPreviewAnchorY = 1.98f;
         // The horizontal correction belongs on Z; negative moves the preview
         // toward the visual right with the current panel orientation.
         inline constexpr float kInventoryPreviewAnchorZ = -1.30f;

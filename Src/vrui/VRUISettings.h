@@ -87,6 +87,9 @@ namespace vrui
         int rmlMaxActiveFPS = 60;             // Maximum texture refresh rate during interaction
         int rmlRenderWidth = 1920;
         int rmlRenderHeight = 1080;
+        bool rmlEntranceAnimation = true;     // Reveal the page surface from its center when opened
+        float rmlEntranceDuration = 0.25f;    // Entrance duration in seconds
+        float rmlEntranceFeather = 0.10f;     // Soft radial edge relative to the panel diagonal
 
         // -----------------------------------------------------------------------
         // [Activation]
