@@ -34,6 +34,7 @@ namespace dragonboard::ui::menu
 
 namespace dragonboard::ui::input
 {
+    class FingerTouchController;
     class InteractionInputController;
     class PointerInteractionController;
 }
@@ -111,7 +112,7 @@ namespace vrui
         /// Toggle menu visibility (called by activation gesture)
         void toggleMenu(bool suppressToggleHaptic = false);
         void closeMenu();  // Only closes — never opens. Safe to call before console commands.
-        void performArmorChangeSafely(std::function<void()> change);
+        void performSkeletonChangeSafely(std::function<void()> change);
 
         /// Check if any menu is currently visible
         bool isMenuOpen() const { return _menuSession.IsOpen(); }
@@ -204,6 +205,7 @@ namespace vrui
 
         // --- Hand node discovery ---
         RE::NiNode* getMenuHandNode() const;
+        RE::NiNode* getMenuControllerNode() const;
         RE::NiNode* getDominantHandNode() const;
         RE::NiNode* getNonDominantHandNode() const;
         RE::NiNode* getPlayerSkeletonRoot() const;
@@ -242,6 +244,7 @@ namespace vrui
         friend class dragonboard::ui::menu::MenuLifecycleController;
         friend class dragonboard::ui::menu::MenuInitializationController;
         friend class dragonboard::ui::input::InteractionInputController;
+        friend class dragonboard::ui::input::FingerTouchController;
         friend class dragonboard::ui::input::PointerInteractionController;
         friend class dragonboard::ui::frame::FrameUpdateController;
         friend class dragonboard::ui::pointer::PointerVisualController;
@@ -263,6 +266,7 @@ namespace vrui
         bool _isVRIKInstalled = false;
 
         bool _initialized = false;
+        bool _rebuildOnNextOpen = false;
         dragonboard::ui::menu::MenuSessionState _menuSession;
 
         // --- Input State ---

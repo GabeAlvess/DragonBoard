@@ -106,7 +106,12 @@ namespace vrui
     void VRUIWidget::attachToNode(RE::NiNode* parent)
     {
         if (parent && _node) {
-            parent->AttachChild(_node.get());
+            if (_node->parent != parent) {
+                if (_node->parent) {
+                    _node->parent->DetachChild(_node.get());
+                }
+                parent->AttachChild(_node.get());
+            }
             RE::NiUpdateData updateData;
             _node->Update(updateData);
             _node->UpdateWorldBound();

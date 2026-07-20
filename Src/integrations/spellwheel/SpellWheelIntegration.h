@@ -6,5 +6,6 @@ namespace dragonboard::integrations::spellwheel
 {
     void Initialize();
     void RegisterPlayerEventSink();
+    void Update(float deltaTime);
     void ToggleMenuForWheel(std::int32_t wheelId);
 }

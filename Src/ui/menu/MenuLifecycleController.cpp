@@ -1,6 +1,8 @@
 #include "MenuLifecycleController.h"
 
 #include "MenuPanelPresenter.h"
+#include "MenuComposition.h"
+#include "MenuInitializationController.h"
 #include "MenuStartupFlow.h"
 #include "gameplay/CombatSlowTime.h"
 #include "runtime/vr/GameMenuActions.h"
@@ -8,6 +10,7 @@
 #include "ui/rml/RmlPanelHost.h"
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUISettings.h"
+#include "vrui/VRUIWidget.h"
 
 #include <chrono>
 
@@ -38,6 +41,20 @@ namespace dragonboard::ui::menu
             (!player->Is3DLoaded() || !player->Get3D(!manager._isVRIKInstalled))) {
             logger::warn("DragonBoardVR: Cannot open menu. Player 3D is not fully loaded.");
             return;
+        }
+
+        if (!manager._menuSession.IsOpen() && manager._rebuildOnNextOpen) {
+            manager._rebuildOnNextOpen = false;
+            const auto preservedBoardPinState = manager._boardPinState;
+            auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+            rmlHost.Close();
+            MenuPanelPresenter::DetachAll(manager._panelRegistry.GetPanels());
+            vrui::VRUIWidget::clearNifCache();
+            MenuInitializationController::Initialize(manager);
+            manager._boardPinState = preservedBoardPinState;
+            Recreate();
+            logger::info(
+                "DragonBoardVR: rebuilt menu scene graph before opening after an equipment skeleton change.");
         }
 
         const bool menuOpen = manager._menuSession.Toggle();

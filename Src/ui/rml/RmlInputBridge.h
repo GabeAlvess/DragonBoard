@@ -33,6 +33,8 @@ namespace dragonboard::ui::rml
             bool triggerButton,
             bool gripButton,
             bool pressed);
+        void SetFingerTouchTrigger(bool leftHand, bool pressed);
+        void SetFingerTouchScroll(bool scrolling);
         void SetThumbstick(float x, float y);
         void SetPointer(float u, float v, bool onPanel);
         void SetPointerOffPanel();
@@ -60,6 +62,8 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _triggerDown{ false };
         std::atomic<bool> _leftTriggerDown{ false };
         std::atomic<bool> _rightTriggerDown{ false };
+        std::atomic<bool> _fingerTouchTriggerDown{ false };
+        std::atomic<bool> _fingerTouchScrollDown{ false };
         std::atomic<bool> _lastTriggerWasLeft{ false };
         std::atomic<bool> _gripDown{ false };
         std::atomic<float> _stickX{ 0.0f };

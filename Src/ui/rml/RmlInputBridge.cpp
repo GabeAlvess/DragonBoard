@@ -11,9 +11,24 @@ namespace dragonboard::ui::rml
         _triggerDown.store(false, std::memory_order_release);
         _leftTriggerDown.store(false, std::memory_order_release);
         _rightTriggerDown.store(false, std::memory_order_release);
+        _fingerTouchTriggerDown.store(false, std::memory_order_release);
+        _fingerTouchScrollDown.store(false, std::memory_order_release);
         _gripDown.store(false, std::memory_order_release);
         _stickX.store(0.0f, std::memory_order_release);
         _stickY.store(0.0f, std::memory_order_release);
+    }
+
+    void RmlInputBridge::SetFingerTouchTrigger(bool leftHand, bool pressed)
+    {
+        if (pressed) {
+            _lastTriggerWasLeft.store(leftHand, std::memory_order_release);
+        }
+        _fingerTouchTriggerDown.store(pressed, std::memory_order_release);
+    }
+
+    void RmlInputBridge::SetFingerTouchScroll(bool scrolling)
+    {
+        _fingerTouchScrollDown.store(scrolling, std::memory_order_release);
     }
 
     void RmlInputBridge::ResetPresentTracking()
@@ -84,8 +99,10 @@ namespace dragonboard::ui::rml
         update.state.pointerOnPanel = _pointerOnPanel.load(std::memory_order_acquire);
         update.state.pointerU = _pointerU.load(std::memory_order_acquire);
         update.state.pointerV = _pointerV.load(std::memory_order_acquire);
-        update.state.triggerDown = _triggerDown.load(std::memory_order_acquire);
-        update.state.gripDown = _gripDown.load(std::memory_order_acquire);
+        update.state.triggerDown = IsTriggerDown();
+        update.state.gripDown =
+            _gripDown.load(std::memory_order_acquire) ||
+            _fingerTouchScrollDown.load(std::memory_order_acquire);
         update.state.stickX = _stickX.load(std::memory_order_acquire);
         update.state.stickY = _stickY.load(std::memory_order_acquire);
 
@@ -119,12 +136,15 @@ namespace dragonboard::ui::rml
 
     bool RmlInputBridge::IsTriggerDown() const
     {
-        return _triggerDown.load(std::memory_order_acquire);
+        return _triggerDown.load(std::memory_order_acquire) ||
+            _fingerTouchTriggerDown.load(std::memory_order_acquire);
     }
 
     bool RmlInputBridge::IsScrollActive() const
     {
-        return _gripDown.load(std::memory_order_acquire) && !IsTriggerDown();
+        return (_gripDown.load(std::memory_order_acquire) ||
+                _fingerTouchScrollDown.load(std::memory_order_acquire)) &&
+            !IsTriggerDown();
     }
 
     bool RmlInputBridge::DidTriggerReleaseSinceLastCheck()

@@ -1,4 +1,5 @@
 #include "VRUIFavoritesContainer.h"
+#include "ui/equipment/EquipInteractionController.h"
 #include "runtime/vr/ReferencePlacement.h"
 #include "VRUIItemUtils.h"
 #include "VRUIButton.h"
@@ -314,10 +315,13 @@ namespace vrui
                         auto* extraList = FindFavoriteExtraList(p, item);
 
                         if (IsFavoriteFormEquipped(p, item)) {
-                            if (item->Is(RE::FormType::Armor)) {
-                                VRMenuManager::get().performArmorChangeSafely([p, item, extraList]() {
+                            if (dragonboard::ui::equipment::EquipInteractionController::
+                                    RequiresSkeletonBridge(item)) {
+                                auto* protectedSlot = item->Is(RE::FormType::Weapon) ?
+                                    GetFavoriteEquipSlot(item, isLeft) : nullptr;
+                                VRMenuManager::get().performSkeletonChangeSafely([p, item, extraList, protectedSlot]() {
                                     if (auto* mgr = RE::ActorEquipManager::GetSingleton()) {
-                                        mgr->UnequipObject(p, item, extraList, 1, nullptr);
+                                        mgr->UnequipObject(p, item, extraList, 1, protectedSlot);
                                         VRMenuManager::get().notifyEquip();
                                         VRMenuManager::get().scheduleEquipRefresh(0.15f);
                                     }
@@ -336,8 +340,34 @@ namespace vrui
                             return;
                         }
 
+                        auto* slot = GetFavoriteEquipSlot(item, isLeft);
+                        if (item->Is(RE::FormType::Weapon) &&
+                            dragonboard::ui::equipment::EquipInteractionController::
+                                RequiresSkeletonBridge(item)) {
+                            VRMenuManager::get().performSkeletonChangeSafely(
+                                [p, item, extraList, slot, count, isLeft]() {
+                                    auto* equipManager = RE::ActorEquipManager::GetSingleton();
+                                    if (!equipManager) return;
+
+                                    if (count < 2) {
+                                        auto* equippedOther = p->GetEquippedObject(!isLeft);
+                                        if (equippedOther && equippedOther->formID == item->formID) {
+                                            auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(
+                                                !isLeft ? 0x13F43 : 0x13F42);
+                                            equipManager->UnequipObject(p, item, extraList, 1, otherSlot);
+                                        }
+                                    }
+                                    equipManager->EquipObject(p, item, extraList, 1, slot);
+                                    if (!p->IsOnMount()) p->DrawWeaponMagicHands(true);
+                                    VRMenuManager::get().notifyEquip();
+                                    VRMenuManager::get().scheduleEquipRefresh(0.15f);
+                                });
+                            return;
+                        }
+
                         // Prevent duping
-                        if (count < 2 && (item->Is(RE::FormType::Weapon) || item->Is(RE::FormType::Armor))) {
+                        if (count < 2 &&
+                            (item->Is(RE::FormType::Weapon) || item->Is(RE::FormType::Armor))) {
                             auto* equippedOther = p->GetEquippedObject(!isLeft);
                             if (equippedOther && equippedOther->formID == item->formID) {
                                 auto otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(!isLeft ? 0x13F43 : 0x13F42);
@@ -345,9 +375,8 @@ namespace vrui
                             }
                         }
 
-                        auto* slot = GetFavoriteEquipSlot(item, isLeft);
                         if (item->Is(RE::FormType::Armor)) {
-                            VRMenuManager::get().performArmorChangeSafely([p, item, extraList]() {
+                            VRMenuManager::get().performSkeletonChangeSafely([p, item, extraList]() {
                                 if (auto* mgr = RE::ActorEquipManager::GetSingleton()) {
                                     mgr->EquipObject(p, item, extraList, 1, nullptr);
                                     if (!p->IsOnMount()) p->DrawWeaponMagicHands(true);
@@ -542,6 +571,37 @@ namespace vrui
                             const bool isLeft = hand == EquipHand::kLeft;
                             auto* extraList = FindFavoriteExtraList(p, obj);
                             auto* slot = GetFavoriteEquipSlot(obj, isLeft);
+                            if (dragonboard::ui::equipment::EquipInteractionController::
+                                    RequiresSkeletonBridge(obj)) {
+                                const bool equipped = IsFavoriteFormEquipped(p, obj);
+                                VRMenuManager::get().performSkeletonChangeSafely(
+                                    [p, obj, extraList, equipped, slot]() {
+                                        auto* equipManager = RE::ActorEquipManager::GetSingleton();
+                                        if (!equipManager) return;
+
+                                        if (equipped) {
+                                            equipManager->UnequipObject(
+                                                p,
+                                                obj,
+                                                extraList,
+                                                1,
+                                                obj->Is(RE::FormType::Weapon) ? slot : nullptr);
+                                        } else {
+                                            equipManager->EquipObject(
+                                                p,
+                                                obj,
+                                                extraList,
+                                                1,
+                                                obj->Is(RE::FormType::Weapon) ? slot : nullptr);
+                                            if (!p->IsOnMount()) {
+                                                p->DrawWeaponMagicHands(true);
+                                            }
+                                        }
+                                        VRMenuManager::get().notifyEquip();
+                                        VRMenuManager::get().scheduleEquipRefresh(0.15f);
+                                    });
+                                return;
+                            }
                             if (IsFavoriteFormEquipped(p, obj)) {
                                 mgr->UnequipObject(p, obj, extraList, 1, slot);
                                 VRMenuManager::get().notifyEquip();

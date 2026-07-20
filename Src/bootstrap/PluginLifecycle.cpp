@@ -4,6 +4,7 @@
 #include "gameplay/CombatSlowTime.h"
 #include "higgsinterface001.h"
 #include "integrations/spellwheel/SpellWheelIntegration.h"
+#include "integrations/vrik/VrikFingerPose.h"
 #include "keyhandler/keyhandler.h"
 #include "plugin.h"
 #include "papyrus/PapyrusPanelBridge.h"
@@ -43,6 +44,7 @@ namespace dragonboard::bootstrap
         case SKSE::MessagingInterface::kPostPostLoad:
             logger::trace("DragonBoardVR: ===== kPostPostLoad =====");
             dragonboard::integrations::spellwheel::Initialize();
+            dragonboard::integrations::vrik::Initialize();
             g_higgsInterface = HiggsPluginAPI::GetHiggsInterface001(
                 SKSE::GetPluginHandle(), SKSE::GetMessagingInterface());
             if (g_higgsInterface) {
@@ -111,6 +113,7 @@ namespace dragonboard::bootstrap
         }
 
         case SKSE::MessagingInterface::kPreLoadGame:
+            dragonboard::integrations::vrik::RestoreTouchHandPose();
             dragonboard::gameplay::CombatSlowTime::GetSingleton().Close();
             dragonboard::papyrus::ResetPapyrusPanels();
             break;

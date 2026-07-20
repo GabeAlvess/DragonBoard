@@ -96,6 +96,20 @@ namespace dragonboard::ui::rml
             const char* className,
             bool enabled) noexcept;
 
+        [[nodiscard]] bool SampleFingerTouchSurface(
+            const RE::NiPoint3& worldPoint,
+            float& pointerU,
+            float& pointerV,
+            float& signedDistance) const;
+        void SetFingerTouchInput(
+            bool active,
+            bool pointerOnPanel,
+            float pointerU,
+            float pointerV,
+            bool pressed,
+            bool scrolling,
+            bool leftHand);
+
         [[nodiscard]] bool IsOpen() const { return _visible.load(); }
         [[nodiscard]] bool IsSettingsOpen() const;
         [[nodiscard]] bool IsDeveloperOpen() const;
@@ -418,6 +432,13 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _rmlMagicSyncPending{ true };
         std::atomic<bool> _rmlJournalSyncPending{ true };
         RmlInputBridge _inputBridge;
+        bool _fingerTouchInputActive = false;
+        bool _fingerTouchPointerOnPanel = false;
+        bool _fingerTouchPressed = false;
+        bool _fingerTouchScrolling = false;
+        bool _fingerTouchLeftHand = false;
+        float _fingerTouchPointerU = 0.0f;
+        float _fingerTouchPointerV = 0.0f;
 
         std::atomic<bool> _visible{ false };
         std::atomic<bool> _applyPending{ false };

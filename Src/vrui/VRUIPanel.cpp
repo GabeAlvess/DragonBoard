@@ -12,6 +12,47 @@ namespace vrui
     namespace
     {
         constexpr float kPanelFaceCorrectionDegrees = 180.0f;
+
+        RE::NiTransform MakeRelativeTransform(
+            const RE::NiTransform& parentWorld,
+            const RE::NiTransform& childWorld)
+        {
+            const float parentScale = parentWorld.scale > 0.0001f ?
+                parentWorld.scale : 1.0f;
+            const RE::NiMatrix3 inverseParentRotation = parentWorld.rotate.Transpose();
+
+            RE::NiTransform relative;
+            relative.translate =
+                inverseParentRotation * (childWorld.translate - parentWorld.translate) /
+                parentScale;
+            relative.rotate = inverseParentRotation * childWorld.rotate;
+            relative.scale = childWorld.scale / parentScale;
+            return relative;
+        }
+
+        RE::NiTransform ComposeTransform(
+            const RE::NiTransform& parentWorld,
+            const RE::NiTransform& relative)
+        {
+            RE::NiTransform result;
+            result.translate = parentWorld.translate +
+                parentWorld.rotate * relative.translate * parentWorld.scale;
+            result.rotate = parentWorld.rotate * relative.rotate;
+            result.scale = parentWorld.scale * relative.scale;
+            return result;
+        }
+
+        void ApplyWorldTransform(RE::NiNode* node, const RE::NiTransform& worldTransform)
+        {
+            if (!node || !node->parent) return;
+
+            const auto local = MakeRelativeTransform(node->parent->world, worldTransform);
+            node->local = local;
+
+            RE::NiUpdateData updateData;
+            updateData.flags = RE::NiUpdateData::Flag::kDirty;
+            node->Update(updateData);
+        }
     }
 
     VRUIPanel::VRUIPanel(const std::string& name, float scale, bool drawsBackground)
@@ -26,8 +67,14 @@ namespace vrui
     {
         const bool sameTrackingNode = _trackingHandNode.get() == handNode;
         const bool alreadyAttached = _node && _node->parent == handNode;
+        const bool preserveWorld =
+            _preserveWorldOnNextHandAttach && _node && _node->parent;
+        const RE::NiTransform preservedWorld = preserveWorld ?
+            _node->world : RE::NiTransform{};
+        _preserveWorldOnNextHandAttach = false;
         _offset = offset;
         _trackingHandNode.reset(handNode);
+        _hasParkedTrackingOffset = false;
 
         if (handNode) {
             if (!alreadyAttached) {
@@ -35,9 +82,42 @@ namespace vrui
                 setLocalPosition(offset);
             }
 
+            if (preserveWorld) {
+                ApplyWorldTransform(_node.get(), preservedWorld);
+
+                auto& settings = VRUISettings::get();
+                RE::NiMatrix3 userRotation;
+                userRotation.SetEulerAnglesXYZ(
+                    settings.menuRotX * kDegToRad,
+                    settings.menuRotY * kDegToRad,
+                    (settings.menuRotZ + kPanelFaceCorrectionDegrees) * kDegToRad);
+                _currentWorldRot = preservedWorld.rotate * userRotation.Transpose();
+                _currentWorldPos = preservedWorld.translate;
+                _hasTargetTransform = true;
+                _smoothHandoffPosition = settings.bEnableMenuLerp;
+                _handoffElapsed = 0.0f;
+
+                RE::NiPoint3 handTarget;
+                handTarget.x = handNode->world.translate.x +
+                    _currentWorldRot.entry[0][0] * _offset.x +
+                    _currentWorldRot.entry[0][1] * _offset.y +
+                    _currentWorldRot.entry[0][2] * _offset.z;
+                handTarget.y = handNode->world.translate.y +
+                    _currentWorldRot.entry[1][0] * _offset.x +
+                    _currentWorldRot.entry[1][1] * _offset.y +
+                    _currentWorldRot.entry[1][2] * _offset.z;
+                handTarget.z = handNode->world.translate.z +
+                    _currentWorldRot.entry[2][0] * _offset.x +
+                    _currentWorldRot.entry[2][1] * _offset.y +
+                    _currentWorldRot.entry[2][2] * _offset.z;
+                _handoffPositionCorrection = preservedWorld.translate - handTarget;
+            }
+
             // Only reset smoothing when the actual anchor changes.
-            if (!sameTrackingNode || !alreadyAttached) {
+            if (!preserveWorld && (!sameTrackingNode || !alreadyAttached)) {
                 _hasTargetTransform = false;
+                _smoothHandoffPosition = false;
+                _handoffElapsed = 0.0f;
             }
 
             logger::trace("DragonBoardVR: Panel '{}' attached directly to hand node '{}'", getName(), handNode->name.c_str());
@@ -46,9 +126,54 @@ namespace vrui
         }
     }
 
+    bool VRUIPanel::parkAtWorldNode(RE::NiNode* worldRoot, RE::NiNode* trackingAnchor)
+    {
+        if (!worldRoot || !_node || !_node->parent) {
+            return false;
+        }
+
+        const RE::NiTransform preservedWorld = _node->world;
+        // The temporary bridge may use an independent OpenVR controller node
+        // even though the panel is normally attached to an animated hand bone.
+        _hasParkedTrackingOffset = trackingAnchor != nullptr;
+        if (_hasParkedTrackingOffset) {
+            _parkedTrackingOffset = MakeRelativeTransform(
+                trackingAnchor->world,
+                preservedWorld);
+        }
+        _trackingHandNode.reset();
+        _smoothHandoffPosition = false;
+        _handoffElapsed = 0.0f;
+
+        detachFromParent();
+        worldRoot->AttachChild(_node.get());
+
+        ApplyWorldTransform(_node.get(), preservedWorld);
+        return true;
+    }
+
+    void VRUIPanel::prepareSmoothHandHandoff()
+    {
+        _preserveWorldOnNextHandAttach =
+            _hasParkedTrackingOffset && _node && _node->parent;
+    }
+
+    bool VRUIPanel::updateParkedTracking(RE::NiNode* trackingAnchor)
+    {
+        if (!_hasParkedTrackingOffset || !trackingAnchor || !_node || !_node->parent) {
+            return false;
+        }
+
+        ApplyWorldTransform(
+            _node.get(),
+            ComposeTransform(trackingAnchor->world, _parkedTrackingOffset));
+        return true;
+    }
+
     void VRUIPanel::detachFromHandNode()
     {
         _trackingHandNode.reset();
+        _hasParkedTrackingOffset = false;
         detachFromParent(); // Safely detaches _node from the player skeleton
         setVisible(false);
         _shown = false;
@@ -171,9 +296,33 @@ namespace vrui
                 // This puts the menu at the correct center point.
                 RE::NiPoint3 liveHandPos = _trackingHandNode->world.translate;
                 
-                _currentWorldPos.x = liveHandPos.x + _currentWorldRot.entry[0][0] * _offset.x + _currentWorldRot.entry[0][1] * _offset.y + _currentWorldRot.entry[0][2] * _offset.z;
-                _currentWorldPos.y = liveHandPos.y + _currentWorldRot.entry[1][0] * _offset.x + _currentWorldRot.entry[1][1] * _offset.y + _currentWorldRot.entry[1][2] * _offset.z;
-                _currentWorldPos.z = liveHandPos.z + _currentWorldRot.entry[2][0] * _offset.x + _currentWorldRot.entry[2][1] * _offset.y + _currentWorldRot.entry[2][2] * _offset.z;
+                RE::NiPoint3 targetWorldPosWithOffset;
+                targetWorldPosWithOffset.x = liveHandPos.x + _currentWorldRot.entry[0][0] * _offset.x + _currentWorldRot.entry[0][1] * _offset.y + _currentWorldRot.entry[0][2] * _offset.z;
+                targetWorldPosWithOffset.y = liveHandPos.y + _currentWorldRot.entry[1][0] * _offset.x + _currentWorldRot.entry[1][1] * _offset.y + _currentWorldRot.entry[1][2] * _offset.z;
+                targetWorldPosWithOffset.z = liveHandPos.z + _currentWorldRot.entry[2][0] * _offset.x + _currentWorldRot.entry[2][1] * _offset.y + _currentWorldRot.entry[2][2] * _offset.z;
+
+                if (_smoothHandoffPosition) {
+                    // Follow current hand translation immediately. Only the
+                    // positional discontinuity introduced by reparenting is
+                    // blended out, over a fixed and bounded interval.
+                    constexpr float kHandoffDurationSeconds = 0.08f;
+                    _handoffElapsed += (std::max)(deltaTime, 0.0f);
+                    const float progress = (std::clamp)(
+                        _handoffElapsed / kHandoffDurationSeconds,
+                        0.0f,
+                        1.0f);
+                    const float smoothProgress =
+                        progress * progress * (3.0f - 2.0f * progress);
+                    _currentWorldPos = targetWorldPosWithOffset +
+                        _handoffPositionCorrection * (1.0f - smoothProgress);
+
+                    if (progress >= 1.0f) {
+                        _smoothHandoffPosition = false;
+                        _handoffElapsed = 0.0f;
+                    }
+                } else {
+                    _currentWorldPos = targetWorldPosWithOffset;
+                }
 
                 // Now apply user rotation to the menu's local center
                 RE::NiMatrix3 finalWorldRot = _currentWorldRot * userRot;

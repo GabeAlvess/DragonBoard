@@ -55,6 +55,46 @@ namespace vrui
         return parentNode->world.translate + rotateVector(parentNode->world.rotate, localPos) * parentScale;
     }
 
+    struct HiggsProximityVolume
+    {
+        RE::NiPoint3 center{};
+        float radius{ 0.75f };
+    };
+
+    static HiggsProximityVolume resolveHiggsProximityVolume(
+        const RE::NiNode* logicalNode,
+        const RE::NiNode* primaryVisualNode)
+    {
+        const auto* visualNode = primaryVisualNode ? primaryVisualNode : logicalNode;
+
+        HiggsProximityVolume volume;
+        if (!visualNode) {
+            return volume;
+        }
+
+        // The visual transform includes the item's saved offset, rotation and scale.
+        // Its aggregate world bound therefore follows the geometry the player sees,
+        // unlike the logical button origin used by the old fixed-radius test.
+        volume.center = visualNode->world.translate;
+
+        const auto& bound = visualNode->worldBound;
+        const bool hasValidBound =
+            std::isfinite(bound.center.x) &&
+            std::isfinite(bound.center.y) &&
+            std::isfinite(bound.center.z) &&
+            std::isfinite(bound.radius) &&
+            bound.radius > 0.001f;
+
+        if (hasValidBound) {
+            volume.center = bound.center;
+            // Broken or unusually large NIF bounds must not make an item selectable
+            // from across the board. Normalized pinned visuals remain below this cap.
+            volume.radius = std::clamp(bound.radius, 0.25f, 2.0f);
+        }
+
+        return volume;
+    }
+
     static std::string formatMatrixRows(const RE::NiMatrix3& mat)
     {
         return std::format(
@@ -1275,12 +1315,17 @@ namespace vrui
             }
 
             // --- Determine which hand (if any) is in proximity ---
-            constexpr float kProximityDist = 2.5f;
-            const RE::NiPoint3& itemPos = _node->world.translate;
+            // Measure from the visible mesh surface rather than from the logical
+            // button origin. This follows per-item visual offsets and scales.
+            constexpr float kProximityPadding = 0.5f;
+            const auto proximityVolume = resolveHiggsProximityVolume(
+                _node.get(),
+                _primaryVisualNode.get());
+            const float proximityDistance = proximityVolume.radius + kProximityPadding;
 
-            bool domInRange = domHand && (domPalmPos - itemPos).Length() <= kProximityDist
+            bool domInRange = domHand && (domPalmPos - proximityVolume.center).Length() <= proximityDistance
                               && g_higgsInterface && !g_higgsInterface->IsHoldingObject(isDomLeft);
-            bool offInRange = offHand && (offPalmPos - itemPos).Length() <= kProximityDist
+            bool offInRange = offHand && (offPalmPos - proximityVolume.center).Length() <= proximityDistance
                               && g_higgsInterface && !g_higgsInterface->IsHoldingObject(isOffLeft);
 
             // Priority: dominant hand first when both are in range

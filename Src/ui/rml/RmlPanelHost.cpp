@@ -1114,6 +1114,76 @@ namespace dragonboard::ui::rml
         _inputBridge.Reset();
     }
 
+    bool RmlPanelHost::SampleFingerTouchSurface(
+        const RE::NiPoint3& worldPoint,
+        float& pointerU,
+        float& pointerV,
+        float& signedDistance) const
+    {
+        const auto& surface = MainSceneSurface();
+        if (!_scenePanelVisible || !surface.node || surface.node->GetAppCulled()) {
+            return false;
+        }
+
+        const auto& transform = surface.node->world;
+        RE::NiPoint3 right(
+            transform.rotate.entry[0][0],
+            transform.rotate.entry[1][0],
+            transform.rotate.entry[2][0]);
+        RE::NiPoint3 up(
+            transform.rotate.entry[0][1],
+            transform.rotate.entry[1][1],
+            transform.rotate.entry[2][1]);
+        const float rightLength = right.Length();
+        const float upLength = up.Length();
+        const float worldScale = std::abs(transform.scale);
+        if (rightLength <= 1.0e-5f || upLength <= 1.0e-5f || worldScale <= 1.0e-5f) {
+            return false;
+        }
+
+        right = right / rightLength;
+        up = up / upLength;
+        const RE::NiPoint3 normal(
+            right.y * up.z - right.z * up.y,
+            right.z * up.x - right.x * up.z,
+            right.x * up.y - right.y * up.x);
+        const RE::NiPoint3 delta = worldPoint - transform.translate;
+        const float width = kScenePlaneExtent * rightLength * worldScale;
+        const float height = kScenePlaneExtent * upLength * worldScale;
+        const float localX =
+            (delta.x * right.x + delta.y * right.y + delta.z * right.z) / width;
+        const float localY =
+            (delta.x * up.x + delta.y * up.y + delta.z * up.z) / height;
+        pointerU = localX + 0.5f;
+        pointerV = 0.5f - localY;
+        signedDistance =
+            delta.x * normal.x + delta.y * normal.y + delta.z * normal.z;
+        return pointerU >= 0.0f && pointerU <= 1.0f &&
+            pointerV >= 0.0f && pointerV <= 1.0f;
+    }
+
+    void RmlPanelHost::SetFingerTouchInput(
+        bool active,
+        bool pointerOnPanel,
+        float pointerU,
+        float pointerV,
+        bool pressed,
+        bool scrolling,
+        bool leftHand)
+    {
+        _fingerTouchInputActive = active;
+        _fingerTouchPointerOnPanel = active && pointerOnPanel;
+        _fingerTouchPointerU = std::clamp(pointerU, 0.0f, 1.0f);
+        _fingerTouchPointerV = std::clamp(pointerV, 0.0f, 1.0f);
+        _fingerTouchPressed = active && pointerOnPanel && pressed;
+        _fingerTouchScrolling = active && pointerOnPanel && scrolling;
+        _fingerTouchLeftHand = leftHand;
+        if (!active) {
+            _inputBridge.SetFingerTouchTrigger(leftHand, false);
+            _inputBridge.SetFingerTouchScroll(false);
+        }
+    }
+
     void RmlPanelHost::ApplyRenderCommandsPresentThread()
     {
         if (!_rmlUi) return;
@@ -1668,6 +1738,8 @@ namespace dragonboard::ui::rml
             if (statusSurface.node) statusSurface.node->SetAppCulled(true);
             statusSurface.sceneVisible = false;
             _scenePanelVisible = false;
+            _inputBridge.SetFingerTouchTrigger(_fingerTouchLeftHand, false);
+            _inputBridge.SetFingerTouchScroll(false);
             _inputBridge.SetPointerOffPanel();
             if (_visible.load() && !manager.isMenuOpen()) {
                 Close();
@@ -1699,6 +1771,8 @@ namespace dragonboard::ui::rml
         if (!mainPanelActive) {
             if (surface.node) surface.node->SetAppCulled(true);
             _scenePanelVisible = false;
+            _inputBridge.SetFingerTouchTrigger(_fingerTouchLeftHand, false);
+            _inputBridge.SetFingerTouchScroll(false);
             _inputBridge.SetPointerOffPanel();
             return;
         }
@@ -1745,6 +1819,22 @@ namespace dragonboard::ui::rml
         const float width = kScenePlaneExtent * xAxisLength * worldScale;
         const float height = kScenePlaneExtent * yAxisLength * worldScale;
         const RE::NiPoint3 worldPosition = screenTransform.translate;
+
+        if (_fingerTouchInputActive) {
+            if (_fingerTouchPointerOnPanel) {
+                _inputBridge.SetPointer(
+                    _fingerTouchPointerU, _fingerTouchPointerV, true);
+            } else {
+                _inputBridge.SetPointerOffPanel();
+            }
+            _inputBridge.SetFingerTouchTrigger(
+                _fingerTouchLeftHand,
+                _fingerTouchPressed);
+            _inputBridge.SetFingerTouchScroll(_fingerTouchScrolling);
+            return;
+        }
+        _inputBridge.SetFingerTouchTrigger(_fingerTouchLeftHand, false);
+        _inputBridge.SetFingerTouchScroll(false);
 
         const RE::NiPoint3 rayOrigin = manager.getLaserOrigin();
         const RE::NiPoint3 rayDirection = manager.getLaserDirection();

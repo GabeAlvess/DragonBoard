@@ -205,6 +205,58 @@ namespace vrui
         hapticIntensity    = (float)ini.GetDoubleValue("Interaction", "fHapticIntensity", hapticIntensity);
         hapticDuration     = (float)ini.GetDoubleValue("Interaction", "fHapticDuration",  hapticDuration);
         equipCooldown      = (float)ini.GetDoubleValue("Interaction", "fEquipCooldown",   equipCooldown);
+        enableFingerTouch = ini.GetBoolValue(
+            "Interaction", "bEnableFingerTouch", enableFingerTouch);
+        fingerTouchTipExtension = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchTipExtension", fingerTouchTipExtension)),
+            -10.0f,
+            10.0f);
+        fingerTouchOffsetX = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchOffsetX", fingerTouchOffsetX)),
+            -10.0f,
+            10.0f);
+        fingerTouchOffsetY = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchOffsetY", fingerTouchOffsetY)),
+            -10.0f,
+            10.0f);
+        fingerTouchOffsetZ = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchOffsetZ", fingerTouchOffsetZ)),
+            -10.0f,
+            10.0f);
+        fingerTouchEnterDistance = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchEnterDistance", fingerTouchEnterDistance)),
+            2.0f,
+            40.0f);
+        fingerTouchExitDistance = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchExitDistance", fingerTouchExitDistance)),
+            fingerTouchEnterDistance,
+            60.0f);
+        fingerTouchHoverDistance = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchHoverDistance", fingerTouchHoverDistance)),
+            0.5f,
+            fingerTouchEnterDistance);
+        fingerTouchPressDistance = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchPressDistance", fingerTouchPressDistance)),
+            0.05f,
+            fingerTouchHoverDistance);
+        fingerTouchReleaseDistance = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchReleaseDistance", fingerTouchReleaseDistance)),
+            fingerTouchPressDistance,
+            fingerTouchHoverDistance);
+        fingerTouchScrollDeadzone = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchScrollDeadzone", fingerTouchScrollDeadzone)),
+            10.0f,
+            200.0f);
         laserNifPath       = ini.GetValue("Interaction", "sLaserNifPath",      laserNifPath.c_str());
         backgroundNifPath  = ini.GetValue("Interaction", "sBackgroundNifPath", backgroundNifPath.c_str());
         mapNifPath         = ini.GetValue("Interaction", "sMapNifPath",         mapNifPath.c_str());
@@ -261,6 +313,25 @@ namespace vrui
 
         // [Debug]
         debugMode = ini.GetBoolValue("Debug", "bDebugMode", debugMode);
+        fingerTrackingProbe = ini.GetBoolValue(
+            "Debug", "bFingerTrackingProbe", fingerTrackingProbe);
+        fingerTrackingProbeMarkers = ini.GetBoolValue(
+            "Debug", "bFingerTrackingProbeMarkers", fingerTrackingProbeMarkers);
+        fingerTrackingMarkerScale = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Debug", "fFingerTrackingMarkerScale", fingerTrackingMarkerScale)),
+            0.05f,
+            5.0f);
+        fingerTrackingTipExtension = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Debug", "fFingerTrackingTipExtension", fingerTrackingTipExtension)),
+            -10.0f,
+            10.0f);
+        fingerTrackingProbeInterval = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Debug", "fFingerTrackingProbeInterval", fingerTrackingProbeInterval)),
+            0.10f,
+            5.0f);
 
         // [FixedButtons]
         auto loadBtn = [&](const char* prefix, float& px, float& py, float& pz,
@@ -605,6 +676,28 @@ namespace vrui
         ini.SetDoubleValue("Interaction", "fHapticIntensity", hapticIntensity, "; Haptic strength (0-1)");
         ini.SetDoubleValue("Interaction", "fHapticDuration",  hapticDuration,  "; Haptic duration in seconds");
         ini.SetDoubleValue("Interaction", "fEquipCooldown",   equipCooldown,   "; Seconds between gear swaps");
+        ini.SetBoolValue  ("Interaction", "bEnableFingerTouch", enableFingerTouch,
+                           "; Switch from laser to index-finger touch near the DragonBoard");
+        ini.SetDoubleValue("Interaction", "fFingerTouchTipExtension", fingerTouchTipExtension,
+                           "; Virtual fingertip distance beyond Finger12");
+        ini.SetDoubleValue("Interaction", "fFingerTouchOffsetX", fingerTouchOffsetX,
+                           "; Touch-point correction along Finger12 local X axis");
+        ini.SetDoubleValue("Interaction", "fFingerTouchOffsetY", fingerTouchOffsetY,
+                           "; Touch-point correction along Finger12 local Y axis");
+        ini.SetDoubleValue("Interaction", "fFingerTouchOffsetZ", fingerTouchOffsetZ,
+                           "; Touch-point correction along Finger12 local Z axis");
+        ini.SetDoubleValue("Interaction", "fFingerTouchEnterDistance", fingerTouchEnterDistance,
+                           "; Distance from the board that activates touch mode");
+        ini.SetDoubleValue("Interaction", "fFingerTouchExitDistance", fingerTouchExitDistance,
+                           "; Larger distance required to return to laser mode");
+        ini.SetDoubleValue("Interaction", "fFingerTouchHoverDistance", fingerTouchHoverDistance,
+                           "; Fingertip distance that starts hover");
+        ini.SetDoubleValue("Interaction", "fFingerTouchPressDistance", fingerTouchPressDistance,
+                           "; Fingertip distance that starts a touch press");
+        ini.SetDoubleValue("Interaction", "fFingerTouchReleaseDistance", fingerTouchReleaseDistance,
+                           "; Withdrawal distance required to release a touch");
+        ini.SetDoubleValue("Interaction", "fFingerTouchScrollDeadzone", fingerTouchScrollDeadzone,
+                           "; Vertical touch movement in RmlUi pixels before a tap becomes scroll");
         ini.SetValue      ("Interaction", "sLaserNifPath",      laserNifPath.c_str(),      "; Custom laser NIF path");
         ini.SetValue      ("Interaction", "sBackgroundNifPath", backgroundNifPath.c_str(), "; Custom tablet NIF path");
         ini.SetValue      ("Interaction", "sMapNifPath",         mapNifPath.c_str(),         "; NIF used for Map button");
@@ -641,6 +734,21 @@ namespace vrui
 
         // [Debug]
         ini.SetBoolValue("Debug", "bDebugMode", debugMode, "; Show debug visuals (AABB boxes)");
+        ini.SetBoolValue(
+            "Debug", "bFingerTrackingProbe", fingerTrackingProbe,
+            "; Log runtime index-finger nodes and HIGGS curl while DragonBoard is open");
+        ini.SetBoolValue(
+            "Debug", "bFingerTrackingProbeMarkers", fingerTrackingProbeMarkers,
+            "; Show visual markers at the estimated index fingertips");
+        ini.SetDoubleValue(
+            "Debug", "fFingerTrackingMarkerScale", fingerTrackingMarkerScale,
+            "; Visual fingertip marker scale (0.05 to 5.0)");
+        ini.SetDoubleValue(
+            "Debug", "fFingerTrackingTipExtension", fingerTrackingTipExtension,
+            "; Distance beyond Finger12 along the Finger11-to-Finger12 direction");
+        ini.SetDoubleValue(
+            "Debug", "fFingerTrackingProbeInterval", fingerTrackingProbeInterval,
+            "; Finger tracking log interval in seconds (0.10 to 5.0)");
 
         // [FixedButtons]
         auto saveBtn = [&](const char* prefix, float px, float py, float pz,

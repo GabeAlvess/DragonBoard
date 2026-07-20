@@ -143,6 +143,10 @@ namespace vrui
         // --- Dashboard / HIGGS Proximity Equip ---
         void setDashboardPinned(bool pinned);
         bool isDashboardPinned() const { return _isDashboardPinned; }
+        bool isInHiggsProximityForHand(bool leftHand) const
+        {
+            return _wasInHiggsProximity && _higgsProximityIsLeft == leftHand;
+        }
         void setAmbientWiggleEnabled(bool enabled) { _ambientWiggleEnabled = enabled; }
         bool isAmbientWiggleEnabled() const { return _ambientWiggleEnabled; }
         void setWorldLockedToHeadSpace(bool enabled, const RE::NiPoint3& worldPos = RE::NiPoint3{},

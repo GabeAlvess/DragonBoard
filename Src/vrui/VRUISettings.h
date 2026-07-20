@@ -154,6 +154,17 @@ namespace vrui
         float hapticIntensity    = 0.1f;    // fHapticIntensity = 0.1
         float hapticDuration     = 0.04f;
         float equipCooldown      = 0.3f;    // fEquipCooldown = 0.3
+        bool  enableFingerTouch  = false;
+        float fingerTouchTipExtension = 2.0f;
+        float fingerTouchOffsetX = 0.0f;
+        float fingerTouchOffsetY = 0.0f;
+        float fingerTouchOffsetZ = 0.0f;
+        float fingerTouchEnterDistance = 3.5f;
+        float fingerTouchExitDistance = 5.0f;
+        float fingerTouchHoverDistance = 1.5f;
+        float fingerTouchPressDistance = 0.45f;
+        float fingerTouchReleaseDistance = 1.0f;
+        float fingerTouchScrollDeadzone = 55.0f;
 
         std::string laserNifPath      = "DragonBoardVR/IconPlane.nif"; // laser.nif crashes SkyrimVR parser (Outfit Studio export incompatibility)
         std::string backgroundNifPath = "DragonBoardVR/Tablet.nif";
@@ -226,6 +237,11 @@ namespace vrui
         // [Debug]
         // -----------------------------------------------------------------------
         bool debugMode = false;
+        bool fingerTrackingProbe = false;
+        bool fingerTrackingProbeMarkers = true;
+        float fingerTrackingMarkerScale = 1.00f;
+        float fingerTrackingTipExtension = 2.0f;
+        float fingerTrackingProbeInterval = 0.25f;
 
         // -----------------------------------------------------------------------
         // [FixedButtons] — per-button position/rotation

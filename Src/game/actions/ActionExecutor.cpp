@@ -1,5 +1,8 @@
 #include "game/actions/ActionExecutor.h"
 
+#include "ui/equipment/EquipInteractionController.h"
+#include "vrui/VRMenuManager.h"
+
 #include <algorithm>
 #include <charconv>
 #include <cctype>
@@ -105,15 +108,23 @@ namespace dragonboard::game::actions
 
             const auto slotFormID = side == EquipSide::kLeft ? 0x13F43 : 0x13F42;
             auto* slot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(slotFormID);
-            RE::ActorEquipManager::GetSingleton()->EquipObject(
-                player,
-                form->As<RE::TESBoundObject>(),
-                nullptr,
-                1,
-                slot,
-                true,
-                false,
-                false);
+            auto equip = [player, form, slot]() {
+                RE::ActorEquipManager::GetSingleton()->EquipObject(
+                    player,
+                    form->As<RE::TESBoundObject>(),
+                    nullptr,
+                    1,
+                    slot,
+                    true,
+                    false,
+                    false);
+            };
+            if (dragonboard::ui::equipment::EquipInteractionController::
+                    RequiresSkeletonBridge(form)) {
+                vrui::VRMenuManager::get().performSkeletonChangeSafely(std::move(equip));
+            } else {
+                equip();
+            }
 
             if (context == ExecutionContext::kModsPanel) {
                 logger::trace("DragonBoardVR: Equipped item {:08X} natively.", action.formID);

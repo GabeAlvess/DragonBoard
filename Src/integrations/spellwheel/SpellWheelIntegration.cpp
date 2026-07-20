@@ -157,23 +157,45 @@ namespace dragonboard::integrations::spellwheel
 
     void RegisterPlayerEventSink()
     {
-        if (g_playerSinkRegistered) return;
-
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) {
-            logger::warn("DragonBoardVR: Player unavailable for Spell Wheel event registration.");
+            if (!g_playerSinkRegistered) {
+                logger::warn("DragonBoardVR: Player unavailable for Spell Wheel event registration.");
+            }
             return;
         }
 
-        g_playerSinkRegistered = player->AddAnimationGraphEventSink(
+        // AddAnimationGraphEventSink() is idempotent: it returns false when this
+        // sink is already present and true only when it had to add it. The
+        // player's animation graph can be rebuilt during play (for example by
+        // equipment/animation changes), so an old successful registration must
+        // not prevent us from attaching to the replacement graph.
+        const bool added = player->AddAnimationGraphEventSink(
             ToggleEventSink::GetSingleton());
-        if (g_playerSinkRegistered) {
-            logger::info(
-                "DragonBoardVR: Spell Wheel transient event bridge registered ({}).",
-                kToggleEvent);
-        } else {
+        if (added) {
+            if (g_playerSinkRegistered) {
+                logger::info(
+                    "DragonBoardVR: Spell Wheel event bridge restored after animation graph change ({}).",
+                    kToggleEvent);
+            } else {
+                logger::info(
+                    "DragonBoardVR: Spell Wheel transient event bridge registered ({}).",
+                    kToggleEvent);
+            }
+            g_playerSinkRegistered = true;
+        } else if (!g_playerSinkRegistered) {
             logger::warn("DragonBoardVR: Failed to register Spell Wheel event bridge.");
         }
+    }
+
+    void Update(float deltaTime)
+    {
+        static float registrationCheckTimer = 0.0f;
+        registrationCheckTimer -= (std::max)(deltaTime, 0.0f);
+        if (registrationCheckTimer > 0.0f) return;
+
+        registrationCheckTimer = 1.0f;
+        RegisterPlayerEventSink();
     }
 
     void ToggleMenuForWheel(std::int32_t wheelId)

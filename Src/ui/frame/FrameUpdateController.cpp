@@ -1,9 +1,12 @@
 #include "FrameUpdateController.h"
 
+#include "diagnostics/FingerTrackingProbe.h"
 #include "gameplay/CombatSlowTime.h"
+#include "integrations/spellwheel/SpellWheelIntegration.h"
 #include "ui/panels/BoardPinWatchdog.h"
 #include "ui/equipment/EquipInteractionController.h"
 #include "ui/input/InteractionInputController.h"
+#include "ui/input/FingerTouchController.h"
 #include "ui/input/PointerInteractionController.h"
 #include "ui/refresh/RefreshPipelineController.h"
 #include "ui/runtime/DeferredActionController.h"
@@ -36,6 +39,7 @@ namespace dragonboard::ui::frame
 
         vrui::VRUIButton::resetFrameLoadCounter();
         dragonboard::ui::runtime::DeferredActionController::Process(manager, deltaTime);
+        dragonboard::integrations::spellwheel::Update(deltaTime);
 
         manager._menuToggleCooldown.Advance(deltaTime);
         dragonboard::ui::equipment::EquipInteractionController::Update(manager, deltaTime);
@@ -46,6 +50,22 @@ namespace dragonboard::ui::frame
         if (!player || !player->Is3DLoaded() || !player->Get3D(!manager._isVRIKInstalled)) {
             return;
         }
+
+        const auto& settings = vrui::VRUISettings::get();
+        dragonboard::diagnostics::FingerTrackingProbe::GetSingleton().Update(
+            manager.getPlayerSkeletonRoot(),
+            manager._isVRIKInstalled,
+            manager._menuSession.IsOpen(),
+            settings.fingerTrackingProbe,
+            settings.fingerTrackingProbeMarkers,
+            settings.fingerTrackingMarkerScale,
+            settings.fingerTrackingTipExtension,
+            RE::NiPoint3{
+                settings.fingerTouchOffsetX,
+                settings.fingerTouchOffsetY,
+                settings.fingerTouchOffsetZ },
+            settings.fingerTrackingProbeInterval,
+            deltaTime);
 
         if (manager._boardPinState.IsPinned() &&
             dragonboard::ui::panels::BoardPinWatchdog::ShouldReturnToHand(
@@ -64,8 +84,16 @@ namespace dragonboard::ui::frame
         dragonboard::ui::input::InteractionInputController::ProcessActivation(
             manager, deltaTime);
         if (manager._menuSession.IsOpen()) {
-            dragonboard::ui::input::PointerInteractionController::Process(manager, deltaTime);
-            dragonboard::ui::input::InteractionInputController::ProcessButtons(
+            const bool touchActive =
+                dragonboard::ui::input::FingerTouchController::GetSingleton().Update(
+                    manager, deltaTime);
+            if (!touchActive) {
+                dragonboard::ui::input::PointerInteractionController::Process(manager, deltaTime);
+                dragonboard::ui::input::InteractionInputController::ProcessButtons(
+                    manager, deltaTime);
+            }
+        } else {
+            (void)dragonboard::ui::input::FingerTouchController::GetSingleton().Update(
                 manager, deltaTime);
         }
 
@@ -74,7 +102,6 @@ namespace dragonboard::ui::frame
             logger::trace(
                 "DragonBoardVR: INI file modification detected (real-time Edit Mode), reloading settings...");
             vrui::VRUISettings::get().load(iniPath);
-            const auto& settings = vrui::VRUISettings::get();
             dragonboard::gameplay::CombatSlowTime::GetSingleton().Reconfigure(
                 settings.slowTimeOnOpen,
                 settings.slowTimeMultiplier);

@@ -182,9 +182,10 @@ namespace vrui
         _interactionFocus.ClearHover();
     }
 
-    void VRMenuManager::performArmorChangeSafely(std::function<void()> change)
+    void VRMenuManager::performSkeletonChangeSafely(std::function<void()> change)
     {
-        if (change) change();
+        dragonboard::ui::equipment::EquipInteractionController::PerformSkeletonSafeChange(
+            *this, std::move(change));
     }
 
     void VRMenuManager::clearGrabbedWidget(VRUIWidget* widget)
@@ -251,6 +252,11 @@ namespace vrui
     RE::NiNode* VRMenuManager::getMenuHandNode() const
     {
         return VRUIHandTracking::getMenuHandNode(_isVRIKInstalled);
+    }
+
+    RE::NiNode* VRMenuManager::getMenuControllerNode() const
+    {
+        return VRUIHandTracking::getMenuControllerNode(_isVRIKInstalled);
     }
 
     RE::NiNode* VRMenuManager::getDominantHandNode() const

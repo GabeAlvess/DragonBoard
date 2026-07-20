@@ -1,4 +1,5 @@
 #include "VRUIInventoryContainer.h"
+#include "ui/equipment/EquipInteractionController.h"
 #include "runtime/vr/ReferencePlacement.h"
 #include "VRUIItemUtils.h"
 #include "VRUIItemEditPanel.h"
@@ -907,13 +908,27 @@ namespace vrui
 
         if (equipped) {
             if (isArmor) {
-                VRMenuManager::get().performArmorChangeSafely([player, item, extraList]() {
+                VRMenuManager::get().performSkeletonChangeSafely([player, item, extraList]() {
                     if (auto* manager = RE::ActorEquipManager::GetSingleton()) {
                         manager->UnequipObject(player, item, extraList, 1, nullptr);
                         VRMenuManager::get().notifyEquip();
                         VRMenuManager::get().scheduleEquipRefresh(0.15f);
                     }
                 });
+                return true;
+            }
+            if (isWeapon && dragonboard::ui::equipment::EquipInteractionController::
+                    RequiresSkeletonBridge(item)) {
+                const auto slotFormID = isLeft ? 0x13F43 : 0x13F42;
+                auto* slot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(slotFormID);
+                VRMenuManager::get().performSkeletonChangeSafely(
+                    [player, item, extraList, slot]() {
+                        if (auto* manager = RE::ActorEquipManager::GetSingleton()) {
+                            manager->UnequipObject(player, item, extraList, 1, slot);
+                            VRMenuManager::get().notifyEquip();
+                            VRMenuManager::get().scheduleEquipRefresh(0.15f);
+                        }
+                    });
                 return true;
             }
             if (isSpell) {
@@ -969,19 +984,11 @@ namespace vrui
                 extraList != nullptr);
         }
 
-        if (count < 2 && isWeapon) {
-            if (sameWeaponInOtherHand) {
-                auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(
-                    !isLeft ? 0x13F43 : 0x13F42);
-                equipManager->UnequipObject(player, item, nullptr, 1, otherSlot);
-            }
-        }
-
         const auto slotFormID = isLeft ? 0x13F43 : 0x13F42;
         auto* slot = (isWeapon || isSpell || isLight) ?
             RE::TESForm::LookupByID<RE::BGSEquipSlot>(slotFormID) : nullptr;
         if (isArmor) {
-            VRMenuManager::get().performArmorChangeSafely([player, item, extraList]() {
+            VRMenuManager::get().performSkeletonChangeSafely([player, item, extraList]() {
                 if (auto* manager = RE::ActorEquipManager::GetSingleton()) {
                     manager->EquipObject(player, item, extraList, 1, nullptr);
                     if (!player->IsOnMount()) player->DrawWeaponMagicHands(true);
@@ -989,6 +996,27 @@ namespace vrui
                     VRMenuManager::get().scheduleEquipRefresh(0.15f);
                 }
             });
+            return true;
+        }
+        if (isWeapon && dragonboard::ui::equipment::EquipInteractionController::
+                RequiresSkeletonBridge(item)) {
+            VRMenuManager::get().performSkeletonChangeSafely(
+                [player, item, extraList, slot, sameWeaponInOtherHand, count, isLeft]() {
+                    auto* manager = RE::ActorEquipManager::GetSingleton();
+                    if (!manager) return;
+
+                    if (count < 2 && sameWeaponInOtherHand) {
+                        auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(
+                            !isLeft ? 0x13F43 : 0x13F42);
+                        manager->UnequipObject(player, item, nullptr, 1, otherSlot);
+                    }
+                    manager->EquipObject(player, item, extraList, 1, slot);
+                    if (!player->IsOnMount()) {
+                        player->DrawWeaponMagicHands(true);
+                    }
+                    VRMenuManager::get().notifyEquip();
+                    VRMenuManager::get().scheduleEquipRefresh(0.15f);
+                });
             return true;
         }
 

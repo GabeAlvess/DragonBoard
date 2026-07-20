@@ -3,6 +3,7 @@
 #include "game/actions/ActionExecutor.h"
 #include "higgsinterface001.h"
 #include "runtime/vr/ReferencePlacement.h"
+#include "ui/equipment/EquipInteractionController.h"
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUIItemUtils.h"
 #include "vrui/VRUILayoutManager.h"
@@ -189,6 +190,45 @@ namespace dragonboard::ui::widgets
                 }
             }
 
+            if (dragonboard::ui::equipment::EquipInteractionController::
+                    RequiresSkeletonBridge(bound)) {
+                menuManager.performSkeletonChangeSafely(
+                    [player, bound, extraData, isActuallyEquipped, isWeapon, isLeft, slot]() {
+                        auto* manager = RE::ActorEquipManager::GetSingleton();
+                        if (!manager) return;
+
+                        if (isActuallyEquipped) {
+                            manager->UnequipObject(
+                                player,
+                                bound,
+                                extraData,
+                                1,
+                                isWeapon ? slot : nullptr);
+                        } else {
+                            if (isWeapon) {
+                                auto* otherEquipped = player->GetEquippedObject(!isLeft);
+                                if (otherEquipped && otherEquipped->formID == bound->formID) {
+                                    auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(
+                                        !isLeft ? 0x13F43 : 0x13F42);
+                                    manager->UnequipObject(player, bound, nullptr, 1, otherSlot);
+                                }
+                            }
+                            manager->EquipObject(
+                                player,
+                                bound,
+                                extraData,
+                                1,
+                                isWeapon ? slot : nullptr);
+                            if (!player->IsOnMount()) {
+                                player->DrawWeaponMagicHands(true);
+                            }
+                        }
+                        vrui::VRMenuManager::get().notifyEquip();
+                        vrui::VRMenuManager::get().scheduleEquipRefresh(0.15f);
+                    });
+                return;
+            }
+
             if (isActuallyEquipped) {
                 auto* unequipSlot = (isWeapon || isLight) ? slot : nullptr;
                 equipManager->UnequipObject(player, bound, extraData, 1, unequipSlot);
@@ -200,7 +240,8 @@ namespace dragonboard::ui::widgets
             if (isWeapon) {
                 auto* otherEquipped = player->GetEquippedObject(!isLeft);
                 if (otherEquipped && otherEquipped->formID == bound->formID) {
-                    auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(!isLeft ? 0x13F43 : 0x13F42);
+                    auto* otherSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(
+                        !isLeft ? 0x13F43 : 0x13F42);
                     equipManager->UnequipObject(player, bound, nullptr, 1, otherSlot);
                 }
             }

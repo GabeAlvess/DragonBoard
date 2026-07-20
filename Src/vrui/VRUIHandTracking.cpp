@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -37,6 +38,19 @@ namespace vrui
             }
 
             return nullptr;
+        }
+
+        bool isUsableTrackingNode(const RE::NiNode* node)
+        {
+            if (!node) {
+                return false;
+            }
+
+            const auto& world = node->world;
+            return std::isfinite(world.translate.x) &&
+                std::isfinite(world.translate.y) &&
+                std::isfinite(world.translate.z) &&
+                std::isfinite(world.scale) && world.scale > 0.0001f;
         }
 
         std::string toLowerCopy(std::string_view value)
@@ -176,6 +190,41 @@ namespace vrui
         const char* handBone = settings.useLeftHandAsMenu ? "NPC L Hand [LHnd]" : "NPC R Hand [RHnd]";
         const char* wandNodeName = settings.useLeftHandAsMenu ? "Left Wand Node" : "Right Wand Node";
         return resolveHandAnchorNode(root, magicNodeName, wandNodeName, handBone);
+    }
+
+    RE::NiNode* VRUIHandTracking::getMenuControllerNode(bool isVRIKInstalled)
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* vrNodes = player ? player->GetVRNodeData() : nullptr;
+        if (!vrNodes) {
+            return nullptr;
+        }
+
+        const bool useLeft = VRUISettings::get().useLeftHandAsMenu;
+        auto* wandNode = useLeft ?
+            vrNodes->LeftWandNode.get() : vrNodes->RightWandNode.get();
+        auto* controllerNode = useLeft ?
+            vrNodes->LeftValveIndexControllerNode.get() :
+            vrNodes->RightValveIndexControllerNode.get();
+
+        RE::NiNode* selected = isUsableTrackingNode(wandNode) ? wandNode :
+            (isUsableTrackingNode(controllerNode) ? controllerNode : nullptr);
+        if (!selected) {
+            return nullptr;
+        }
+
+        // Reject a stale VR node rather than moving the board to an unrelated
+        // transform. The controller and the animated hand should be nearby.
+        if (auto* handNode = getMenuHandNode(isVRIKInstalled)) {
+            const auto delta = selected->world.translate - handNode->world.translate;
+            constexpr float kMaximumControllerHandDistance = 50.0f;
+            if (delta.SqrLength() >
+                kMaximumControllerHandDistance * kMaximumControllerHandDistance) {
+                return nullptr;
+            }
+        }
+
+        return selected;
     }
 
     RE::NiNode* VRUIHandTracking::getDominantHandNode(bool isVRIKInstalled)

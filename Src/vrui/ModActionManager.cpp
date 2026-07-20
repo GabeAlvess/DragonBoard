@@ -1,5 +1,6 @@
 #include "ModActionManager.h"
 #include "game/actions/ActionExecutor.h"
+#include "ui/equipment/EquipInteractionController.h"
 #include <RE/S/ScriptEventSourceHolder.h>
 #include <RE/P/PlayerCharacter.h>
 #include <RE/T/TESForm.h>
@@ -180,13 +181,16 @@ namespace vrui {
 
     RE::BSEventNotifyControl ModActionManager::ProcessEvent(const RE::TESEquipEvent* event, [[maybe_unused]] RE::BSTEventSource<RE::TESEquipEvent>* eventSource)
     {
-        std::lock_guard<std::mutex> lock(_mutex);
-        
-        if (!_isListening) return RE::BSEventNotifyControl::kContinue;
         if (!event) return RE::BSEventNotifyControl::kContinue;
 
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player || event->actor.get() != player) return RE::BSEventNotifyControl::kContinue;
+
+        dragonboard::ui::equipment::EquipInteractionController::
+            NotifyPlayerEquipmentChanged();
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (!_isListening) return RE::BSEventNotifyControl::kContinue;
 
         if (!event->equipped) return RE::BSEventNotifyControl::kContinue;
 

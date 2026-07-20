@@ -15,6 +15,9 @@ namespace vrui
 
         /// Attach this panel to a specific NiNode in the player skeleton
         void attachToHandNode(RE::NiNode* handNode, const RE::NiPoint3& offset = {0, 5, 10});
+        bool parkAtWorldNode(RE::NiNode* worldRoot, RE::NiNode* trackingAnchor);
+        bool updateParkedTracking(RE::NiNode* trackingAnchor);
+        void prepareSmoothHandHandoff();
         void detachFromHandNode();
 
         /// Show/hide the panel (with optional animation)
@@ -53,6 +56,12 @@ namespace vrui
         RE::NiPointer<RE::NiNode> _trackingHandNode;
         RE::NiPointer<RE::NiNode> _backgroundNode;
         RE::NiPoint3 _offset;
+        RE::NiTransform _parkedTrackingOffset;
+        bool _hasParkedTrackingOffset = false;
+        bool _preserveWorldOnNextHandAttach = false;
+        bool _smoothHandoffPosition = false;
+        RE::NiPoint3 _handoffPositionCorrection;
+        float _handoffElapsed = 0.0f;
         
         // Transform smoothing state
         RE::NiPoint3 _currentWorldPos;
