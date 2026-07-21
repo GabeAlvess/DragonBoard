@@ -360,6 +360,53 @@ namespace vrui
         VRMenuManager::get().refreshActiveDynamicContainers();
     }
 
+    std::string VRUIItemEditPanel::allocatePinElementId() const
+    {
+        const auto baseId =
+            "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
+
+        // Spells and configured mod actions are unique abilities, not stacked
+        // inventory instances. Preserve their historical update-in-place ID.
+        if (_sourcePanel != "InventoryPanel") return baseId;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* form = RE::TESForm::LookupByID(_targetFormID);
+        auto* item = form ? form->As<RE::TESBoundObject>() : nullptr;
+        const std::int32_t inventoryCount =
+            player && item ? player->GetItemCount(item) : 0;
+        if (inventoryCount <= 0) {
+            logger::warn(
+                "DragonBoardVR: pin rejected for {:08X} '{}'; item is no longer in inventory.",
+                static_cast<std::uint32_t>(_targetFormID),
+                _targetItemName);
+            return {};
+        }
+
+        std::size_t pinnedCopies = 0;
+        for (const auto& element : VRUILayoutManager::getContainerElements("Dashboard")) {
+            if (element.formID == static_cast<std::uint32_t>(_targetFormID) &&
+                element.id.rfind("Pinned_", 0) == 0) {
+                ++pinnedCopies;
+            }
+        }
+        if (pinnedCopies >= static_cast<std::size_t>(inventoryCount)) {
+            logger::warn(
+                "DragonBoardVR: pin rejected for {:08X} '{}'; {} pinned copy/copies already use all {} inventory item(s).",
+                static_cast<std::uint32_t>(_targetFormID),
+                _targetItemName,
+                pinnedCopies,
+                inventoryCount);
+            return {};
+        }
+
+        if (!VRUILayoutManager::findElementAnywhere(baseId)) return baseId;
+        for (std::int32_t copy = 2; copy <= inventoryCount; ++copy) {
+            const auto candidate = baseId + "_" + std::to_string(copy);
+            if (!VRUILayoutManager::findElementAnywhere(candidate)) return candidate;
+        }
+        return {};
+    }
+
     bool VRUIItemEditPanel::pinToDashboard()
     {
         if (VRMenuManager::get().isBoardWorldPinned()) {
@@ -369,7 +416,8 @@ namespace vrui
             return false;
         }
         syncWorkingTransformFromPreview();
-        const auto elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
+        const auto elementId = allocatePinElementId();
+        if (elementId.empty()) return false;
         RE::NiPoint3 position{ _posX, _posY, _posZ };
         RE::NiMatrix3 rotation;
         VRUILayoutManager::setMatrixEuler(
@@ -400,7 +448,8 @@ namespace vrui
     {
         if (_targetCategory != "Magic") return false;
         syncWorkingTransformFromPreview();
-        const auto elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
+        const auto elementId = allocatePinElementId();
+        if (elementId.empty()) return false;
         RE::NiPoint3 position{ _posX, _posY, _posZ };
         RE::NiMatrix3 rotation;
         VRUILayoutManager::setMatrixEuler(
@@ -409,20 +458,67 @@ namespace vrui
             editorRotYToRuntime(_rotY, _targetModelPath) * kDegToRad,
             editorRotZToRuntime(_rotX, _rotZ, _targetModelPath) * kDegToRad);
         float scale = _scale;
-        // The left-hand panel uses the same board-local coordinate system as
-        // the persistent layer, even before its own panel has been attached.
-        if (const auto panel = VRMenuManager::get().findPanelByName("Persistent_Panel")) {
-            if (auto* target = panel->findWidgetByName("FixedWidgetsContainer")) {
-                getPreviewVisualTransformRelativeTo(target->getNode(), position, rotation, scale);
-            }
-        }
+        auto& menuManager = VRMenuManager::get();
+        auto* leftHand = menuManager.getLeftHandNode();
+        if (!leftHand) return false;
+        const auto leftHandPanel = menuManager.findPanelByName("AlwaysVisiblePanel");
+        if (!leftHandPanel) return false;
+        const auto& settings = VRUISettings::get();
+        const RE::NiPoint3 panelOffset{
+            settings.menuOffsetX,
+            settings.menuOffsetY,
+            settings.menuOffsetZ };
+        leftHandPanel->attachToHandNode(leftHand, panelOffset);
+        auto* target = leftHandPanel->findWidgetByName("AlwaysVisibleWidgetsContainer");
+        if (!target || !target->getNode()) return false;
+        getPreviewVisualTransformRelativeTo(target->getNode(), position, rotation, scale);
         VRUILayoutManager::updateElementTransformAnywhere(
             elementId,
             position, rotation, scale,
             _targetModelPath, _targetCategory, _targetFormID,
             _targetActionFunc, "", true, false, true);
         dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
-            VRMenuManager::get(), elementId);
+            menuManager, elementId);
+        return true;
+    }
+
+    bool VRUIItemEditPanel::pinToRightHand()
+    {
+        if (_targetCategory != "Magic") return false;
+        syncWorkingTransformFromPreview();
+        const auto elementId = allocatePinElementId();
+        if (elementId.empty()) return false;
+        RE::NiPoint3 position{ _posX, _posY, _posZ };
+        RE::NiMatrix3 rotation;
+        VRUILayoutManager::setMatrixEuler(
+            rotation,
+            editorRotXToRuntime(_rotX, _rotZ, _targetModelPath) * kDegToRad,
+            editorRotYToRuntime(_rotY, _targetModelPath) * kDegToRad,
+            editorRotZToRuntime(_rotX, _rotZ, _targetModelPath) * kDegToRad);
+        float scale = _scale;
+        auto& menuManager = VRMenuManager::get();
+        auto* rightHand = menuManager.getRightHandNode();
+        if (!rightHand) return false;
+        const auto rightHandPanel =
+            menuManager.findPanelByName("AlwaysVisibleRightHandPanel");
+        if (!rightHandPanel) return false;
+        const auto& settings = VRUISettings::get();
+        const RE::NiPoint3 panelOffset{
+            settings.menuOffsetX,
+            settings.menuOffsetY,
+            settings.menuOffsetZ };
+        rightHandPanel->attachToHandNode(rightHand, panelOffset);
+        auto* target = rightHandPanel->findWidgetByName(
+            "AlwaysVisibleRightHandWidgetsContainer");
+        if (!target || !target->getNode()) return false;
+        getPreviewVisualTransformRelativeTo(target->getNode(), position, rotation, scale);
+        VRUILayoutManager::updateElementTransformAnywhere(
+            elementId,
+            position, rotation, scale,
+            _targetModelPath, _targetCategory, _targetFormID,
+            _targetActionFunc, "", false, true, true);
+        dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
+            menuManager, elementId);
         return true;
     }
 
@@ -430,7 +526,8 @@ namespace vrui
     {
         if (_targetCategory != "Magic" || !_previewWidget || !_previewWidget->getNode()) return false;
         syncWorkingTransformFromPreview();
-        const auto elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
+        const auto elementId = allocatePinElementId();
+        if (elementId.empty()) return false;
         RE::NiPoint3 worldPosition;
         RE::NiMatrix3 worldRotation;
         float worldScale = 1.0f;
@@ -747,7 +844,8 @@ namespace vrui
             }
 
             // Priority: JSON Layout (Dashboard container)
-            std::string elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
+            const auto elementId = allocatePinElementId();
+            if (elementId.empty()) return;
             
             // Generate rotation matrix from current Euler angles
             RE::NiMatrix3 rot;
@@ -781,7 +879,8 @@ namespace vrui
         if (_targetCategory == "Magic") {
             auto pinWorldBtn = std::make_shared<VRUIButton>("PIN TO LHAND", "DragonBoardVR/IsEquipped.nif", "", 6.0f, 0.8f);
             pinWorldBtn->setOnPressHandler([this](VRUIButton*, EquipHand) {
-                std::string elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
+                const auto elementId = allocatePinElementId();
+                if (elementId.empty()) return;
 
                 VRUILayoutManager::updateElementTransformAnywhereDirect(
                     elementId,
@@ -802,33 +901,11 @@ namespace vrui
             });
             pagePin->addElement(pinWorldBtn);
 
-            auto pinHmdWorldBtn = std::make_shared<VRUIButton>("PIN TO WORLD", "DragonBoardVR/IsEquipped.nif", "", 6.0f, 0.8f);
-            pinHmdWorldBtn->setOnPressHandler([this](VRUIButton*, EquipHand) {
-                if (!_previewWidget || !_previewWidget->getNode()) {
-                    return;
-                }
-
-                std::string elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
-                RE::NiNode* previewNode = _previewWidget->getNode();
-                RE::NiPoint3 worldPos = previewNode->world.translate;
-                RE::NiMatrix3 worldRot = previewNode->world.rotate;
-
-                VRUILayoutManager::updateElementTransformAnywhere(
-                    elementId,
-                    worldPos,
-                    worldRot,
-                    previewNode->world.scale,
-                    _targetModelPath,
-                    _targetCategory,
-                    _targetFormID,
-                    _targetActionFunc,
-                    "",
-                    false,
-                    true);
-                dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(
-                    VRMenuManager::get(), elementId);
+            auto pinRightHandBtn = std::make_shared<VRUIButton>("PIN TO RHAND", "DragonBoardVR/IsEquipped.nif", "", 6.0f, 0.8f);
+            pinRightHandBtn->setOnPressHandler([this](VRUIButton*, EquipHand) {
+                pinToRightHand();
             });
-            pagePin->addElement(pinHmdWorldBtn);
+            pagePin->addElement(pinRightHandBtn);
         }
 
         // Toggle: Hide/Show label on pinned dashboard item

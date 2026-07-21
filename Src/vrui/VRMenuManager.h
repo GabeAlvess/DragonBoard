@@ -115,6 +115,7 @@ namespace vrui
         /// Toggle menu visibility (called by activation gesture)
         void toggleMenu(bool suppressToggleHaptic = false);
         void closeMenu();  // Only closes — never opens. Safe to call before console commands.
+        void restartDragonBoard();
         void performSkeletonChangeSafely(std::function<void()> change);
 
         /// Check if any menu is currently visible
@@ -211,6 +212,8 @@ namespace vrui
         RE::NiNode* getMenuControllerNode() const;
         RE::NiNode* getDominantHandNode() const;
         RE::NiNode* getNonDominantHandNode() const;
+        RE::NiNode* getLeftHandNode() const;
+        RE::NiNode* getRightHandNode() const;
         RE::NiNode* getPlayerSkeletonRoot() const;
         RE::NiNode* getPinnedAttachNode() const;
 
@@ -289,6 +292,8 @@ namespace vrui
         dragonboard::ui::refresh::RefreshCoordinator _refreshCoordinator;
         dragonboard::ui::settings::SettingsSaveScheduler _settingsSaveScheduler;
         dragonboard::ui::settings::IniChangeWatcher _iniChangeWatcher;
+        dragonboard::ui::settings::IniChangeWatcher _layoutIniChangeWatcher;
+        dragonboard::ui::settings::IniChangeWatcher _stateIniChangeWatcher;
         dragonboard::ui::input::ActivationHoldTracker _activationHoldTracker;
         dragonboard::ui::input::PressHoldTracker _dominantTriggerTracker;
         dragonboard::ui::input::PressHoldTracker _offhandTriggerTracker;

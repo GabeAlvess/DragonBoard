@@ -12,7 +12,7 @@ namespace dragonboard::ui::panels
     {
         constexpr const char* kPersistentPanelName = "Persistent_Panel";
         constexpr const char* kAlwaysVisiblePanelName = "AlwaysVisiblePanel";
-        constexpr const char* kAlwaysVisibleHmdPanelName = "AlwaysVisibleHmdPanel";
+        constexpr const char* kAlwaysVisibleRightHandPanelName = "AlwaysVisibleRightHandPanel";
     }
 
     void PanelManagementController::Register(
@@ -112,7 +112,7 @@ namespace dragonboard::ui::panels
                     panel->getName() != "Background_Panel" &&
                     panel->getName() != kPersistentPanelName &&
                     panel->getName() != kAlwaysVisiblePanelName &&
-                    panel->getName() != kAlwaysVisibleHmdPanelName) {
+                    panel->getName() != kAlwaysVisibleRightHandPanelName) {
                     sourcePanel = panel;
                     break;
                 }

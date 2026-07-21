@@ -85,16 +85,17 @@ namespace vrui
         // -----------------------------------------------------------------------
         bool rmlRenderOnDirty = true;        // Reuse the last panel texture while unchanged
         int rmlMaxActiveFPS = 60;             // Maximum texture refresh rate during interaction
-        int rmlRenderWidth = 1920;
-        int rmlRenderHeight = 1080;
+        int rmlRenderWidth = 1280;
+        int rmlRenderHeight = 720;
         bool rmlEntranceAnimation = true;     // Reveal the page surface from its center when opened
+        std::string rmlEntranceStyle = "radial";
         float rmlEntranceDuration = 0.25f;    // Entrance duration in seconds
         float rmlEntranceFeather = 0.10f;     // Soft radial edge relative to the panel diagonal
 
         // -----------------------------------------------------------------------
         // [Activation]
         // -----------------------------------------------------------------------
-        ActivationMode activationMode     = ActivationMode::GripPlusY; // iActivationMode = 4
+        ActivationMode activationMode     = ActivationMode::Hotkey8;
         float activationHoldTimeGrip      = 0.0f;   // fHoldTimeGrip
         float activationHoldTimeTrigger   = 0.3f;   
         float activationHoldTimeThumbstick= 0.15f;  
@@ -104,15 +105,15 @@ namespace vrui
         // -----------------------------------------------------------------------
         // [Visual]  — ALL panels share these values
         // -----------------------------------------------------------------------
-        float menuScale     = 1.0f;          
-        float menuOffsetX   =   0.5f;        // fMenuOffsetX
-        float menuOffsetY   = -18.5f;        // fMenuOffsetY
-        float menuOffsetZ   =   0.0f;        // fMenuOffsetZ
+        float menuScale     = 1.12f;
+        float menuOffsetX   =   1.0f;        // Internal layout default
+        float menuOffsetY   = -17.0f;        // Internal layout default
+        float menuOffsetZ   =  -3.5f;        // Internal layout default
         float menuRotX      = -10.0f;        // fMenuRotX
         float menuRotY      =  36.0f;        // fMenuRotY
-        float menuRotZ      = 0.0f;          // fMenuRotZ (0 = front face toward the player)
+        float menuRotZ      = 85.0f;         // Internal layout default
         
-        float containerGridOffsetZ = 1.0f;   // fContainerGridOffsetZ
+        float containerGridOffsetZ = 0.42f;  // Internal layout default
         
         bool  bEnableMenuLerp  = true;       
         float fMenuLerpSpeed   = 5.0f;       
@@ -120,15 +121,15 @@ namespace vrui
         // -----------------------------------------------------------------------
         // [Buttons]
         // -----------------------------------------------------------------------
-        float buttonSpacingX  = 2.4f;       // fButtonSpacingX
+        float buttonSpacingX  = 2.6f;       // Internal layout default
         float buttonSpacingY  = 1.2f;       // fButtonSpacingY
         float buttonMeshScale = 1.5f;       
-        float itemMeshScale   = 1.27f;      // Base scale of in-button 3D item models
+        float itemMeshScale   = 1.29f;      // Base scale of in-button 3D item models
         float itemWeaponScale = 1.0f;       // Specific multiplier for weapons/shields
         float itemArmorScale  = 1.0f;       // Specific multiplier for armor/clothes
-        float itemPotionScale = 1.0f;       // Specific multiplier for potions
-        float itemFoodScale   = 1.0f;       // Specific multiplier for food/ingredients
-        float itemMiscScale   = 1.0f;       // Specific multiplier for misc/clutter/books
+        float itemPotionScale = 3.31f;      // Specific multiplier for potions
+        float itemFoodScale   = 0.87f;      // Specific multiplier for food/ingredients
+        float itemMiscScale   = 0.90f;      // Specific multiplier for misc/clutter/books
         bool  normalizeItemVisuals = true;  // Center visible geometry and fit it uniformly
         bool  useNifInventoryMarkerRotation = true; // Use BSInvMarker only without an INI override
         int   gridColumns     = 5;          // Grid columns for main panel and dynamic containers
@@ -138,29 +139,29 @@ namespace vrui
         // [Background] — Tablet NIF
         // -----------------------------------------------------------------------
         bool  showBackground    = true;
-        float backgroundScale   = 11.55f;   // fScale = 11.55
+        float backgroundScale   = 1.55f;
         float backgroundOffsetX =  0.0f;
         float backgroundOffsetY = -1.0f;
         float backgroundOffsetZ =  0.0f;
-        float backgroundRotX    = 90.0f;
+        float backgroundRotX    =  0.0f;
         float backgroundRotY    =  0.0f;
-        float backgroundRotZ    = 180.0f;
+        float backgroundRotZ    =  0.0f;
 
         // -----------------------------------------------------------------------
         // [Interaction]
         // -----------------------------------------------------------------------
         float raycastMaxDistance = 100.0f;
         bool  bEnableRotationSnapping = true;
-        float fSnapDistanceThreshold = 4.0f;    // fSnapDistanceThreshold = 4.0
+        float fSnapDistanceThreshold = 1.0f;
         bool  hapticOnHover      = true;
         bool  hapticOnPress      = true;
         float hapticIntensity    = 0.1f;    // fHapticIntensity = 0.1
         float hapticDuration     = 0.04f;
         float equipCooldown      = 0.3f;    // fEquipCooldown = 0.3
-        bool  enableFingerTouch  = false;
+        bool  enableFingerTouch  = true;
         float fingerTouchTipExtension = 2.0f;
         float fingerTouchOffsetX = 0.0f;
-        float fingerTouchOffsetY = 0.0f;
+        float fingerTouchOffsetY = -0.2f;
         float fingerTouchOffsetZ = 0.0f;
         float fingerTouchEnterDistance = 3.5f;
         float fingerTouchExitDistance = 5.0f;
@@ -170,17 +171,17 @@ namespace vrui
         float fingerTouchScrollDeadzone = 55.0f;
 
         std::string laserNifPath      = "DragonBoardVR/IconPlane.nif"; // laser.nif crashes SkyrimVR parser (Outfit Studio export incompatibility)
-        std::string backgroundNifPath = "DragonBoardVR/Tablet.nif";
+        std::string backgroundNifPath = "DragonBoardVR/dragonboard.nif";
 
         // -----------------------------------------------------------------------
         // [LaserPointer]
         // -----------------------------------------------------------------------
         // Reticle (cursor glued to the panel surface)
-        float reticleScaleX = 2.5f;     // fReticleScaleX = 2.5
-        float reticleScaleY = 2.5f;     
-        float reticleScaleZ = 2.5f;     
+        float reticleScaleX = 2.12f;
+        float reticleScaleY = 2.12f;
+        float reticleScaleZ = 2.12f;
         float reticleOffsetX = 0.0f;
-        float reticleOffsetY = -1.9f;   // fReticleOffsetY = -1.9
+        float reticleOffsetY = -0.75f;
         float reticleOffsetZ = 0.0f;
         float reticleRotX    = -90.0f;   // fReticleRotX = -90
         float reticleRotY    = 0.0f;
@@ -220,11 +221,11 @@ namespace vrui
         // -----------------------------------------------------------------------
         // [Labels]
         // -----------------------------------------------------------------------
-        float labelScale          = 1.0f;
+        float labelScale          = 0.7f;
         float labelXOffset        = 0.0f;
         float labelYOffset        = 0.3f;
         float labelZOffset        = 0.0f;
-        float labelSpacing        = 0.2f;
+        float labelSpacing        = 0.25f;
         float labelYOffsetDynamic = 0.2f;   // Y offset for labels in dynamic containers (inventory/magic/favorites)
 
         // -----------------------------------------------------------------------
@@ -275,8 +276,8 @@ namespace vrui
 
         std::string bSaveLabel  = "Save";      
         std::string bSaveAction = "QuickSave";  
-        float bSavePosX = 14.169888f; float bSavePosY = 0.251898f; float bSavePosZ = -2.571962f;
-        float bSaveRotX = -0.571924f; float bSaveRotY = 0.971138f; float bSaveRotZ = -15.558892f;
+        float bSavePosX = 14.000000f; float bSavePosY = 0.250000f; float bSavePosZ = 8.000000f;
+        float bSaveRotX = 0.000000f; float bSaveRotY = 0.000000f; float bSaveRotZ = -20.000000f;
         float bSaveScale = 1.099043f;
 
         float bPrevPosX = 3.000000f;  float bPrevPosY = 0.250000f; float bPrevPosZ = -9.000000f;
@@ -324,7 +325,7 @@ namespace vrui
         float bDevPosX = -16.000000f; float bDevPosY = 0.000000f; float bDevPosZ = -2.000000f;
         float bDevRotX = 0.000000f; float bDevRotY = 0.000000f; float bDevRotZ = 0.000000f;
         float bDevScale = 0.800000f;   
-        bool  showDevButton = false; // bShowDevButton = false
+        bool  showDevButton = true;
         std::string defaultPanelAction = "MainPanel";
 
         // -----------------------------------------------------------------------
@@ -357,30 +358,30 @@ namespace vrui
         // [MapMarker]
         // -----------------------------------------------------------------------
         bool  bEnableMapMarker = true;
-        float mapWorldMinX = -57000.0f; 
-        float mapWorldMaxX =  80000.0f;
-        float mapWorldMinY = -80000.0f;
+        float mapWorldMinX = -77000.0f;
+        float mapWorldMaxX =  54000.0f;
+        float mapWorldMinY = -90000.0f;
         float mapWorldMaxY =  78000.0f;
         
-        float mapMarkerScale  = 1.2f;
-        float mapWidth        = -7.9f;  
-        float mapHeight       = 9.1f;
+        float mapMarkerScale  = 1.0f;
+        float mapWidth        = -10.0f;
+        float mapHeight       = 8.2f;
         
         bool  bMapMarkerDynamicRotation = true;
         float mapMarkerRotX             = 90.0f;
         float mapMarkerRotY             = 0.0f;
         float mapMarkerRotZ             = 180.0f;
         float mapMarkerRotOffset        = 0.0f; 
-        float mapMarkerOffsetX          = -1.0f;
+        float mapMarkerOffsetX          = 2.0f;
         float mapMarkerOffsetY          = 0.0f;
-        float mapMarkerOffsetZ          = -0.9f;
+        float mapMarkerOffsetZ          = -0.75f;
 
         std::string mapMarkerNifPath = "DragonBoardVR/Player.nif"; 
         std::array<MapCalibrationPoint, kMapCalibrationPointCount> mapCalibrationPoints{};
 
         // [QuestMarker]
         bool  bEnableQuestMarker = true;
-        float questMarkerScale = 0.5f;
+        float questMarkerScale = 0.25f;
         float questMarkerRotX = 90.0f;
         float questMarkerRotY = 0.0f;
         float questMarkerRotZ = 180.0f;
@@ -397,6 +398,8 @@ namespace vrui
         void save(const std::string& iniPath) const;
         void setUseLeftHandAsMenu(bool useLeftHand);
         static std::string getDefaultIniPath();
+        static std::string getDefaultLayoutIniPath();
+        static std::string getDefaultStateIniPath();
         static VRUISettings& get();
 
     private:

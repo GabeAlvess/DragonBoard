@@ -24,6 +24,8 @@ namespace dragonboard::ui::menu
             const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
             bool worldPinned,
             RE::NiNode* menuHand,
+            RE::NiNode* leftHandNode,
+            RE::NiNode* rightHandNode,
             RE::NiNode* pinnedAttachNode,
             const RE::NiPoint3& panelOffset);
         static void PresentClosed(
@@ -31,7 +33,8 @@ namespace dragonboard::ui::menu
             bool worldPinned,
             RE::NiNode* menuHand,
             RE::NiNode* pinnedAttachNode,
-            RE::NiNode* headNode,
+            RE::NiNode* leftHandNode,
+            RE::NiNode* rightHandNode,
             const RE::NiPoint3& panelOffset);
         static void DetachAll(const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels);
     };

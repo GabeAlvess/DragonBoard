@@ -217,7 +217,6 @@ namespace dragonboard::ui::equipment
                         }
                     }
                 }
-                manager._rebuildOnNextOpen = true;
                 skeletonSwap = {};
                 manager._refreshCoordinator.RequestTransforms();
                 logger::info(

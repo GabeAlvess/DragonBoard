@@ -1332,6 +1332,15 @@ namespace dragonboard::ui::rml
         CaptureStatusSurfaceGameThread(deltaTime);
         DispatchExternalEventsGameThread();
 
+        if (_restartPending.exchange(false, std::memory_order_acq_rel)) {
+            ApplyDraftGameThread();
+            manager.saveSettingsNow();
+            _applyPending.store(false, std::memory_order_release);
+            _savePending.store(false, std::memory_order_release);
+            manager.restartDragonBoard();
+            return;
+        }
+
         if (_worldPinTogglePending.exchange(false)) {
             const bool pinned = !manager.isBoardWorldPinned();
             manager.setBoardWorldPinned(pinned);
@@ -2380,7 +2389,8 @@ namespace dragonboard::ui::rml
         const bool entranceConfigurationChanged = _entranceAnimation.Configure(
             settings.rmlEntranceAnimation,
             settings.rmlEntranceDuration,
-            settings.rmlEntranceFeather);
+            settings.rmlEntranceFeather,
+            ParseRmlEntranceStyle(settings.rmlEntranceStyle));
         const bool visible = _visible.load(std::memory_order_acquire);
         if (visible != _rmlWasVisiblePresentThread) {
             _rmlWasVisiblePresentThread = visible;
@@ -2887,6 +2897,12 @@ namespace dragonboard::ui::rml
                 if (_rmlUi->ConsumeWorldPinToggleRequested()) {
                     _worldPinTogglePending.store(true);
                 }
+                if (_rmlUi->ConsumeRestartRequested()) {
+                    _restartPending.store(true, std::memory_order_release);
+                    Close();
+                    logger::info(
+                        "DragonBoardVR: manual component restart requested from RmlUi settings.");
+                }
 
                 if (_inputBridge.DidTriggerReleaseSinceLastCheck() &&
                     _deferredRmlTransformApply) {
@@ -2931,7 +2947,7 @@ namespace dragonboard::ui::rml
                 case RmlItemAction::kBack: _itemEditActionPending.store(ItemEditAction::kBack); break;
                 case RmlItemAction::kPinDashboard: _itemEditActionPending.store(ItemEditAction::kPinDashboard); break;
                 case RmlItemAction::kPinLeftHand: _itemEditActionPending.store(ItemEditAction::kPinLeftHand); break;
-                case RmlItemAction::kPinWorld: _itemEditActionPending.store(ItemEditAction::kPinWorld); break;
+                case RmlItemAction::kPinRightHand: _itemEditActionPending.store(ItemEditAction::kPinRightHand); break;
                 case RmlItemAction::kToggleLabel: _itemEditActionPending.store(ItemEditAction::kToggleLabel); break;
                 case RmlItemAction::kNone: break;
                 }
@@ -3032,8 +3048,8 @@ namespace dragonboard::ui::rml
                 case RmlMagicAction::kPinLeftHand:
                     _magicActionPending.store(MagicAction::kPinLeftHand);
                     break;
-                case RmlMagicAction::kPinWorld:
-                    _magicActionPending.store(MagicAction::kPinWorld);
+                case RmlMagicAction::kPinRightHand:
+                    _magicActionPending.store(MagicAction::kPinRightHand);
                     break;
                 case RmlMagicAction::kToggleLabel:
                     _magicActionPending.store(MagicAction::kToggleLabel);
@@ -3136,14 +3152,18 @@ namespace dragonboard::ui::rml
             auto* renderer = _rmlUi->GetRenderer();
             renderer->SetEntranceEffect(
                 _entranceAnimation.GetProgress(),
-                _entranceAnimation.GetFeather());
+                _entranceAnimation.GetFeather(),
+                _entranceAnimation.GetStyle());
             const bool rendered = _rmlUi->Render(
                 _panelRenderTarget,
                 static_cast<int>(_panelWidth),
                 static_cast<int>(_panelHeight),
                 kPanelLogicalWidth,
                 kPanelLogicalHeight);
-            renderer->SetEntranceEffect(1.0f, _entranceAnimation.GetFeather());
+            renderer->SetEntranceEffect(
+                1.0f,
+                _entranceAnimation.GetFeather(),
+                _entranceAnimation.GetStyle());
             if (rendered) {
                 if (!_entranceAnimation.IsActive() &&
                     _entranceAnimation.GetProgress() >= 0.9999f) {
@@ -4990,9 +5010,9 @@ namespace dragonboard::ui::rml
                 }
             }
             return;
-        case MagicAction::kPinWorld:
+        case MagicAction::kPinRightHand:
             {
-                const bool succeeded = preview && hasSelection && preview->pinToWorld();
+                const bool succeeded = preview && hasSelection && preview->pinToRightHand();
                 queuePinHaptic(succeeded);
                 if (succeeded) {
                     Close();
@@ -5131,7 +5151,7 @@ namespace dragonboard::ui::rml
             ApplyItemEditDraftGameThread();
             succeeded = backend->pinToLeftHand();
             break;
-        case ItemEditAction::kPinWorld:
+        case ItemEditAction::kPinRightHand:
             {
                 bool canPinToWorld = false;
                 {
@@ -5140,7 +5160,7 @@ namespace dragonboard::ui::rml
                 }
                 if (canPinToWorld) {
                     ApplyItemEditDraftGameThread();
-                    succeeded = backend->pinToWorld();
+                    succeeded = backend->pinToRightHand();
                 } else {
                     succeeded = false;
                 }
@@ -5160,7 +5180,7 @@ namespace dragonboard::ui::rml
         const bool pinAction =
             action == ItemEditAction::kPinDashboard ||
             action == ItemEditAction::kPinLeftHand ||
-            action == ItemEditAction::kPinWorld;
+            action == ItemEditAction::kPinRightHand;
         if (pinAction && succeeded) {
             _inputBridge.SetHaptic(static_cast<std::uint8_t>(
                 dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kStrong));

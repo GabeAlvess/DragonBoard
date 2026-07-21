@@ -151,7 +151,14 @@ namespace vrui {
                             elem.category = el.value("category", "");
                             elem.hideLabel = el.value("hideLabel", false);
                             elem.pinToWorld = el.value("pinToWorld", false);
-                            elem.pinToHmdWorld = el.value("pinToHmdWorld", false);
+                            // Legacy HMD pins become right-hand pins while retaining
+                            // a one-shot marker so their world pose can be converted.
+                            const bool legacyHmdPin =
+                                !el.contains("pinToRightHand") &&
+                                el.value("pinToHmdWorld", false);
+                            elem.pinToRightHand = el.value(
+                                "pinToRightHand", el.value("pinToHmdWorld", false));
+                            elem.legacyHmdPin = legacyHmdPin;
                             elem.visualTransformComposed = el.value("visualTransformComposed", false);
 
                             if (el.contains("transform")) {
@@ -233,7 +240,7 @@ namespace vrui {
                     je["category"] = e.category;
                     je["hideLabel"] = e.hideLabel;
                     je["pinToWorld"] = e.pinToWorld;
-                    je["pinToHmdWorld"] = e.pinToHmdWorld;
+                    je["pinToRightHand"] = e.pinToRightHand;
                     je["visualTransformComposed"] = e.visualTransformComposed;
 
                     nlohmann::json jte;
@@ -341,7 +348,7 @@ namespace vrui {
                                                            const std::string& nifPath, const std::string& category, uint32_t formID,
                                                            const std::string& actionFunc, const std::string& label,
                                                            std::optional<bool> pinToWorld,
-                                                           std::optional<bool> pinToHmdWorld,
+                                                           std::optional<bool> pinToRightHand,
                                                            std::optional<bool> visualTransformComposed) {
         bool found = false;
 
@@ -366,7 +373,10 @@ namespace vrui {
                     if (!actionFunc.empty()) e.actionFunc = actionFunc;
                     if (!label.empty()) e.label = label;
                     if (pinToWorld) e.pinToWorld = *pinToWorld;
-                    if (pinToHmdWorld) e.pinToHmdWorld = *pinToHmdWorld;
+                    if (pinToRightHand) {
+                        e.pinToRightHand = *pinToRightHand;
+                        e.legacyHmdPin = false;
+                    }
                     if (visualTransformComposed) e.visualTransformComposed = *visualTransformComposed;
                     found = true;
                     break;
@@ -385,7 +395,10 @@ namespace vrui {
             ne.actionFunc = actionFunc;
             ne.label = label;
             if (pinToWorld) ne.pinToWorld = *pinToWorld;
-            if (pinToHmdWorld) ne.pinToHmdWorld = *pinToHmdWorld;
+            if (pinToRightHand) {
+                ne.pinToRightHand = *pinToRightHand;
+                ne.legacyHmdPin = false;
+            }
             if (visualTransformComposed) ne.visualTransformComposed = *visualTransformComposed;
 
             const std::string targetContainerId = getDefaultContainerIdForElement(elementId);
@@ -414,7 +427,7 @@ namespace vrui {
                                                                  const std::string& nifPath, const std::string& category, uint32_t formID,
                                                                  const std::string& actionFunc, const std::string& label,
                                                                  std::optional<bool> pinToWorld,
-                                                                 std::optional<bool> pinToHmdWorld,
+                                                                 std::optional<bool> pinToRightHand,
                                                                  std::optional<bool> visualTransformComposed) {
         bool found = false;
 
@@ -428,7 +441,10 @@ namespace vrui {
                     if (!actionFunc.empty()) e.actionFunc = actionFunc;
                     if (!label.empty()) e.label = label;
                     if (pinToWorld) e.pinToWorld = *pinToWorld;
-                    if (pinToHmdWorld) e.pinToHmdWorld = *pinToHmdWorld;
+                    if (pinToRightHand) {
+                        e.pinToRightHand = *pinToRightHand;
+                        e.legacyHmdPin = false;
+                    }
                     if (visualTransformComposed) e.visualTransformComposed = *visualTransformComposed;
                     found = true;
                     break;
@@ -447,7 +463,10 @@ namespace vrui {
             ne.actionFunc = actionFunc;
             ne.label = label;
             if (pinToWorld) ne.pinToWorld = *pinToWorld;
-            if (pinToHmdWorld) ne.pinToHmdWorld = *pinToHmdWorld;
+            if (pinToRightHand) {
+                ne.pinToRightHand = *pinToRightHand;
+                ne.legacyHmdPin = false;
+            }
             if (visualTransformComposed) ne.visualTransformComposed = *visualTransformComposed;
 
             const std::string targetContainerId = getDefaultContainerIdForElement(elementId);
@@ -524,12 +543,13 @@ namespace vrui {
         }
     }
 
-    void VRUILayoutManager::setElementPinToHmdWorld(const std::string& elementId, bool pinToHmdWorld)
+    void VRUILayoutManager::setElementPinToRightHand(const std::string& elementId, bool pinToRightHand)
     {
         for (auto& c : _containers) {
             for (auto& e : c.elements) {
                 if (e.id == elementId) {
-                    e.pinToHmdWorld = pinToHmdWorld;
+                    e.pinToRightHand = pinToRightHand;
+                    e.legacyHmdPin = false;
                     saveLayout();
                     return;
                 }

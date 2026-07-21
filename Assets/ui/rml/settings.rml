@@ -14,10 +14,8 @@
 
             <div class="section-label">SETTINGS</div>
             <button id="tab-general" class="nav-item"><span>General</span></button>
-            <button id="tab-position" class="nav-item"><span>Position</span></button>
             <button id="tab-visuals" class="nav-item"><span>Visuals</span></button>
             <button id="tab-items" class="nav-item"><span>Item scale</span></button>
-            <button id="tab-labels" class="nav-item"><span>Labels</span></button>
         </aside>
 
         <div class="content-shell">
@@ -47,29 +45,6 @@
                                 <span id="toggle-dev-state" class="toggle-state">Disabled</span>
                             </button>
                         </div>
-                        <div class="setting-row featured">
-                            <div class="setting-copy"><span class="setting-label">Menu scale</span><span class="setting-help">Overall board size in your field of view</span></div>
-                            <input id="menuScale" type="range" class="range" min="0.25" max="3" step="0.01" value="1" />
-                            <span id="value-menuScale" class="value">1.00</span>
-                        </div>
-                        <div class="setting-row">
-                            <div class="setting-copy"><span class="setting-label">Horizontal spacing</span><span class="setting-help">Distance between columns</span></div>
-                            <input id="buttonSpacingX" type="range" class="range" min="0.2" max="8" step="0.05" value="2.4" />
-                            <span id="value-buttonSpacingX" class="value">2.40</span>
-                        </div>
-                        <div class="setting-row">
-                            <div class="setting-copy"><span class="setting-label">Vertical spacing</span><span class="setting-help">Distance between rows</span></div>
-                            <input id="buttonSpacingY" type="range" class="range" min="0.2" max="8" step="0.05" value="1.2" />
-                            <span id="value-buttonSpacingY" class="value">1.20</span>
-                        </div>
-                    </div>
-                    <div class="hint"><span class="hint-icon">i</span><span>Changes are previewed instantly. Save when the board feels comfortable at arm's length.</span></div>
-                </section>
-
-                <section id="page-position" class="page">
-                    <h1>Position</h1>
-                    <p class="lead">Place and orient the board relative to your hand.</p>
-                    <div class="settings-card compact">
                         <div class="setting-row toggle-setting">
                             <div class="setting-copy"><span class="setting-label">Pin board to world</span><span class="setting-help">Keep the whole DragonBoard at its current world position</span></div>
                             <div class="toggle-space"></div>
@@ -78,28 +53,23 @@
                                 <span id="toggle-world-pin-state" class="toggle-state">Hand</span>
                             </button>
                         </div>
+                        <div class="setting-row">
+                            <div class="setting-copy"><span class="setting-label">Restart DragonBoard</span><span class="setting-help">Recreate all components after a player skeleton change</span></div>
+                            <button id="restart-dragonboard" class="save-button restart-button"><span>Restart now</span></button>
+                        </div>
+                        <div class="setting-row featured">
+                            <div class="setting-copy"><span class="setting-label">Menu scale</span><span class="setting-help">Overall board size in your field of view</span></div>
+                            <input id="menuScale" type="range" class="range" min="0.25" max="3" step="0.01" value="1" />
+                            <span id="value-menuScale" class="value">1.00</span>
+                        </div>
                     </div>
-                    <div class="group-label">POSITION</div>
-                    <div class="settings-card compact">
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">X axis</span><span class="setting-help">Left / right</span></div><input id="menuOffsetX" type="range" class="range" min="-40" max="40" step="0.05" value="0.5" /><span id="value-menuOffsetX" class="value">0.50</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Y axis</span><span class="setting-help">Near / far</span></div><input id="menuOffsetY" type="range" class="range" min="-40" max="40" step="0.05" value="-18.5" /><span id="value-menuOffsetY" class="value">-18.50</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Z axis</span><span class="setting-help">Down / up</span></div><input id="menuOffsetZ" type="range" class="range" min="-40" max="40" step="0.05" value="0" /><span id="value-menuOffsetZ" class="value">0.00</span></div>
-                    </div>
-                    <div class="group-label rotation-label">ROTATION</div>
-                    <div class="rotation-row">
-                        <div class="axis-card"><div class="axis-head"><span class="axis-key">X</span><span id="value-menuRotX" class="axis-value">-10.0 deg</span></div><input id="menuRotX" type="range" class="range axis-range" min="-180" max="180" step="0.5" value="-10" /></div>
-                        <div class="axis-card"><div class="axis-head"><span class="axis-key">Y</span><span id="value-menuRotY" class="axis-value">36.0 deg</span></div><input id="menuRotY" type="range" class="range axis-range" min="-180" max="180" step="0.5" value="36" /></div>
-                        <div class="axis-card last"><div class="axis-head"><span class="axis-key">Z</span><span id="value-menuRotZ" class="axis-value">0.0 deg</span></div><input id="menuRotZ" type="range" class="range axis-range" min="-180" max="180" step="0.5" value="0" /></div>
-                    </div>
+                    <div class="hint"><span class="hint-icon">i</span><span>Changes are previewed instantly. Save when the board feels comfortable at arm's length.</span></div>
                 </section>
 
                 <section id="page-visuals" class="page">
                     <h1>Visuals</h1>
                     <p class="lead">Fine-tune the scale of the board's 3D elements.</p>
                     <div class="settings-card">
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Button mesh</span><span class="setting-help">Interactive button geometry</span></div><input id="buttonMeshScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1.5" /><span id="value-buttonMeshScale" class="value">1.50</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Item mesh</span><span class="setting-help">Inventory object geometry</span></div><input id="itemMeshScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1.27" /><span id="value-itemMeshScale" class="value">1.27</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Container depth</span><span class="setting-help">Grid offset from the panel</span></div><input id="containerGridOffsetZ" type="range" class="range" min="-20" max="20" step="0.05" value="1" /><span id="value-containerGridOffsetZ" class="value">1.00</span></div>
                         <div class="setting-row"><div class="setting-copy"><span class="setting-label">Reticle scale</span><span class="setting-help">Laser pointer impact marker</span></div><input id="reticleScale" type="range" class="range" min="0.1" max="10" step="0.05" value="2.5" /><span id="value-reticleScale" class="value">2.50</span></div>
                     </div>
                 </section>
@@ -116,20 +86,6 @@
                     </div>
                 </section>
 
-                <section id="page-labels" class="page">
-                    <h1>Labels</h1>
-                    <p class="lead">Control label size, spacing and local offsets.</p>
-                    <div class="settings-card compact">
-                        <div class="setting-row featured"><div class="setting-copy"><span class="setting-label">Label scale</span><span class="setting-help">Text size above interactive objects</span></div><input id="labelScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-labelScale" class="value">1.00</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Spacing</span><span class="setting-help">Distance between label and object</span></div><input id="labelSpacing" type="range" class="range" min="-5" max="5" step="0.05" value="0.2" /><span id="value-labelSpacing" class="value">0.20</span></div>
-                    </div>
-                    <div class="group-label rotation-label">LOCAL OFFSET</div>
-                    <div class="rotation-row">
-                        <div class="axis-card"><div class="axis-head"><span class="axis-key">X</span><span id="value-labelXOffset" class="axis-value">0.00</span></div><input id="labelXOffset" type="range" class="range axis-range" min="-10" max="10" step="0.05" value="0" /></div>
-                        <div class="axis-card"><div class="axis-head"><span class="axis-key">Y</span><span id="value-labelYOffset" class="axis-value">0.30</span></div><input id="labelYOffset" type="range" class="range axis-range" min="-10" max="10" step="0.05" value="0.3" /></div>
-                        <div class="axis-card last"><div class="axis-head"><span class="axis-key">Z</span><span id="value-labelZOffset" class="axis-value">0.00</span></div><input id="labelZOffset" type="range" class="range axis-range" min="-10" max="10" step="0.05" value="0" /></div>
-                    </div>
-                </section>
             </main>
 
             <footer>

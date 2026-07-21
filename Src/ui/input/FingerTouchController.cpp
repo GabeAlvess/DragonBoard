@@ -280,10 +280,6 @@ namespace dragonboard::ui::input
         if (!_active) {
             _active = true;
             _contactLatched = false;
-            manager.triggerHaptic(
-                true,
-                settings.hapticIntensity * 0.45f,
-                settings.hapticDuration * 0.65f);
             logger::info("DragonBoardVR: finger touch mode active; laser suspended.");
         }
 

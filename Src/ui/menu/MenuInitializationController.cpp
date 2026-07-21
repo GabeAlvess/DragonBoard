@@ -37,6 +37,10 @@ namespace dragonboard::ui::menu
         }
 
         manager._iniChangeWatcher.Track(iniPath);
+        manager._layoutIniChangeWatcher.Track(
+            vrui::VRUISettings::getDefaultLayoutIniPath());
+        manager._stateIniChangeWatcher.Track(
+            vrui::VRUISettings::getDefaultStateIniPath());
 
         if (GetModuleHandleA("vrik.dll") != nullptr) {
             manager._isVRIKInstalled = true;

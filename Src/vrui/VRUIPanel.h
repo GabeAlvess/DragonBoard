@@ -10,11 +10,19 @@ namespace vrui
     class VRUIPanel : public VRUIContainer
     {
     public:
+        enum class HandFollowBasis : std::uint8_t
+        {
+            kMenu,
+            kLeft,
+            kRight
+        };
+
         /// @param name      Panel identifier
         explicit VRUIPanel(const std::string& name, float scale = 1.0f, bool drawsBackground = false);
 
         /// Attach this panel to a specific NiNode in the player skeleton
         void attachToHandNode(RE::NiNode* handNode, const RE::NiPoint3& offset = {0, 5, 10});
+        void setHandFollowBasis(HandFollowBasis basis) { _handFollowBasis = basis; }
         bool parkAtWorldNode(RE::NiNode* worldRoot, RE::NiNode* trackingAnchor);
         bool updateParkedTracking(RE::NiNode* trackingAnchor);
         void prepareSmoothHandHandoff();
@@ -54,6 +62,7 @@ namespace vrui
         bool _pointerSurface = false;
         bool _backgroundLoadFailed = false;
         RE::NiPointer<RE::NiNode> _trackingHandNode;
+        HandFollowBasis _handFollowBasis = HandFollowBasis::kMenu;
         RE::NiPointer<RE::NiNode> _backgroundNode;
         RE::NiPoint3 _offset;
         RE::NiTransform _parkedTrackingOffset;

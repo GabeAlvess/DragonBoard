@@ -60,7 +60,7 @@ namespace dragonboard::ui::menu
         if (auto panel = FindPanel(panels, "AlwaysVisiblePanel"); panel && panel->isActive()) {
             panel->triggerEntranceAnimation(accumulatedDelay);
         }
-        if (auto panel = FindPanel(panels, "AlwaysVisibleHmdPanel"); panel && panel->isActive()) {
+        if (auto panel = FindPanel(panels, "AlwaysVisibleRightHandPanel"); panel && panel->isActive()) {
             panel->triggerEntranceAnimation(accumulatedDelay);
         }
         if (auto panel = FindPanel(panels, "MainPanel")) {

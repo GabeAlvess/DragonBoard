@@ -16,6 +16,18 @@
 
 namespace dragonboard::ui::menu
 {
+    void MenuLifecycleController::RebuildSceneGraph(vrui::VRMenuManager& manager)
+    {
+        const auto preservedBoardPinState = manager._boardPinState;
+        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+        rmlHost.Close();
+        MenuPanelPresenter::DetachAll(manager._panelRegistry.GetPanels());
+        vrui::VRUIWidget::clearNifCache();
+        MenuInitializationController::Initialize(manager);
+        manager._boardPinState = preservedBoardPinState;
+        Recreate();
+    }
+
     void MenuLifecycleController::ApplySafeClose(vrui::VRMenuManager& manager)
     {
         if (!manager._menuSession.Close()) return;
@@ -45,14 +57,7 @@ namespace dragonboard::ui::menu
 
         if (!manager._menuSession.IsOpen() && manager._rebuildOnNextOpen) {
             manager._rebuildOnNextOpen = false;
-            const auto preservedBoardPinState = manager._boardPinState;
-            auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-            rmlHost.Close();
-            MenuPanelPresenter::DetachAll(manager._panelRegistry.GetPanels());
-            vrui::VRUIWidget::clearNifCache();
-            MenuInitializationController::Initialize(manager);
-            manager._boardPinState = preservedBoardPinState;
-            Recreate();
+            RebuildSceneGraph(manager);
             logger::info(
                 "DragonBoardVR: rebuilt menu scene graph before opening after an equipment skeleton change.");
         }
@@ -107,6 +112,8 @@ namespace dragonboard::ui::menu
                 manager._panelRegistry.GetPanels(),
                 manager._boardPinState.IsPinned(),
                 menuHand,
+                manager.getLeftHandNode(),
+                manager.getRightHandNode(),
                 pinnedAttachNode,
                 panelOffset);
         } else {
@@ -126,13 +133,14 @@ namespace dragonboard::ui::menu
             manager._dominantTriggerTracker.Reset();
 
             // PresentClosed detaches ordinary board panels while deliberately
-            // preserving AlwaysVisiblePanel and AlwaysVisibleHmdPanel in place.
+            // preserving AlwaysVisiblePanel and AlwaysVisibleRightHandPanel in place.
             MenuPanelPresenter::PresentClosed(
                 manager._panelRegistry.GetPanels(),
                 manager._boardPinState.IsPinned(),
                 manager.getMenuHandNode(),
                 manager.resolvePinnedAttachNode(manager.getPlayerSkeletonRoot()),
-                manager.getHeadNode(),
+                manager.getLeftHandNode(),
+                manager.getRightHandNode(),
                 manager.getPanelOffset());
             dragonboard::ui::pointer::PointerVisualController::Hide(manager);
         }
@@ -146,5 +154,21 @@ namespace dragonboard::ui::menu
             "DragonBoardVR: menu toggle {} completed in {} ms.",
             menuOpen ? "OPEN" : "CLOSED",
             toggleMs);
+    }
+
+    void MenuLifecycleController::Restart(vrui::VRMenuManager& manager)
+    {
+        const bool reopen = manager._menuSession.IsOpen();
+        if (reopen) {
+            ApplySafeClose(manager);
+        }
+        manager._rebuildOnNextOpen = false;
+        RebuildSceneGraph(manager);
+        if (reopen) {
+            ApplyToggle(manager, true);
+        }
+        logger::info(
+            "DragonBoardVR: manual component restart completed (reopened={}).",
+            reopen);
     }
 }

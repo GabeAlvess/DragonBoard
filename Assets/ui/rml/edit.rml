@@ -87,7 +87,7 @@
                             <div class="group-label pin-group-label">MAGIC ITEM ANCHORS</div>
                             <div class="pin-grid">
                                 <div id="edit-pin-left" class="pin-card" tabindex="0"><span class="pin-title">Pin to left hand</span><span class="pin-description">Follow the configured hand anchor</span></div>
-                                <div id="edit-pin-world" class="pin-card" tabindex="0"><span class="pin-title">Pin to world</span><span id="edit-pin-world-state" class="pin-description">Preserve the current world pose</span></div>
+                                <div id="edit-pin-right" class="pin-card" tabindex="0"><span class="pin-title">Pin to right hand</span><span id="edit-pin-right-state" class="pin-description">Attach this spell to the right hand</span></div>
                             </div>
                         </div>
                     </section>

@@ -24,7 +24,8 @@ namespace dragonboard::ui::panels
             const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
             RE::NiNode* handNode,
             RE::NiNode* pinnedAttachNode,
-            RE::NiNode* headNode,
+            RE::NiNode* leftHandNode,
+            RE::NiNode* rightHandNode,
             bool worldPinned,
             const RE::NiPoint3& handOffset);
     };

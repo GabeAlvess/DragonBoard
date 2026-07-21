@@ -181,7 +181,7 @@ namespace dragonboard::ui::rml
             kBack,
             kPinDashboard,
             kPinLeftHand,
-            kPinWorld,
+            kPinRightHand,
             kToggleLabel
         };
 
@@ -210,7 +210,7 @@ namespace dragonboard::ui::rml
             kEdit,
             kPinDashboard,
             kPinLeftHand,
-            kPinWorld,
+            kPinRightHand,
             kToggleLabel,
             kFavorite,
             kClose,
@@ -447,6 +447,7 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _applyPending{ false };
         std::atomic<bool> _savePending{ false };
         std::atomic<bool> _worldPinTogglePending{ false };
+        std::atomic<bool> _restartPending{ false };
         std::atomic<LocalPanelMode> _localPanelMode{ LocalPanelMode::kSettings };
         std::atomic<DragonBoardVR_API::PanelHandle> _activeExternalPanel{
             DragonBoardVR_API::InvalidPanel };

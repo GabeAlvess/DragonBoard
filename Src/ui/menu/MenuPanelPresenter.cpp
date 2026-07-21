@@ -9,12 +9,12 @@ namespace dragonboard::ui::menu
         constexpr const char* kBackgroundPanelName = "Background_Panel";
         constexpr const char* kPersistentPanelName = "Persistent_Panel";
         constexpr const char* kAlwaysVisiblePanelName = "AlwaysVisiblePanel";
-        constexpr const char* kAlwaysVisibleHmdPanelName = "AlwaysVisibleHmdPanel";
+        constexpr const char* kAlwaysVisibleRightHandPanelName = "AlwaysVisibleRightHandPanel";
 
         bool IsAlwaysVisible(const std::string& name)
         {
             return name == kBackgroundPanelName || name == kPersistentPanelName ||
-                   name == kAlwaysVisiblePanelName || name == kAlwaysVisibleHmdPanelName;
+                   name == kAlwaysVisiblePanelName || name == kAlwaysVisibleRightHandPanelName;
         }
 
         void AttachToBoard(
@@ -36,6 +36,8 @@ namespace dragonboard::ui::menu
         const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
         bool worldPinned,
         RE::NiNode* menuHand,
+        RE::NiNode* leftHandNode,
+        RE::NiNode* rightHandNode,
         RE::NiNode* pinnedAttachNode,
         const RE::NiPoint3& panelOffset)
     {
@@ -43,14 +45,24 @@ namespace dragonboard::ui::menu
             const auto& name = panel->getName();
             const bool alwaysVisible = IsAlwaysVisible(name);
             if (!panel->isActive() && !alwaysVisible) continue;
-            if ((name == kAlwaysVisiblePanelName || name == kAlwaysVisibleHmdPanelName) && !panel->isActive()) {
+            if ((name == kAlwaysVisiblePanelName || name == kAlwaysVisibleRightHandPanelName) && !panel->isActive()) {
                 continue;
             }
 
-            if (alwaysVisible && name != kAlwaysVisiblePanelName && name != kAlwaysVisibleHmdPanelName) {
+            if (alwaysVisible && name != kAlwaysVisiblePanelName && name != kAlwaysVisibleRightHandPanelName) {
                 panel->setActive(true);
             }
-            AttachToBoard(panel, worldPinned, menuHand, pinnedAttachNode, panelOffset);
+            if (name == kAlwaysVisiblePanelName) {
+                if (leftHandNode) {
+                    panel->attachToHandNode(leftHandNode, panelOffset);
+                }
+            } else if (name == kAlwaysVisibleRightHandPanelName) {
+                if (rightHandNode) {
+                    panel->attachToHandNode(rightHandNode, panelOffset);
+                }
+            } else {
+                AttachToBoard(panel, worldPinned, menuHand, pinnedAttachNode, panelOffset);
+            }
             panel->show();
         }
     }
@@ -60,14 +72,17 @@ namespace dragonboard::ui::menu
         bool worldPinned,
         RE::NiNode* menuHand,
         RE::NiNode* pinnedAttachNode,
-        RE::NiNode* headNode,
+        RE::NiNode* leftHandNode,
+        RE::NiNode* rightHandNode,
         const RE::NiPoint3& panelOffset)
     {
         for (const auto& panel : panels) {
             const auto& name = panel->getName();
             if (name == kAlwaysVisiblePanelName) {
                 if (panel->isActive()) {
-                    AttachToBoard(panel, worldPinned, menuHand, pinnedAttachNode, panelOffset);
+                    if (leftHandNode) {
+                        panel->attachToHandNode(leftHandNode, panelOffset);
+                    }
                     panel->show();
                 } else {
                     panel->detachFromHandNode();
@@ -75,11 +90,10 @@ namespace dragonboard::ui::menu
                 continue;
             }
 
-            if (name == kAlwaysVisibleHmdPanelName) {
+            if (name == kAlwaysVisibleRightHandPanelName) {
                 if (panel->isActive()) {
-                    if (headNode) {
-                        panel->attachToNode(headNode);
-                        panel->setLocalPosition({ 0.0f, 0.0f, 0.0f });
+                    if (rightHandNode) {
+                        panel->attachToHandNode(rightHandNode, panelOffset);
                     }
                     panel->show();
                 } else {

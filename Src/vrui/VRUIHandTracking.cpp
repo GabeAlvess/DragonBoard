@@ -259,6 +259,38 @@ namespace vrui
         return resolveHandAnchorNode(root, magicNodeName, wandNodeName, handBone);
     }
 
+    RE::NiNode* VRUIHandTracking::getLeftHandNode(bool isVRIKInstalled)
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return nullptr;
+
+        auto* rootObj = player->Get3D(!isVRIKInstalled);
+        auto* root = rootObj ? rootObj->AsNode() : nullptr;
+        if (!root) return nullptr;
+
+        return resolveHandAnchorNode(
+            root,
+            "NPC L MagicNode [LMag]",
+            "Left Wand Node",
+            "NPC L Hand [LHnd]");
+    }
+
+    RE::NiNode* VRUIHandTracking::getRightHandNode(bool isVRIKInstalled)
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return nullptr;
+
+        auto* rootObj = player->Get3D(!isVRIKInstalled);
+        auto* root = rootObj ? rootObj->AsNode() : nullptr;
+        if (!root) return nullptr;
+
+        return resolveHandAnchorNode(
+            root,
+            "NPC R MagicNode [RMag]",
+            "Right Wand Node",
+            "NPC R Hand [RHnd]");
+    }
+
     RE::NiNode* VRUIHandTracking::getPlayerSkeletonRoot(bool isVRIKInstalled)
     {
         auto* player = RE::PlayerCharacter::GetSingleton();

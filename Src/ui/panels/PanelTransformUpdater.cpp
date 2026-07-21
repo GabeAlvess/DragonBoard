@@ -6,14 +6,16 @@ namespace dragonboard::ui::panels
 {
     namespace
     {
-        constexpr const char* kAlwaysVisibleHmdPanelName = "AlwaysVisibleHmdPanel";
+        constexpr const char* kAlwaysVisiblePanelName = "AlwaysVisiblePanel";
+        constexpr const char* kAlwaysVisibleRightHandPanelName = "AlwaysVisibleRightHandPanel";
     }
 
     void PanelTransformUpdater::Update(
         const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
         RE::NiNode* handNode,
         RE::NiNode* pinnedAttachNode,
-        RE::NiNode* headNode,
+        RE::NiNode* leftHandNode,
+        RE::NiNode* rightHandNode,
         bool worldPinned,
         const RE::NiPoint3& handOffset)
     {
@@ -22,10 +24,16 @@ namespace dragonboard::ui::panels
                 continue;
             }
 
-            if (panel->getName() == kAlwaysVisibleHmdPanelName) {
-                if (headNode) {
-                    panel->attachToNode(headNode);
-                    panel->setLocalPosition({ 0.0f, 0.0f, 0.0f });
+            if (panel->getName() == kAlwaysVisiblePanelName) {
+                if (leftHandNode) {
+                    panel->attachToHandNode(leftHandNode, handOffset);
+                }
+                continue;
+            }
+
+            if (panel->getName() == kAlwaysVisibleRightHandPanelName) {
+                if (rightHandNode) {
+                    panel->attachToHandNode(rightHandNode, handOffset);
                 }
                 continue;
             }

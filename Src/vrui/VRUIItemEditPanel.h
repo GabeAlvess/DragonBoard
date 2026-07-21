@@ -76,11 +76,13 @@ namespace vrui
         void resetItemOffsets();
         bool pinToDashboard();
         bool pinToLeftHand();
+        bool pinToRightHand();
         bool pinToWorld();
         bool togglePinnedLabel();
 
     private:
         void saveOffsets();
+        [[nodiscard]] std::string allocatePinElementId() const;
         void syncWorkingTransformFromPreview();
         bool getPreviewVisualWorldTransform(
             RE::NiPoint3& position, RE::NiMatrix3& rotation, float& scale) const;

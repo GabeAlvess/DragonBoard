@@ -35,6 +35,7 @@ using namespace vrui;
 namespace
 {
     bool g_menuCreated = false;
+    std::weak_ptr<VRUIButton> g_developerButton;
 }
 
 // =========================================================================
@@ -393,6 +394,13 @@ void dragonboard::ui::menu::Recreate()
     Create();
 }
 
+void dragonboard::ui::menu::SetDeveloperButtonVisible(bool visible)
+{
+    if (auto button = g_developerButton.lock()) {
+        button->setVisible(visible);
+    }
+}
+
 void dragonboard::ui::menu::Create()
 {
     if (g_menuCreated) {
@@ -425,9 +433,11 @@ void dragonboard::ui::menu::Create()
     auto persistentPanel = std::make_shared<VRUIPanel>("Persistent_Panel", 1.0f, false);
     persistentPanel->setPointerSurface(true);
     auto alwaysVisiblePanel = std::make_shared<VRUIPanel>("AlwaysVisiblePanel", 1.0f, false);
+    alwaysVisiblePanel->setHandFollowBasis(VRUIPanel::HandFollowBasis::kLeft);
     alwaysVisiblePanel->setActive(false);
-    auto alwaysVisibleHmdPanel = std::make_shared<VRUIPanel>("AlwaysVisibleHmdPanel", 1.0f, false);
-    alwaysVisibleHmdPanel->setActive(false);
+    auto alwaysVisibleRightHandPanel = std::make_shared<VRUIPanel>("AlwaysVisibleRightHandPanel", 1.0f, false);
+    alwaysVisibleRightHandPanel->setHandFollowBasis(VRUIPanel::HandFollowBasis::kRight);
+    alwaysVisibleRightHandPanel->setActive(false);
     auto mcmPanel = std::make_shared<VRUIMenuMCM>("MCM_Panel");
     mcmPanel->initializeVisuals();
     mcmPanel->setActive(false);
@@ -530,16 +540,16 @@ void dragonboard::ui::menu::Create()
     applyJSONTransform(sbMap, "TopTabs", "Btn_Map");
     configureFavoriteButton(fixedContainer, sbMap, settings.bMapAction, settings.bMapLabel);
 
-    if (settings.showDevButton) {
-        auto sbDev = std::make_shared<VRUIButton>(settings.bDevLabel, settings.devNifPath, "", 2.0f, 2.0f, true);
-        sbDev->setOnPressHandler(resolveFixedButtonAction(settings.bDevAction));
-        sbDev->setLocalPosition({ settings.bDevPosX, settings.bDevPosY, settings.bDevPosZ });
-        setWidgetEulerDegrees(sbDev, settings.bDevRotX, settings.bDevRotY, settings.bDevRotZ);
-        sbDev->setLocalScale(settings.bDevScale);
-        applyJSONTransform(sbDev, "TopTabs", "Btn_Dev");
-        configureFavoriteButton(fixedContainer, sbDev, settings.bDevAction, settings.bDevLabel);
-        fixedContainer->addElement(sbDev);
-    }
+    auto sbDev = std::make_shared<VRUIButton>(settings.bDevLabel, settings.devNifPath, "", 2.0f, 2.0f, true);
+    sbDev->setOnPressHandler(resolveFixedButtonAction(settings.bDevAction));
+    sbDev->setLocalPosition({ settings.bDevPosX, settings.bDevPosY, settings.bDevPosZ });
+    setWidgetEulerDegrees(sbDev, settings.bDevRotX, settings.bDevRotY, settings.bDevRotZ);
+    sbDev->setLocalScale(settings.bDevScale);
+    applyJSONTransform(sbDev, "TopTabs", "Btn_Dev");
+    configureFavoriteButton(fixedContainer, sbDev, settings.bDevAction, settings.bDevLabel);
+    sbDev->setVisible(settings.showDevButton);
+    g_developerButton = sbDev;
+    fixedContainer->addElement(sbDev);
 
     // --- Persistent Nav Buttons (control the active pageable container) ---
     // All in the same fixedContainer — uniform snapping alongside sidebar buttons.
@@ -578,7 +588,7 @@ void dragonboard::ui::menu::Create()
     fixedContainer->addElement(sbFav);
 
     fixedContainer->addElement(sbMap);
-    // sbDev added conditionally above
+    // sbDev is always present internally; Settings controls its visibility.
     fixedContainer->addElement(prevBtn);
     fixedContainer->addElement(homeBtn);
     fixedContainer->addElement(nextBtn);
@@ -824,7 +834,7 @@ void dragonboard::ui::menu::Create()
     manager.registerPanel(bgPanel);
     manager.registerPanel(persistentPanel);
     manager.registerPanel(alwaysVisiblePanel);
-    manager.registerPanel(alwaysVisibleHmdPanel);
+    manager.registerPanel(alwaysVisibleRightHandPanel);
     manager.registerPanel(panel);
     manager.registerPanel(mcmPanel);
     manager.registerPanel(itemEditPanel);

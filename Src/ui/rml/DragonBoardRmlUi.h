@@ -154,7 +154,7 @@ namespace dragonboard::ui::rml
             kBack,
             kPinDashboard,
             kPinLeftHand,
-            kPinWorld,
+            kPinRightHand,
             kToggleLabel
         };
 
@@ -185,7 +185,7 @@ namespace dragonboard::ui::rml
             kEdit,
             kPinDashboard,
             kPinLeftHand,
-            kPinWorld,
+            kPinRightHand,
             kToggleLabel,
             kFavorite,
             kClose,
@@ -416,6 +416,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool ConsumeEditModeToggleRequested();
         [[nodiscard]] bool ConsumeDeveloperPanelToggleRequested();
         [[nodiscard]] bool ConsumeWorldPinToggleRequested();
+        [[nodiscard]] bool ConsumeRestartRequested();
         [[nodiscard]] HapticCue ConsumeHapticCue();
         [[nodiscard]] std::optional<SliderChange> ConsumeSliderChange();
         [[nodiscard]] std::optional<std::size_t> ConsumeDeveloperCommandRequested();
@@ -563,8 +564,10 @@ namespace dragonboard::ui::rml
         float _observedPageScrollTop = 0.0f;
         float _observedNestedScrollTop = 0.0f;
         Rml::ElementDocument* _triggerScrollLockDocument = nullptr;
+        Rml::Element* _triggerScrollTarget = nullptr;
         float _triggerScrollLockPageTop = 0.0f;
         float _triggerScrollLockNestedTop = 0.0f;
+        float _triggerScrollTargetTop = 0.0f;
         bool _triggerScrollLockActive = false;
         bool _triggerScrollReleasePending = false;
         bool _triggerScrollSuppressionLogged = false;
@@ -596,6 +599,7 @@ namespace dragonboard::ui::rml
         bool _editModeToggleRequested = false;
         bool _developerPanelToggleRequested = false;
         bool _worldPinToggleRequested = false;
+        bool _restartRequested = false;
         HapticCue _pendingHapticCue = HapticCue::kNone;
         std::string _hoveredElementId;
         std::string _modsListMarkup;

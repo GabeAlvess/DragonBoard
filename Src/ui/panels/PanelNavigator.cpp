@@ -11,12 +11,12 @@ namespace dragonboard::ui::panels
         constexpr const char* kBackgroundPanelName = "Background_Panel";
         constexpr const char* kPersistentPanelName = "Persistent_Panel";
         constexpr const char* kAlwaysVisiblePanelName = "AlwaysVisiblePanel";
-        constexpr const char* kAlwaysVisibleHmdPanelName = "AlwaysVisibleHmdPanel";
+        constexpr const char* kAlwaysVisibleRightHandPanelName = "AlwaysVisibleRightHandPanel";
 
         bool IsPersistentPanel(const std::string& name)
         {
             return name == kBackgroundPanelName || name == kPersistentPanelName ||
-                   name == kAlwaysVisiblePanelName || name == kAlwaysVisibleHmdPanelName;
+                   name == kAlwaysVisiblePanelName || name == kAlwaysVisibleRightHandPanelName;
         }
     }
 

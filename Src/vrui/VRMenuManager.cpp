@@ -211,6 +211,11 @@ namespace vrui
         _interactionFocus.ClearHover();
     }
 
+    void VRMenuManager::restartDragonBoard()
+    {
+        dragonboard::ui::menu::MenuLifecycleController::Restart(*this);
+    }
+
     void VRMenuManager::performSkeletonChangeSafely(std::function<void()> change)
     {
         dragonboard::ui::equipment::EquipInteractionController::PerformSkeletonSafeChange(
@@ -296,6 +301,16 @@ namespace vrui
     RE::NiNode* VRMenuManager::getNonDominantHandNode() const
     {
         return VRUIHandTracking::getNonDominantHandNode(_isVRIKInstalled);
+    }
+
+    RE::NiNode* VRMenuManager::getLeftHandNode() const
+    {
+        return VRUIHandTracking::getLeftHandNode(_isVRIKInstalled);
+    }
+
+    RE::NiNode* VRMenuManager::getRightHandNode() const
+    {
+        return VRUIHandTracking::getRightHandNode(_isVRIKInstalled);
     }
 
     RE::NiNode* VRMenuManager::getPlayerSkeletonRoot() const

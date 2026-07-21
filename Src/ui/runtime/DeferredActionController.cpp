@@ -36,6 +36,10 @@ namespace dragonboard::ui::runtime
         // immediately so the next poll does not mistake it for an external edit
         // and request a global refresh that rebuilds every pinned widget.
         manager._iniChangeWatcher.Track(iniPath);
+        manager._layoutIniChangeWatcher.Track(
+            vrui::VRUISettings::getDefaultLayoutIniPath());
+        manager._stateIniChangeWatcher.Track(
+            vrui::VRUISettings::getDefaultStateIniPath());
         if (verbosePerf) {
             const double saveMs = ElapsedMs(saveStart, PerfClock::now());
             if (saveMs >= 0.5) {

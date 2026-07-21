@@ -115,7 +115,7 @@
                 <div id="magic-pin-menu" class="magic-pin-menu">
                     <button id="magic-pin-dashboard" class="pin-option"><span>DASHBOARD</span></button>
                     <button id="magic-pin-left" class="pin-option"><span>LEFT HAND</span></button>
-                    <button id="magic-pin-world" class="pin-option"><span>WORLD</span></button>
+                    <button id="magic-pin-right" class="pin-option"><span>RIGHT HAND</span></button>
                     <button id="magic-pin-label" class="pin-option"><span>LABEL</span></button>
                 </div>
 

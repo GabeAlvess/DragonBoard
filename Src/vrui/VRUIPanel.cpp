@@ -53,6 +53,27 @@ namespace vrui
             updateData.flags = RE::NiUpdateData::Flag::kDirty;
             node->Update(updateData);
         }
+
+        void ResolveHandFollowRotation(
+            const VRUISettings& settings,
+            VRUIPanel::HandFollowBasis basis,
+            float& rotX,
+            float& rotY,
+            float& rotZ)
+        {
+            rotX = settings.menuRotX;
+            rotY = settings.menuRotY;
+            rotZ = settings.menuRotZ;
+
+            const bool currentValuesAreMirrored = !settings.useLeftHandAsMenu;
+            const bool targetValuesAreMirrored =
+                basis == VRUIPanel::HandFollowBasis::kRight;
+            if (basis != VRUIPanel::HandFollowBasis::kMenu &&
+                currentValuesAreMirrored != targetValuesAreMirrored) {
+                rotY = -rotY;
+                rotZ = -rotZ;
+            }
+        }
     }
 
     VRUIPanel::VRUIPanel(const std::string& name, float scale, bool drawsBackground)
@@ -86,11 +107,16 @@ namespace vrui
                 ApplyWorldTransform(_node.get(), preservedWorld);
 
                 auto& settings = VRUISettings::get();
+                float rotX = 0.0f;
+                float rotY = 0.0f;
+                float rotZ = 0.0f;
+                ResolveHandFollowRotation(
+                    settings, _handFollowBasis, rotX, rotY, rotZ);
                 RE::NiMatrix3 userRotation;
                 userRotation.SetEulerAnglesXYZ(
-                    settings.menuRotX * kDegToRad,
-                    settings.menuRotY * kDegToRad,
-                    (settings.menuRotZ + kPanelFaceCorrectionDegrees) * kDegToRad);
+                    rotX * kDegToRad,
+                    rotY * kDegToRad,
+                    (rotZ + kPanelFaceCorrectionDegrees) * kDegToRad);
                 _currentWorldRot = preservedWorld.rotate * userRotation.Transpose();
                 _currentWorldPos = preservedWorld.translate;
                 _hasTargetTransform = true;
@@ -235,18 +261,24 @@ namespace vrui
             auto& settings = VRUISettings::get();
             auto& manager = VRMenuManager::get();
 
-            if (manager.isBoardWorldPinned()) {
+            if (manager.isBoardWorldPinned() &&
+                _handFollowBasis == HandFollowBasis::kMenu) {
                 applyPinnedWorldTransform();
             } else if (_trackingHandNode && settings.bEnableMenuLerp) {
                 // Calculate target world transform from hand node
                 RE::NiPoint3 targetWorldPos = _trackingHandNode->world.translate;
                 
                 // Rotation offset from settings
+                float rotX = 0.0f;
+                float rotY = 0.0f;
+                float rotZ = 0.0f;
+                ResolveHandFollowRotation(
+                    settings, _handFollowBasis, rotX, rotY, rotZ);
                 RE::NiMatrix3 userRot;
                 userRot.SetEulerAnglesXYZ(
-                    settings.menuRotX * (kDegToRad),
-                    settings.menuRotY * (kDegToRad),
-                    (settings.menuRotZ + kPanelFaceCorrectionDegrees) * (kDegToRad)
+                    rotX * (kDegToRad),
+                    rotY * (kDegToRad),
+                    (rotZ + kPanelFaceCorrectionDegrees) * (kDegToRad)
                 );
                 
                 RE::NiMatrix3 handRot = _trackingHandNode->world.rotate;
@@ -354,11 +386,16 @@ namespace vrui
                 // Direct attach mode (Standard rigid following)
                 _node->local.translate = _offset;
                 
+                float rotX = 0.0f;
+                float rotY = 0.0f;
+                float rotZ = 0.0f;
+                ResolveHandFollowRotation(
+                    settings, _handFollowBasis, rotX, rotY, rotZ);
                 RE::NiMatrix3 userRot;
                 userRot.SetEulerAnglesXYZ(
-                    settings.menuRotX * (kDegToRad),
-                    settings.menuRotY * (kDegToRad),
-                    (settings.menuRotZ + kPanelFaceCorrectionDegrees) * (kDegToRad)
+                    rotX * (kDegToRad),
+                    rotY * (kDegToRad),
+                    (rotZ + kPanelFaceCorrectionDegrees) * (kDegToRad)
                 );
                 _node->local.rotate = userRot;
                 _node->local.scale = settings.menuScale;

@@ -1667,7 +1667,7 @@ namespace vrui
                     }
                     VRUILayoutManager::updateElementTransformAnywhere(_layoutId,
                         _lockedWorldPos, _lockedWorldRot, _lockedWorldScale);
-                    VRUILayoutManager::setElementPinToHmdWorld(_layoutId, true);
+                    VRUILayoutManager::setElementPinToRightHand(_layoutId, true);
                     VRUILayoutManager::setElementPinToWorld(_layoutId, false);
                 } else {
                     VRUILayoutManager::updateElementTransformAnywhere(_layoutId, 

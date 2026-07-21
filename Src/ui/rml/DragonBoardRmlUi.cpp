@@ -73,7 +73,7 @@ namespace dragonboard::ui::rml
             if (!element) return false;
             const std::string_view id(element->GetId());
             return id == "edit-pin-dashboard" || id == "edit-pin-left" ||
-                   id == "edit-pin-world" || id == "edit-toggle-label" ||
+                   id == "edit-pin-right" || id == "edit-toggle-label" ||
                    id.starts_with("mods-card-");
         }
 
@@ -127,17 +127,13 @@ namespace dragonboard::ui::rml
             "Assets/ui/rml/assets/DragonBoardVR_Font.ttf"
         };
 
-        constexpr std::array<const char*, 5> kPages{
-            "general", "position", "visuals", "items", "labels"
+        constexpr std::array<const char*, 3> kPages{
+            "general", "visuals", "items"
         };
 
-        constexpr std::array<const char*, 23> kSliders{
-            "menuScale", "buttonSpacingX", "buttonSpacingY",
-            "menuOffsetX", "menuOffsetY", "menuOffsetZ",
-            "menuRotX", "menuRotY", "menuRotZ",
-            "buttonMeshScale", "itemMeshScale", "containerGridOffsetZ", "reticleScale",
-            "itemWeaponScale", "itemArmorScale", "itemPotionScale", "itemFoodScale", "itemMiscScale",
-            "labelScale", "labelSpacing", "labelXOffset", "labelYOffset", "labelZOffset"
+        constexpr std::array<const char*, 7> kSliders{
+            "menuScale", "reticleScale", "itemWeaponScale", "itemArmorScale",
+            "itemPotionScale", "itemFoodScale", "itemMiscScale"
         };
 
         constexpr std::array<const char*, 3> kDeveloperPages{
@@ -378,6 +374,7 @@ namespace dragonboard::ui::rml
                 BindClick(_settingsDocument, "toggle-edit-mode");
                 BindClick(_settingsDocument, "toggle-dev-panel");
                 BindClick(_settingsDocument, "toggle-world-pin");
+                BindClick(_settingsDocument, "restart-dragonboard");
                 SelectSettingsPage("general");
                 _settingsDocument->Hide();
                 logger::info("DragonBoardVR: external RmlUi settings loaded from '{}'.", path);
@@ -420,7 +417,7 @@ namespace dragonboard::ui::rml
                 for (const auto* slider : kItemEditSliders) BindSlider(_itemEditDocument, slider);
                 for (const auto* id : {
                          "edit-apply-item", "edit-apply-category", "edit-reset", "edit-back", "edit-close",
-                         "edit-pin-dashboard", "edit-pin-left", "edit-pin-world", "edit-toggle-label" }) {
+                         "edit-pin-dashboard", "edit-pin-left", "edit-pin-right", "edit-toggle-label" }) {
                     BindClick(_itemEditDocument, id);
                 }
                 SelectItemEditPage("position");
@@ -469,7 +466,7 @@ namespace dragonboard::ui::rml
                          "magic-filter-restoration", "magic-filter-illusion",
                          "magic-filter-alteration", "magic-filter-powers",
                          "magic-filter-passive", "magic-pin-dashboard",
-                         "magic-pin-left", "magic-pin-world", "magic-pin-label" }) {
+                         "magic-pin-left", "magic-pin-right", "magic-pin-label" }) {
                     BindClick(_magicDocument, id);
                 }
                 _magicDocument->Hide();
@@ -511,6 +508,7 @@ namespace dragonboard::ui::rml
     void DragonBoardRmlUi::Shutdown()
     {
         _triggerScrollLockDocument = nullptr;
+        _triggerScrollTarget = nullptr;
         _triggerScrollLockActive = false;
         _triggerScrollReleasePending = false;
         _triggerCaptureMode = TriggerCaptureMode::kNone;
@@ -1491,8 +1489,12 @@ namespace dragonboard::ui::rml
         _triggerScrollLockDocument = _activeDocument;
         auto* page = _activeDocument ? _activeDocument->GetElementById("page-scroll") : nullptr;
         auto* nested = _activeDocument ? _activeDocument->GetElementById("dev-command-list") : nullptr;
+        auto* hovered = _context ? _context->GetHoverElement() : nullptr;
+        _triggerScrollTarget = hovered ? hovered->GetClosestScrollableContainer() : nullptr;
         _triggerScrollLockPageTop = page ? page->GetScrollTop() : 0.0f;
         _triggerScrollLockNestedTop = nested ? nested->GetScrollTop() : 0.0f;
+        _triggerScrollTargetTop = _triggerScrollTarget ?
+            _triggerScrollTarget->GetScrollTop() : 0.0f;
         _triggerScrollLockActive = true;
         _triggerScrollReleasePending = false;
         _triggerScrollSuppressionLogged = false;
@@ -1503,6 +1505,7 @@ namespace dragonboard::ui::rml
         if (!_triggerScrollLockActive) return;
         if (!_activeDocument || _activeDocument != _triggerScrollLockDocument) {
             _triggerScrollLockDocument = nullptr;
+            _triggerScrollTarget = nullptr;
             _triggerScrollLockActive = false;
             _triggerScrollReleasePending = false;
             return;
@@ -1512,19 +1515,24 @@ namespace dragonboard::ui::rml
         auto* nested = _activeDocument->GetElementById("dev-command-list");
         const bool pageMoved = page && page->GetScrollTop() != _triggerScrollLockPageTop;
         const bool nestedMoved = nested && nested->GetScrollTop() != _triggerScrollLockNestedTop;
+        const bool targetMoved = _triggerScrollTarget &&
+            _triggerScrollTarget->GetScrollTop() != _triggerScrollTargetTop;
         if (pageMoved) page->SetScrollTop(_triggerScrollLockPageTop);
         if (nestedMoved) nested->SetScrollTop(_triggerScrollLockNestedTop);
+        if (targetMoved) _triggerScrollTarget->SetScrollTop(_triggerScrollTargetTop);
 
-        if ((pageMoved || nestedMoved) && !_triggerScrollSuppressionLogged) {
+        if ((pageMoved || nestedMoved || targetMoved) && !_triggerScrollSuppressionLogged) {
             logger::info(
-                "DragonBoardVR: suppressed RmlUi trigger drag scroll (page={}, nested={}).",
+                "DragonBoardVR: suppressed RmlUi trigger drag scroll (page={}, nested={}, target={}).",
                 pageMoved,
-                nestedMoved);
+                nestedMoved,
+                targetMoved);
             _triggerScrollSuppressionLogged = true;
         }
 
         if (_triggerScrollReleasePending) {
             _triggerScrollLockDocument = nullptr;
+            _triggerScrollTarget = nullptr;
             _triggerScrollLockActive = false;
             _triggerScrollReleasePending = false;
         }
@@ -1696,6 +1704,11 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ConsumeWorldPinToggleRequested()
     {
         return std::exchange(_worldPinToggleRequested, false);
+    }
+
+    bool DragonBoardRmlUi::ConsumeRestartRequested()
+    {
+        return std::exchange(_restartRequested, false);
     }
 
     DragonBoardRmlUi::HapticCue DragonBoardRmlUi::ConsumeHapticCue()
@@ -2633,11 +2646,11 @@ namespace dragonboard::ui::rml
         }
         setText("edit-pin-dashboard-state",
             info.boardPinnedToWorld ? "Unavailable while the board is world pinned" : "Attach this item to the dashboard");
-        if (auto* world = _itemEditDocument->GetElementById("edit-pin-world")) {
-            world->SetClass("disabled", !info.canPinToWorld);
+        if (auto* right = _itemEditDocument->GetElementById("edit-pin-right")) {
+            right->SetClass("disabled", !info.canPinToWorld);
         }
-        setText("edit-pin-world-state",
-            info.canPinToWorld ? "Preserve the current world pose" : "Requires a valid 3D preview pose");
+        setText("edit-pin-right-state",
+            info.canPinToWorld ? "Attach this spell to the right hand" : "Requires a valid 3D preview pose");
         setText("edit-label-state", info.labelHidden ? "Hidden" : "Visible");
         if (auto* label = _itemEditDocument->GetElementById("edit-toggle-label")) {
             label->SetClass("enabled", !info.labelHidden);
@@ -2818,8 +2831,8 @@ namespace dragonboard::ui::rml
             _itemEditAction = ItemEditAction::kPinDashboard;
         } else if (value == "edit-pin-left") {
             _itemEditAction = ItemEditAction::kPinLeftHand;
-        } else if (value == "edit-pin-world") {
-            _itemEditAction = ItemEditAction::kPinWorld;
+        } else if (value == "edit-pin-right") {
+            _itemEditAction = ItemEditAction::kPinRightHand;
         } else if (value == "edit-toggle-label") {
             _itemEditAction = ItemEditAction::kToggleLabel;
         } else if (value == "mods-add") {
@@ -2884,8 +2897,8 @@ namespace dragonboard::ui::rml
             _magicAction = MagicAction::kPinDashboard;
         } else if (value == "magic-pin-left") {
             _magicAction = MagicAction::kPinLeftHand;
-        } else if (value == "magic-pin-world") {
-            _magicAction = MagicAction::kPinWorld;
+        } else if (value == "magic-pin-right") {
+            _magicAction = MagicAction::kPinRightHand;
         } else if (value == "magic-pin-label") {
             _magicAction = MagicAction::kToggleLabel;
         } else if (value == "magic-close") {
@@ -2956,6 +2969,8 @@ namespace dragonboard::ui::rml
             _developerPanelToggleRequested = true;
         } else if (value == "toggle-world-pin") {
             _worldPinToggleRequested = true;
+        } else if (value == "restart-dragonboard") {
+            _restartRequested = true;
         } else if (value.starts_with("tab-")) {
             SelectSettingsPage(id + 4);
         } else if (value.starts_with("dev-tab-")) {

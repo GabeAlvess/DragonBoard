@@ -1,7 +1,9 @@
 #include "ui/rml/RmlEntranceAnimation.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <string>
 
 namespace dragonboard::ui::rml
 {
@@ -15,13 +17,32 @@ namespace dragonboard::ui::rml
         constexpr float kComparisonEpsilon = 0.00001f;
     }
 
+    RmlEntranceStyle ParseRmlEntranceStyle(std::string_view value)
+    {
+        std::string compact;
+        compact.reserve(value.size());
+        for (const unsigned char character : value) {
+            if (std::isalnum(character)) {
+                compact.push_back(static_cast<char>(std::tolower(character)));
+            }
+        }
+
+        if (compact == "reverseradial") return RmlEntranceStyle::kReverseRadial;
+        if (compact == "fade" || compact == "instant") return RmlEntranceStyle::kFade;
+        if (compact == "lefttoright") return RmlEntranceStyle::kLeftToRight;
+        if (compact == "righttoleft") return RmlEntranceStyle::kRightToLeft;
+        return RmlEntranceStyle::kRadial;
+    }
+
     bool RmlEntranceAnimation::Configure(
         bool enabled,
         float durationSeconds,
-        float feather)
+        float feather,
+        RmlEntranceStyle style)
     {
         const float previousProgress = GetProgress();
         const float previousFeather = _feather;
+        const auto previousStyle = _style;
 
         if (!std::isfinite(durationSeconds)) {
             durationSeconds = kDefaultDurationSeconds;
@@ -36,6 +57,7 @@ namespace dragonboard::ui::rml
             kMinimumDurationSeconds,
             kMaximumDurationSeconds);
         _feather = std::clamp(feather, 0.0f, kMaximumFeather);
+        _style = style;
 
         if (!_enabled) {
             Stop();
@@ -50,7 +72,8 @@ namespace dragonboard::ui::rml
         }
 
         return std::abs(previousProgress - GetProgress()) > kComparisonEpsilon ||
-               (_active && std::abs(previousFeather - _feather) > kComparisonEpsilon);
+               (_active && std::abs(previousFeather - _feather) > kComparisonEpsilon) ||
+               previousStyle != _style;
     }
 
     void RmlEntranceAnimation::Start()

@@ -99,10 +99,14 @@ namespace dragonboard::ui::rml
         update.state.pointerOnPanel = _pointerOnPanel.load(std::memory_order_acquire);
         update.state.pointerU = _pointerU.load(std::memory_order_acquire);
         update.state.pointerV = _pointerV.load(std::memory_order_acquire);
-        update.state.triggerDown = IsTriggerDown();
+        const bool physicalTriggerDown =
+            _triggerDown.load(std::memory_order_acquire);
+        update.state.triggerDown = physicalTriggerDown ||
+            _fingerTouchTriggerDown.load(std::memory_order_acquire);
         update.state.gripDown =
             _gripDown.load(std::memory_order_acquire) ||
-            _fingerTouchScrollDown.load(std::memory_order_acquire);
+            (_fingerTouchScrollDown.load(std::memory_order_acquire) &&
+             !physicalTriggerDown);
         update.state.stickX = _stickX.load(std::memory_order_acquire);
         update.state.stickY = _stickY.load(std::memory_order_acquire);
 

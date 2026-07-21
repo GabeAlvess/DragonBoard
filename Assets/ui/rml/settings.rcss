@@ -542,6 +542,11 @@ footer {
     border-color: #8f5d18;
 }
 
+.restart-button {
+    width: 360px;
+    margin-left: auto;
+}
+
 .keycap.light {
     color: #4a3019;
     background-color: #f9edda;

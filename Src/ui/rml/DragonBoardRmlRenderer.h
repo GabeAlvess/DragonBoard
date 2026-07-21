@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui/rml/D3D11StateGuard.h"
+#include "ui/rml/RmlEntranceAnimation.h"
 
 #include <RmlUi/Core/RenderInterface.h>
 
@@ -31,7 +32,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsReady() const;
         [[nodiscard]] int GetDrawCallCount() const;
         [[nodiscard]] const D3D11StateTiming& GetLastStateTiming() const;
-        void SetEntranceEffect(float progress, float feather);
+        void SetEntranceEffect(float progress, float feather, RmlEntranceStyle style);
 
         Rml::CompiledGeometryHandle CompileGeometry(
             Rml::Span<const Rml::Vertex> vertices,

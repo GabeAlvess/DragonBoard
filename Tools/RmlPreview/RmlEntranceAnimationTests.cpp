@@ -6,6 +6,8 @@
 #include <stdexcept>
 
 using dragonboard::ui::rml::RmlEntranceAnimation;
+using dragonboard::ui::rml::RmlEntranceStyle;
+using dragonboard::ui::rml::ParseRmlEntranceStyle;
 
 namespace
 {
@@ -24,6 +26,17 @@ namespace
 
 int main()
 {
+    Require(ParseRmlEntranceStyle("radial") == RmlEntranceStyle::kRadial,
+        "radial style was not parsed");
+    Require(ParseRmlEntranceStyle("reverse radial") == RmlEntranceStyle::kReverseRadial,
+        "reverse radial style was not parsed");
+    Require(ParseRmlEntranceStyle("Fade") == RmlEntranceStyle::kFade,
+        "fade style was not parsed case-insensitively");
+    Require(ParseRmlEntranceStyle("leftToRight") == RmlEntranceStyle::kLeftToRight,
+        "left-to-right style was not parsed");
+    Require(ParseRmlEntranceStyle("rightToLeft") == RmlEntranceStyle::kRightToLeft,
+        "right-to-left style was not parsed");
+
     RmlEntranceAnimation animation;
     Require(!animation.Configure(true, 0.25f, 0.10f), "default configuration changed the frame");
 
@@ -71,6 +84,15 @@ int main()
     RequireNear(animation.GetFeather(), 0.10f, "invalid feather did not use its default");
     Require(animation.Advance(0.125f), "default duration did not advance");
     RequireNear(animation.GetProgress(), 0.875f, "invalid duration did not use its default");
+
+    RmlEntranceAnimation fade;
+    Require(
+        fade.Configure(true, 0.25f, 0.10f, RmlEntranceStyle::kFade),
+        "switching to fade did not invalidate the frame");
+    fade.Start();
+    Require(fade.IsActive(), "fade did not use the configured duration");
+    Require(fade.Advance(0.125f), "fade did not advance");
+    RequireNear(fade.GetProgress(), 0.875f, "fade progress did not use entrance easing");
 
     std::cout << "RmlUi entrance animation tests passed.\n";
     return 0;

@@ -8,10 +8,6 @@ Para trabalho pendente, prioridades e critérios de conclusão, consulte `TODO.m
 
 ## Snapshot analisado
 
-- Data da análise: 2026-07-20.
-- Branch: `codex/finger-touch-diagnostic`.
-- Commit HEAD: `73a630d` (`feat: extend RmlUi panels and VR integrations`).
-- O working tree contém alterações locais e arquivos ainda não versionados, principalmente a experiência de toque por dedo, integração VRIK e diagnóstico de finger tracking.
 - Escopo lido: `xmake.lua`, 95 headers e 92 fontes C++ em `Src/`, 8 documentos RML, 10 folhas RCSS, 2 scripts Papyrus, ferramentas locais e documentação existente.
 - Tamanho aproximado: 35.755 linhas C++ em `Src/`, 5.100 linhas RML/RCSS e 2.742 linhas C++ nas ferramentas.
 - Esta análise confirma estrutura e comportamento implementado no código. Ela não substitui build limpo, conferência do DLL implantado nem teste dentro do Skyrim VR após reiniciar o jogo.

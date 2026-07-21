@@ -98,9 +98,18 @@ namespace dragonboard::ui::frame
         }
 
         const std::string iniPath = vrui::VRUISettings::getDefaultIniPath();
-        if (manager._iniChangeWatcher.Update(deltaTime, iniPath, 0.50f)) {
+        const bool mainIniChanged =
+            manager._iniChangeWatcher.Update(deltaTime, iniPath, 0.50f);
+        const bool layoutIniChanged = manager._layoutIniChangeWatcher.Update(
+            deltaTime, vrui::VRUISettings::getDefaultLayoutIniPath(), 0.50f);
+        const bool stateIniChanged = manager._stateIniChangeWatcher.Update(
+            deltaTime, vrui::VRUISettings::getDefaultStateIniPath(), 0.50f);
+        if (mainIniChanged || layoutIniChanged || stateIniChanged) {
             logger::trace(
-                "DragonBoardVR: INI file modification detected (real-time Edit Mode), reloading settings...");
+                "DragonBoardVR: Split INI modification detected (main={}, layout={}, state={}), reloading settings...",
+                mainIniChanged,
+                layoutIniChanged,
+                stateIniChanged);
             vrui::VRUISettings::get().load(iniPath);
             dragonboard::gameplay::CombatSlowTime::GetSingleton().Reconfigure(
                 settings.slowTimeOnOpen,

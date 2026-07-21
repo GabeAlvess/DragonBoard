@@ -112,6 +112,8 @@ cbuffer EntranceConstants : register(b0)
     float2 render_size;
     float entrance_progress;
     float entrance_feather;
+    uint entrance_style;
+    float3 entrance_padding;
 };
 
 struct PSInput
@@ -135,6 +137,31 @@ float4 main(PSInput input) : SV_TARGET
         distance_from_center);
     float initial_fade = smoothstep(0.0, 0.18, entrance_progress);
     float reveal = radial_reveal * initial_fade;
+
+    if (entrance_style == 1) {
+        // Reveal the outside edge first, then contract the hidden area toward
+        // the center until the whole panel is visible.
+        float reverse_radius = (1.0 - entrance_progress) * corner_radius;
+        reveal = smoothstep(
+            reverse_radius - soft_edge,
+            reverse_radius,
+            distance_from_center) * initial_fade;
+    } else if (entrance_style == 2) {
+        reveal = entrance_progress;
+    } else if (entrance_style == 3) {
+        float linear_edge = max(entrance_feather, 0.0001);
+        reveal = (1.0 - smoothstep(
+            entrance_progress,
+            entrance_progress + linear_edge,
+            panel_uv.x)) * initial_fade;
+    } else if (entrance_style == 4) {
+        float linear_edge = max(entrance_feather, 0.0001);
+        float boundary = 1.0 - entrance_progress;
+        reveal = smoothstep(
+            boundary - linear_edge,
+            boundary,
+            panel_uv.x) * initial_fade;
+    }
 
     // The dedicated blend state multiplies the fully composed render target by
     // this source alpha. RGB is intentionally zero and ignored by that state.
@@ -221,6 +248,8 @@ float4 main(PSInput input) : SV_TARGET
             float renderSize[2];
             float entranceProgress;
             float entranceFeather;
+            std::uint32_t entranceStyle;
+            float padding[3];
         };
 
         ComPtr<ID3D11Device> device;
@@ -248,6 +277,7 @@ float4 main(PSInput input) : SV_TARGET
         Rml::Rectanglei scissorRegion{};
         float entranceProgress = 1.0f;
         float entranceFeather = 0.10f;
+        RmlEntranceStyle entranceStyle = RmlEntranceStyle::kRadial;
         bool frameActive = false;
         D3D11StateGuard stateGuard;
     };
@@ -499,7 +529,9 @@ float4 main(PSInput input) : SV_TARGET
             Impl::EntranceConstants constants{
                 { static_cast<float>(_impl->renderWidth), static_cast<float>(_impl->renderHeight) },
                 _impl->entranceProgress,
-                _impl->entranceFeather
+                _impl->entranceFeather,
+                static_cast<std::uint32_t>(_impl->entranceStyle),
+                { 0.0f, 0.0f, 0.0f }
             };
             context->UpdateSubresource(
                 _impl->entranceConstants.Get(),
@@ -553,11 +585,15 @@ float4 main(PSInput input) : SV_TARGET
         return _impl ? _impl->stateGuard.GetLastTiming() : empty;
     }
 
-    void DragonBoardRmlRenderer::SetEntranceEffect(float progress, float feather)
+    void DragonBoardRmlRenderer::SetEntranceEffect(
+        float progress,
+        float feather,
+        RmlEntranceStyle style)
     {
         if (!_impl) return;
         _impl->entranceProgress = std::clamp(progress, 0.0f, 1.0f);
         _impl->entranceFeather = std::clamp(feather, 0.0f, 0.5f);
+        _impl->entranceStyle = style;
     }
 
     Rml::CompiledGeometryHandle DragonBoardRmlRenderer::CompileGeometry(

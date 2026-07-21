@@ -19,12 +19,14 @@ namespace dragonboard::ui::refresh
 
         auto* handNode = manager.getMenuHandNode();
         auto* pinnedAttachNode = manager.resolvePinnedAttachNode(manager.getPlayerSkeletonRoot());
-        auto* headNode = manager.getHeadNode();
+        auto* leftHandNode = manager.getLeftHandNode();
+        auto* rightHandNode = manager.getRightHandNode();
         dragonboard::ui::panels::PanelTransformUpdater::Update(
             manager._panelRegistry.GetPanels(),
             handNode,
             pinnedAttachNode,
-            headNode,
+            leftHandNode,
+            rightHandNode,
             manager._boardPinState.IsPinned(),
             manager.getPanelOffset());
     }

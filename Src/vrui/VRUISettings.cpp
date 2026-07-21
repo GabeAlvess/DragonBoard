@@ -2,11 +2,73 @@
 
 #include <CLIBUtil/simpleINI.hpp>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
+#include <initializer_list>
 
 namespace vrui
 {
+    namespace
+    {
+        std::string GetSiblingIniPath(const std::string& mainIniPath, const char* fileName)
+        {
+            const auto parent = std::filesystem::path(mainIniPath).parent_path();
+            return (parent / fileName).string();
+        }
+
+        void CopyIniKey(
+            const CSimpleIniA& source,
+            CSimpleIniA& destination,
+            const char* section,
+            const char* key)
+        {
+            const auto* value = source.GetValue(section, key, nullptr);
+            if (value) destination.SetValue(section, key, value);
+        }
+
+        void CopyIniKeyAs(
+            const CSimpleIniA& source,
+            CSimpleIniA& destination,
+            const char* sourceSection,
+            const char* destinationSection,
+            const char* key)
+        {
+            const auto* value = source.GetValue(sourceSection, key, nullptr);
+            if (value) destination.SetValue(destinationSection, key, value);
+        }
+
+        void CopyIniSection(
+            const CSimpleIniA& source,
+            CSimpleIniA& destination,
+            const char* section)
+        {
+            CSimpleIniA::TNamesDepend keys;
+            if (!source.GetAllKeys(section, keys)) return;
+            for (const auto& key : keys) {
+                const auto* value = source.GetValue(section, key.pItem, nullptr);
+                if (value) destination.SetValue(section, key.pItem, value, key.pComment);
+            }
+        }
+
+        std::string NormalizeEntranceStyle(std::string_view value)
+        {
+            std::string compact;
+            compact.reserve(value.size());
+            for (const unsigned char character : value) {
+                if (std::isalnum(character)) {
+                    compact.push_back(static_cast<char>(std::tolower(character)));
+                }
+            }
+
+            if (compact == "reverseradial") return "reverse radial";
+            if (compact == "fade" || compact == "instant") return "Fade";
+            if (compact == "lefttoright") return "leftToRight";
+            if (compact == "righttoleft") return "rightToLeft";
+            return "radial";
+        }
+    }
+
     VRUISettings& VRUISettings::get()
     {
         static VRUISettings instance;
@@ -17,6 +79,36 @@ namespace vrui
     {
         for (int i = 0; i < kMaxSlots; ++i) {
             slotScaleUser[i] = 1.0f;
+        }
+        const std::array<const char*, kMaxSlots> defaultActions{
+            "none", "Wait", "TweenMenu", "None", "None", "None", "Journal", "None"
+        };
+        const std::array<const char*, kMaxSlots> defaultLabels{
+            "Save", "Wait", "TweenMenu", "Inventory", "", "", "Journal", ""
+        };
+        const std::array<const char*, kMaxSlots> defaultSublabels{
+            "", "", "Menu", "", "", "", "", ""
+        };
+        const std::array<float, kMaxSlots> defaultPosX{
+            5.0f, 12.0f, 9.5f, 6.0f, -6.278928f, -9.0f, 7.25f, 0.0f
+        };
+        const std::array<float, kMaxSlots> defaultPosY{
+            -1.0f, -1.0f, -1.0f, -0.5f, -0.4158f, -0.5f, -1.0f, 0.0f
+        };
+        const std::array<float, kMaxSlots> defaultPosZ{
+            -10.25f, -10.25f, -10.25f, -10.0f, -10.885161f, -10.0f, -10.25f, 0.0f
+        };
+        const std::array<bool, kMaxSlots> defaultFloating{
+            true, true, true, false, false, false, true, false
+        };
+        for (int i = 0; i < kMaxSlots; ++i) {
+            slotActions[i] = defaultActions[i];
+            slotLabels[i] = defaultLabels[i];
+            slotSublabels[i] = defaultSublabels[i];
+            slotPosX[i] = defaultPosX[i];
+            slotPosY[i] = defaultPosY[i];
+            slotPosZ[i] = defaultPosZ[i];
+            slotFloating[i] = defaultFloating[i];
         }
         categoryButtons["Btn_Cat_All"] = { 8.500000f, -0.250000f, 10.000000f, 10.000000f, 0.000000f, 0.000000f, 0.800000f };
         categoryButtons["Btn_Cat_Weapons"] = { 6.000000f, -0.250000f, 10.000000f, 10.000000f, 0.000000f, 0.000000f, 0.800000f };
@@ -49,10 +141,29 @@ namespace vrui
         return "Data/SKSE/Plugins/DragonBoardVR.ini";
     }
 
+    std::string VRUISettings::getDefaultLayoutIniPath()
+    {
+        return "Data/SKSE/Plugins/DragonBoardVR_Layout.ini";
+    }
+
+    std::string VRUISettings::getDefaultStateIniPath()
+    {
+        return "Data/SKSE/Plugins/DragonBoardVR_State.ini";
+    }
+
     void VRUISettings::load(const std::string& iniPath)
     {
         CSimpleIniA ini;
         ini.SetUnicode();
+
+        const auto layoutPath = GetSiblingIniPath(iniPath, "DragonBoardVR_Layout.ini");
+        const auto statePath = GetSiblingIniPath(iniPath, "DragonBoardVR_State.ini");
+        CSimpleIniA layoutIni;
+        CSimpleIniA stateIni;
+        layoutIni.SetUnicode();
+        stateIni.SetUnicode();
+        const bool layoutExists = layoutIni.LoadFile(layoutPath.c_str()) >= 0;
+        const bool stateExists = stateIni.LoadFile(statePath.c_str()) >= 0;
 
         if (ini.LoadFile(iniPath.c_str()) < 0) {
             logger::trace("DragonBoardVR: No INI file found at '{}', using defaults", iniPath);
@@ -104,6 +215,8 @@ namespace vrui
             240);
         rmlEntranceAnimation = ini.GetBoolValue(
             "RmlUi", "bEntranceAnimation", rmlEntranceAnimation);
+        rmlEntranceStyle = NormalizeEntranceStyle(
+            ini.GetValue("RmlUi", "animationstyle", rmlEntranceStyle.c_str()));
         rmlEntranceDuration = std::clamp(
             static_cast<float>(ini.GetDoubleValue(
                 "RmlUi", "fEntranceDuration", rmlEntranceDuration)),
@@ -142,41 +255,50 @@ namespace vrui
         useLeftHandAsMenu = ini.GetBoolValue("Activation", "bUseLeftHandAsMenu", useLeftHandAsMenu);
         
         // [Visual]
-        menuScale       = (float)ini.GetDoubleValue("Visual", "fMenuScale",   menuScale);
-        menuOffsetX     = (float)ini.GetDoubleValue("Visual", "fMenuOffsetX", menuOffsetX);
-        menuOffsetY     = (float)ini.GetDoubleValue("Visual", "fMenuOffsetY", menuOffsetY);
-        menuOffsetZ     = (float)ini.GetDoubleValue("Visual", "fMenuOffsetZ", menuOffsetZ);
-        menuRotX        = (float)ini.GetDoubleValue("Visual", "fMenuRotX",    menuRotX);
-        menuRotY        = (float)ini.GetDoubleValue("Visual", "fMenuRotY",    menuRotY);
-        menuRotZ        = (float)ini.GetDoubleValue("Visual", "fMenuRotZ",    menuRotZ);
-        containerGridOffsetZ = (float)ini.GetDoubleValue("Visual", "fContainerGridOffsetZ", containerGridOffsetZ);
-        // Older builds required Z=180 to show the front of the board. The
-        // fixed half-turn now belongs to VRUIPanel, so migrate the configurable
-        // value once while preserving the exact visible pose: old 180 -> new 0.
-        const bool zeroFaceRotation =
-            ini.GetBoolValue("Visual", "bMenuFaceRotationZeroBased", false);
-        if (!zeroFaceRotation) {
-            menuRotZ = std::fmod(menuRotZ - 180.0f, 360.0f);
-            if (menuRotZ <= -180.0f) menuRotZ += 360.0f;
-            if (menuRotZ > 180.0f) menuRotZ -= 360.0f;
-            ini.SetDoubleValue("Visual", "fMenuRotZ", menuRotZ);
-            ini.SetBoolValue("Visual", "bMenuFaceRotationZeroBased", true,
-                "; true = fMenuRotZ 0 shows the front face of the board");
-            if (ini.SaveFile(iniPath.c_str()) < 0) {
-                logger::warn("DragonBoardVR: Could not persist zero-based menu rotation migration to '{}'.", iniPath);
-            } else {
-                logger::info(
-                    "DragonBoardVR: Migrated menu rotation to zero-based front-face convention (fMenuRotZ={:.1f}).",
-                    menuRotZ);
-            }
+        if (layoutExists) {
+            // Split configs omit the remaining pose fields intentionally. Reset
+            // them to their left-hand base values on every load so reloading the
+            // same files is idempotent instead of mirroring the live value again.
+            menuOffsetX = 1.0f;
+            menuOffsetY = -17.0f;
+            menuOffsetZ = -3.5f;
+            menuRotX = -10.0f;
+            menuRotY = 36.0f;
+            menuRotZ = 85.0f;
+            containerGridOffsetZ = 0.42f;
         }
+        menuScale       = (float)ini.GetDoubleValue("Visual", "fMenuScale",   menuScale);
+        // Other pose keys removed from the split INIs stay supported by the backend,
+        // but only a genuinely old monolithic INI may override their defaults.
+        // In particular, never run the legacy 180-degree migration against a
+        // missing key: doing so rotates the new internal default to its back face.
+        if (!layoutExists) {
+            menuOffsetX     = (float)ini.GetDoubleValue("Visual", "fMenuOffsetX", menuOffsetX);
+            menuOffsetY     = (float)ini.GetDoubleValue("Visual", "fMenuOffsetY", menuOffsetY);
+            menuOffsetZ     = (float)ini.GetDoubleValue("Visual", "fMenuOffsetZ", menuOffsetZ);
+            menuRotX        = (float)ini.GetDoubleValue("Visual", "fMenuRotX",    menuRotX);
+            menuRotY        = (float)ini.GetDoubleValue("Visual", "fMenuRotY",    menuRotY);
+            menuRotZ        = (float)ini.GetDoubleValue("Visual", "fMenuRotZ",    menuRotZ);
+            containerGridOffsetZ = (float)ini.GetDoubleValue("Visual", "fContainerGridOffsetZ", containerGridOffsetZ);
 
-        // Apply Mirroring for Right Hand
-        // The INI file is treated as "Left Hand Base". If we are on the right hand,
-        // we flip the Y/Z rotations in memory.
-        if (!useLeftHandAsMenu) {
-            menuRotY    = -menuRotY;
-            menuRotZ    = -menuRotZ;
+            const bool hasLegacyMenuRotation = ini.KeyExists("Visual", "fMenuRotZ");
+            const bool zeroFaceRotation =
+                ini.GetBoolValue("Visual", "bMenuFaceRotationZeroBased", false);
+            if (hasLegacyMenuRotation && !zeroFaceRotation) {
+                menuRotZ = std::fmod(menuRotZ - 180.0f, 360.0f);
+                if (menuRotZ <= -180.0f) menuRotZ += 360.0f;
+                if (menuRotZ > 180.0f) menuRotZ -= 360.0f;
+                ini.SetDoubleValue("Visual", "fMenuRotZ", menuRotZ);
+                ini.SetBoolValue("Visual", "bMenuFaceRotationZeroBased", true,
+                    "; true = fMenuRotZ 0 shows the front face of the board");
+                if (ini.SaveFile(iniPath.c_str()) < 0) {
+                    logger::warn("DragonBoardVR: Could not persist zero-based menu rotation migration to '{}'.", iniPath);
+                } else {
+                    logger::info(
+                        "DragonBoardVR: Migrated menu rotation to zero-based front-face convention (fMenuRotZ={:.1f}).",
+                        menuRotZ);
+                }
+            }
         }
 
         bEnableMenuLerp = ini.GetBoolValue("Visual", "bEnableMenuLerp", bEnableMenuLerp);
@@ -525,6 +647,237 @@ namespace vrui
                 }
             }
         }
+
+        if (layoutExists) {
+            menuScale = (float)layoutIni.GetDoubleValue("Visual", "fMenuScale", menuScale);
+            if (layoutIni.KeyExists("Visual", "fMenuRotZ")) {
+                menuRotZ = (float)layoutIni.GetDoubleValue(
+                    "Visual", "fMenuRotZ", menuRotZ);
+            }
+            bEnableMenuLerp = layoutIni.GetBoolValue(
+                "Visual", "bEnableMenuLerp", bEnableMenuLerp);
+            fMenuLerpSpeed = (float)layoutIni.GetDoubleValue(
+                "Visual", "fMenuLerpSpeed", fMenuLerpSpeed);
+
+            itemWeaponScale = (float)layoutIni.GetDoubleValue(
+                "Buttons", "fItemWeaponScale", itemWeaponScale);
+            itemArmorScale = (float)layoutIni.GetDoubleValue(
+                "Buttons", "fItemArmorScale", itemArmorScale);
+            itemPotionScale = (float)layoutIni.GetDoubleValue(
+                "Buttons", "fItemPotionScale", itemPotionScale);
+            itemFoodScale = (float)layoutIni.GetDoubleValue(
+                "Buttons", "fItemFoodScale", itemFoodScale);
+            itemMiscScale = (float)layoutIni.GetDoubleValue(
+                "Buttons", "fItemMiscScale", itemMiscScale);
+            normalizeItemVisuals = layoutIni.GetBoolValue(
+                "Buttons", "bNormalizeItemVisuals", normalizeItemVisuals);
+
+            backgroundScale = (float)layoutIni.GetDoubleValue(
+                "Background", "fScale", backgroundScale);
+            backgroundOffsetX = (float)layoutIni.GetDoubleValue(
+                "Background", "fOffsetX", backgroundOffsetX);
+            backgroundOffsetY = (float)layoutIni.GetDoubleValue(
+                "Background", "fOffsetY", backgroundOffsetY);
+            backgroundOffsetZ = (float)layoutIni.GetDoubleValue(
+                "Background", "fOffsetZ", backgroundOffsetZ);
+            backgroundRotX = (float)layoutIni.GetDoubleValue(
+                "Background", "fRotX", backgroundRotX);
+            backgroundRotY = (float)layoutIni.GetDoubleValue(
+                "Background", "fRotY", backgroundRotY);
+            backgroundRotZ = (float)layoutIni.GetDoubleValue(
+                "Background", "fRotZ", backgroundRotZ);
+
+            reticleScaleX = (float)layoutIni.GetDoubleValue(
+                "LaserPointer", "fReticleScaleX", reticleScaleX);
+            reticleScaleY = (float)layoutIni.GetDoubleValue(
+                "LaserPointer", "fReticleScaleY", reticleScaleY);
+            reticleScaleZ = (float)layoutIni.GetDoubleValue(
+                "LaserPointer", "fReticleScaleZ", reticleScaleZ);
+            laserNifPath = layoutIni.GetValue(
+                "LaserPointer", "sLaserNifPath", laserNifPath.c_str());
+            backgroundNifPath = layoutIni.GetValue(
+                "LaserPointer", "sBackgroundNifPath", backgroundNifPath.c_str());
+            mapNifPath = layoutIni.GetValue(
+                "LaserPointer", "sMapNifPath", mapNifPath.c_str());
+            devNifPath = layoutIni.GetValue(
+                "LaserPointer", "sDevNifPath", devNifPath.c_str());
+            magicNifPath = layoutIni.GetValue(
+                "LaserPointer", "sMagicNifPath", magicNifPath.c_str());
+            inventoryNifPath = layoutIni.GetValue(
+                "LaserPointer", "sInventoryNifPath", inventoryNifPath.c_str());
+            unknownNifPath = layoutIni.GetValue(
+                "LaserPointer", "sUnknownNifPath", unknownNifPath.c_str());
+            settingsNifPath = layoutIni.GetValue(
+                "LaserPointer", "sSettingsNifPath", settingsNifPath.c_str());
+            saveNifPath = layoutIni.GetValue(
+                "LaserPointer", "sSaveNifPath", saveNifPath.c_str());
+            modsNifPath = layoutIni.GetValue(
+                "LaserPointer", "sModsNifPath", modsNifPath.c_str());
+            favNifPath = layoutIni.GetValue(
+                "LaserPointer", "sFavNifPath", favNifPath.c_str());
+            statusNifPath = layoutIni.GetValue(
+                "LaserPointer", "sStatusNifPath", statusNifPath.c_str());
+            nextPageNifPath = layoutIni.GetValue(
+                "LaserPointer", "sNextPageNifPath", nextPageNifPath.c_str());
+            homeNifPath = layoutIni.GetValue(
+                "LaserPointer", "sHomeNifPath", homeNifPath.c_str());
+            prevPageNifPath = layoutIni.GetValue(
+                "LaserPointer", "sPrevPageNifPath", prevPageNifPath.c_str());
+            bEnableButtonEditMode = layoutIni.GetBoolValue(
+                "LaserPointer", "bEnableButtonEditMode", bEnableButtonEditMode);
+
+            const auto loadLayoutButton = [&](const char* prefix,
+                                                float& px, float& py, float& pz,
+                                                float& rx, float& ry, float& rz,
+                                                float& scale) {
+                const auto key = [prefix](const char* suffix) {
+                    return std::string(prefix) + suffix;
+                };
+                px = (float)layoutIni.GetDoubleValue(
+                    "FixedButtons", key("PosX").c_str(), px);
+                py = (float)layoutIni.GetDoubleValue(
+                    "FixedButtons", key("PosY").c_str(), py);
+                pz = (float)layoutIni.GetDoubleValue(
+                    "FixedButtons", key("PosZ").c_str(), pz);
+                rx = (float)layoutIni.GetDoubleValue(
+                    "FixedButtons", key("RotX").c_str(), rx);
+                ry = (float)layoutIni.GetDoubleValue(
+                    "FixedButtons", key("RotY").c_str(), ry);
+                rz = (float)layoutIni.GetDoubleValue(
+                    "FixedButtons", key("RotZ").c_str(), rz);
+                scale = (float)layoutIni.GetDoubleValue(
+                    "FixedButtons", key("Scale").c_str(), scale);
+            };
+            loadLayoutButton("fStatus", bStatusPosX, bStatusPosY, bStatusPosZ,
+                bStatusRotX, bStatusRotY, bStatusRotZ, bStatusScale);
+            loadLayoutButton("fInv", bInvPosX, bInvPosY, bInvPosZ,
+                bInvRotX, bInvRotY, bInvRotZ, bInvScale);
+            loadLayoutButton("fMagic", bMagicPosX, bMagicPosY, bMagicPosZ,
+                bMagicRotX, bMagicRotY, bMagicRotZ, bMagicScale);
+            loadLayoutButton("fSys", bSysPosX, bSysPosY, bSysPosZ,
+                bSysRotX, bSysRotY, bSysRotZ, bSysScale);
+            loadLayoutButton("fSave", bSavePosX, bSavePosY, bSavePosZ,
+                bSaveRotX, bSaveRotY, bSaveRotZ, bSaveScale);
+            loadLayoutButton("fPrev", bPrevPosX, bPrevPosY, bPrevPosZ,
+                bPrevRotX, bPrevRotY, bPrevRotZ, bPrevScale);
+            loadLayoutButton("fHome", bHomePosX, bHomePosY, bHomePosZ,
+                bHomeRotX, bHomeRotY, bHomeRotZ, bHomeScale);
+            loadLayoutButton("fNext", bNextPosX, bNextPosY, bNextPosZ,
+                bNextRotX, bNextRotY, bNextRotZ, bNextScale);
+            loadLayoutButton("fMods", bModsPosX, bModsPosY, bModsPosZ,
+                bModsRotX, bModsRotY, bModsRotZ, bModsScale);
+            loadLayoutButton("fFav", bFavPosX, bFavPosY, bFavPosZ,
+                bFavRotX, bFavRotY, bFavRotZ, bFavScale);
+            loadLayoutButton("fAddFunc", bAddFuncPosX, bAddFuncPosY, bAddFuncPosZ,
+                bAddFuncRotX, bAddFuncRotY, bAddFuncRotZ, bAddFuncScale);
+            loadLayoutButton("fGold", bGoldPosX, bGoldPosY, bGoldPosZ,
+                bGoldRotX, bGoldRotY, bGoldRotZ, bGoldScale);
+            loadLayoutButton("fMap", bMapPosX, bMapPosY, bMapPosZ,
+                bMapRotX, bMapRotY, bMapRotZ, bMapScale);
+            loadLayoutButton("fDev", bDevPosX, bDevPosY, bDevPosZ,
+                bDevRotX, bDevRotY, bDevRotZ, bDevScale);
+
+            bStatusLabel = layoutIni.GetValue(
+                "FixedButtons", "sStatusLabel", bStatusLabel.c_str());
+            bStatusAction = layoutIni.GetValue(
+                "FixedButtons", "sStatusAction", bStatusAction.c_str());
+            bInvLabel = layoutIni.GetValue(
+                "FixedButtons", "sInvLabel", bInvLabel.c_str());
+            bInvAction = layoutIni.GetValue(
+                "FixedButtons", "sInvAction", bInvAction.c_str());
+            bMagicLabel = layoutIni.GetValue(
+                "FixedButtons", "sMagicLabel", bMagicLabel.c_str());
+            bMagicAction = layoutIni.GetValue(
+                "FixedButtons", "sMagicAction", bMagicAction.c_str());
+            bSysLabel = layoutIni.GetValue(
+                "FixedButtons", "sSysLabel", bSysLabel.c_str());
+            bSysAction = layoutIni.GetValue(
+                "FixedButtons", "sSysAction", bSysAction.c_str());
+            bSaveLabel = layoutIni.GetValue(
+                "FixedButtons", "sSaveLabel", bSaveLabel.c_str());
+            bSaveAction = layoutIni.GetValue(
+                "FixedButtons", "sSaveAction", bSaveAction.c_str());
+            bModsLabel = layoutIni.GetValue(
+                "FixedButtons", "sModsLabel", bModsLabel.c_str());
+            bModsAction = layoutIni.GetValue(
+                "FixedButtons", "sModsAction", bModsAction.c_str());
+            bMapLabel = layoutIni.GetValue(
+                "FixedButtons", "sMapLabel", bMapLabel.c_str());
+            bMapAction = layoutIni.GetValue(
+                "FixedButtons", "sMapAction", bMapAction.c_str());
+            bDevLabel = layoutIni.GetValue(
+                "FixedButtons", "sDevLabel", bDevLabel.c_str());
+            bDevAction = layoutIni.GetValue(
+                "FixedButtons", "sDevAction", bDevAction.c_str());
+            showDevButton = layoutIni.GetBoolValue(
+                "FixedButtons", "bShowDevButton", showDevButton);
+            defaultPanelAction = layoutIni.GetValue(
+                "FixedButtons", "sDefaultPanelAction", defaultPanelAction.c_str());
+            bFavLabel = "Journal";
+            bFavAction = "Journal";
+
+            for (int i = 0; i < kMaxSlots; ++i) {
+                const auto index = std::to_string(i + 1);
+                slotActions[i] = layoutIni.GetValue(
+                    "Slots", ("sSlot" + index).c_str(), slotActions[i].c_str());
+                slotTextures[i] = layoutIni.GetValue(
+                    "Slots", ("sSlot" + index + "Image").c_str(), slotTextures[i].c_str());
+                slotNifs[i] = layoutIni.GetValue(
+                    "Slots", ("sSlot" + index + "Nif").c_str(), slotNifs[i].c_str());
+                slotLabels[i] = layoutIni.GetValue(
+                    "Slots", ("sSlot" + index + "Label").c_str(), slotLabels[i].c_str());
+                slotSublabels[i] = layoutIni.GetValue(
+                    "Slots", ("sSlot" + index + "Sublabel").c_str(), slotSublabels[i].c_str());
+                slotPosX[i] = (float)layoutIni.GetDoubleValue(
+                    "Slots", ("fSlot" + index + "PosX").c_str(), slotPosX[i]);
+                slotPosY[i] = (float)layoutIni.GetDoubleValue(
+                    "Slots", ("fSlot" + index + "PosY").c_str(), slotPosY[i]);
+                slotPosZ[i] = (float)layoutIni.GetDoubleValue(
+                    "Slots", ("fSlot" + index + "PosZ").c_str(), slotPosZ[i]);
+                slotRotX[i] = (float)layoutIni.GetDoubleValue(
+                    "Slots", ("fSlot" + index + "RotX").c_str(), slotRotX[i]);
+                slotRotY[i] = (float)layoutIni.GetDoubleValue(
+                    "Slots", ("fSlot" + index + "RotY").c_str(), slotRotY[i]);
+                slotRotZ[i] = (float)layoutIni.GetDoubleValue(
+                    "Slots", ("fSlot" + index + "RotZ").c_str(), slotRotZ[i]);
+                slotScaleUser[i] = (float)layoutIni.GetDoubleValue(
+                    "Slots", ("fSlot" + index + "ScaleUser").c_str(), slotScaleUser[i]);
+                slotFloating[i] = layoutIni.GetBoolValue(
+                    "Slots", ("bSlot" + index + "Floating").c_str(), slotFloating[i]);
+            }
+        }
+
+        // INI/layout rotations are stored as a left-hand base. Apply hand
+        // mirroring once, after all configuration sources have been layered.
+        if (!useLeftHandAsMenu) {
+            menuRotY = -menuRotY;
+            menuRotZ = -menuRotZ;
+        }
+
+        if (stateExists) {
+            for (std::size_t i = 0; i < mapCalibrationPoints.size(); ++i) {
+                const auto prefix = "Point" + std::to_string(i + 1);
+                auto& point = mapCalibrationPoints[i];
+                point.valid = stateIni.GetBoolValue(
+                    "MapCalibration", ("b" + prefix + "Valid").c_str(), point.valid);
+                point.worldX = (float)stateIni.GetDoubleValue(
+                    "MapCalibration", ("f" + prefix + "WorldX").c_str(), point.worldX);
+                point.worldY = (float)stateIni.GetDoubleValue(
+                    "MapCalibration", ("f" + prefix + "WorldY").c_str(), point.worldY);
+                point.mapU = (float)stateIni.GetDoubleValue(
+                    "MapCalibration", ("f" + prefix + "MapU").c_str(), point.mapU);
+                point.mapV = (float)stateIni.GetDoubleValue(
+                    "MapCalibration", ("f" + prefix + "MapV").c_str(), point.mapV);
+            }
+        }
+
+        if (!layoutExists || !stateExists) {
+            logger::info(
+                "DragonBoardVR: Migrating split settings files (layoutExists={}, stateExists={}).",
+                layoutExists,
+                stateExists);
+            save(iniPath);
+        }
     }
 
     void VRUISettings::save(const std::string& iniPath) const
@@ -598,6 +951,8 @@ namespace vrui
             "; RmlUi render-target height; supported examples: 1920x1080, 1280x720, 960x540");
         ini.SetBoolValue("RmlUi", "bEntranceAnimation", rmlEntranceAnimation,
             "; Reveal the RmlUi page from the center whenever the Board opens");
+        ini.SetValue("RmlUi", "animationstyle", rmlEntranceStyle.c_str(),
+            "; animation preset: radial, reverse radial, Fade, leftToRight, rightToLeft");
         ini.SetDoubleValue("RmlUi", "fEntranceDuration", rmlEntranceDuration,
             "; Entrance reveal duration in seconds (0.05 to 2.0)");
         ini.SetDoubleValue("RmlUi", "fEntranceFeather", rmlEntranceFeather,
@@ -798,6 +1153,7 @@ namespace vrui
 
 
         // [FixedWidgets]
+        ini.Delete("FixedWidgets", nullptr);
         ini.SetLongValue("FixedWidgets", "iCount", (long)fixedWidgets.size());
         for (int i = 0; i < (int)fixedWidgets.size(); ++i) {
             std::string p = "Widget" + std::to_string(i) + "_";
@@ -897,7 +1253,95 @@ namespace vrui
             ini.SetValue("ItemOverrides", keyBuf, buf);
         }
 
-        ini.SaveFile(iniPath.c_str());
-        logger::info("DragonBoardVR: Settings saved to '{}'", iniPath);
+        CSimpleIniA mainOut;
+        CSimpleIniA layoutOut;
+        CSimpleIniA stateOut;
+        mainOut.SetUnicode();
+        layoutOut.SetUnicode();
+        stateOut.SetUnicode();
+
+        const auto copyKeys = [&](CSimpleIniA& destination,
+                                  const char* section,
+                                  std::initializer_list<const char*> keys) {
+            for (const auto* key : keys) CopyIniKey(ini, destination, section, key);
+        };
+
+        copyKeys(mainOut, "General", {
+            "bVerboseLogging", "bEditModeEnabled"
+        });
+        copyKeys(mainOut, "MapMarker", {
+            "bEnableMapMarker", "bDynamicRotation", "sMarkerNifPath"
+        });
+        CopyIniSection(ini, mainOut, "QuestMarker");
+        copyKeys(mainOut, "Activation", { "iActivationMode" });
+        CopyIniSection(ini, mainOut, "Combat");
+        copyKeys(mainOut, "Interaction", {
+            "fRaycastMaxDistance", "bEnableFingerTouch",
+            "fFingerTouchEnterDistance", "fFingerTouchExitDistance",
+            "fHapticIntensity", "fHapticDuration"
+        });
+        CopyIniSection(ini, mainOut, "Debug");
+        CopyIniSection(ini, mainOut, "FixedWidgets");
+        CopyIniSection(ini, mainOut, "Wiggle");
+        CopyIniSection(ini, mainOut, "RmlUi");
+        CopyIniSection(ini, mainOut, "CategoryOverrides");
+        CopyIniSection(ini, mainOut, "ItemOverrides");
+        mainOut.SetValue("CategoryOverrides", nullptr, nullptr);
+        mainOut.SetValue("ItemOverrides", nullptr, nullptr);
+
+        copyKeys(layoutOut, "Visual", {
+            "fMenuScale", "fMenuRotZ", "bEnableMenuLerp", "fMenuLerpSpeed"
+        });
+        copyKeys(layoutOut, "Buttons", {
+            "fItemWeaponScale", "fItemArmorScale", "fItemPotionScale",
+            "fItemFoodScale", "fItemMiscScale", "bNormalizeItemVisuals"
+        });
+        copyKeys(layoutOut, "Background", {
+            "fScale", "fOffsetX", "fOffsetY", "fOffsetZ",
+            "fRotX", "fRotY", "fRotZ"
+        });
+        copyKeys(layoutOut, "LaserPointer", {
+            "fReticleScaleX", "fReticleScaleY", "fReticleScaleZ"
+        });
+        for (const auto* key : {
+                 "sLaserNifPath", "sBackgroundNifPath", "sMapNifPath",
+                 "sDevNifPath", "sMagicNifPath", "sInventoryNifPath",
+                 "sUnknownNifPath", "sSettingsNifPath", "sSaveNifPath",
+                 "sModsNifPath", "sFavNifPath", "sStatusNifPath",
+                 "sNextPageNifPath", "sHomeNifPath", "sPrevPageNifPath",
+                 "bEnableButtonEditMode" }) {
+            CopyIniKeyAs(ini, layoutOut, "Interaction", "LaserPointer", key);
+        }
+        CopyIniSection(ini, layoutOut, "FixedButtons");
+        CopyIniSection(ini, layoutOut, "Slots");
+
+        for (std::size_t i = 0; i < mapCalibrationPoints.size(); ++i) {
+            const auto prefix = "Point" + std::to_string(i + 1);
+            for (const auto* suffix : {
+                     "Valid", "WorldX", "WorldY", "MapU", "MapV" }) {
+                const auto keyPrefix = suffix == std::string_view("Valid") ? "b" : "f";
+                const auto key = keyPrefix + prefix + suffix;
+                CopyIniKey(ini, stateOut, "MapCalibration", key.c_str());
+            }
+        }
+
+        const auto layoutPath = GetSiblingIniPath(iniPath, "DragonBoardVR_Layout.ini");
+        const auto statePath = GetSiblingIniPath(iniPath, "DragonBoardVR_State.ini");
+        const bool mainSaved = mainOut.SaveFile(iniPath.c_str()) >= 0;
+        const bool layoutSaved = layoutOut.SaveFile(layoutPath.c_str()) >= 0;
+        const bool stateSaved = stateOut.SaveFile(statePath.c_str()) >= 0;
+        if (!mainSaved || !layoutSaved || !stateSaved) {
+            logger::error(
+                "DragonBoardVR: Failed to save split settings (main={}, layout={}, state={}).",
+                mainSaved,
+                layoutSaved,
+                stateSaved);
+            return;
+        }
+        logger::info(
+            "DragonBoardVR: Settings saved to '{}', '{}' and '{}'.",
+            iniPath,
+            layoutPath,
+            statePath);
     }
 }

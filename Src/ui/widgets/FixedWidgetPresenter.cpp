@@ -19,7 +19,7 @@ namespace dragonboard::ui::widgets
     {
         constexpr const char* kPersistentPanelName = "Persistent_Panel";
         constexpr const char* kAlwaysVisiblePanelName = "AlwaysVisiblePanel";
-        constexpr const char* kAlwaysVisibleHmdPanelName = "AlwaysVisibleHmdPanel";
+        constexpr const char* kAlwaysVisibleRightHandPanelName = "AlwaysVisibleRightHandPanel";
         constexpr const char* kDashboardContainerName = "Dashboard";
 
         [[nodiscard]] std::shared_ptr<vrui::VRUIContainer> FindOrCreateContainer(
@@ -124,7 +124,8 @@ namespace dragonboard::ui::widgets
             widget->setNoPopAnimation(true);
             widget->setDashboardPinned(true);
             widget->setAmbientWiggleEnabled(
-                (element.pinToWorld || element.pinToHmdWorld) && element.category == "Magic");
+                (element.pinToWorld || element.pinToRightHand) &&
+                element.category == "Magic");
             widget->setDimensions(2.0f, 2.0f);
             widget->setLocalPosition({ element.transform.px, element.transform.py, element.transform.pz });
             widget->setLocalRotation(ResolveRotation(element.transform));
@@ -169,23 +170,49 @@ namespace dragonboard::ui::widgets
             const vrui::UIJSONElement& element,
             const std::shared_ptr<vrui::VRUIContainer>& fixedContainer,
             const std::shared_ptr<vrui::VRUIContainer>& worldMagicContainer,
-            const std::shared_ptr<vrui::VRUIContainer>& hmdWorldMagicContainer)
+            const std::shared_ptr<vrui::VRUIContainer>& rightHandMagicContainer)
         {
             if (element.visuals.model.empty()) return;
-            auto widget = CreatePinnedWidget(element);
-            const bool isWorldPinnedMagic = element.pinToWorld && element.category == "Magic";
-            const bool isHmdWorldPinnedMagic = element.pinToHmdWorld && element.category == "Magic";
-            if (isHmdWorldPinnedMagic) {
-                const auto worldRotation = ResolveRotation(element.transform);
-                const RE::NiPoint3 headWorldPosition = menuManager.getHeadNode() ?
-                    menuManager.getHeadNode()->world.translate : RE::NiPoint3{};
-                widget->setWorldLockedToHeadSpace(
-                    true,
-                    { element.transform.px, element.transform.py, element.transform.pz },
-                    worldRotation,
-                    element.transform.scale,
-                    headWorldPosition);
-                hmdWorldMagicContainer->addElement(widget);
+            auto routedElement = element;
+            if (routedElement.legacyHmdPin) {
+                if (auto* rightHand = menuManager.getRightHandNode()) {
+                    const auto inverseHandRotation = rightHand->world.rotate.Transpose();
+                    const float handScale = rightHand->world.scale != 0.0f ?
+                        rightHand->world.scale : 1.0f;
+                    const RE::NiPoint3 worldPosition{
+                        routedElement.transform.px,
+                        routedElement.transform.py,
+                        routedElement.transform.pz };
+                    const auto worldRotation = ResolveRotation(routedElement.transform);
+                    const auto localPosition =
+                        inverseHandRotation * (worldPosition - rightHand->world.translate) /
+                        handScale;
+                    const auto localRotation = inverseHandRotation * worldRotation;
+                    const float localScale = routedElement.transform.scale / handScale;
+                    vrui::VRUILayoutManager::updateElementTransformAnywhere(
+                        routedElement.id,
+                        localPosition,
+                        localRotation,
+                        localScale,
+                        routedElement.visuals.model,
+                        routedElement.category,
+                        routedElement.formID,
+                        routedElement.actionFunc,
+                        routedElement.label,
+                        false,
+                        true,
+                        routedElement.visualTransformComposed);
+                    if (const auto migrated =
+                            vrui::VRUILayoutManager::findElementAnywhere(routedElement.id)) {
+                        routedElement = *migrated;
+                    }
+                }
+            }
+            auto widget = CreatePinnedWidget(routedElement);
+            const bool isWorldPinnedMagic = routedElement.pinToWorld && routedElement.category == "Magic";
+            const bool isRightHandPinnedMagic = routedElement.pinToRightHand && routedElement.category == "Magic";
+            if (isRightHandPinnedMagic) {
+                rightHandMagicContainer->addElement(widget);
             } else if (isWorldPinnedMagic) {
                 worldMagicContainer->addElement(widget);
             } else {
@@ -229,8 +256,8 @@ namespace dragonboard::ui::widgets
         auto& settings = vrui::VRUISettings::get();
         auto persistentPanel = menuManager.findPanelByName(kPersistentPanelName);
         auto alwaysVisiblePanel = menuManager.findPanelByName(kAlwaysVisiblePanelName);
-        auto alwaysVisibleHmdPanel = menuManager.findPanelByName(kAlwaysVisibleHmdPanelName);
-        if (!persistentPanel || !alwaysVisiblePanel || !alwaysVisibleHmdPanel) {
+        auto alwaysVisibleRightHandPanel = menuManager.findPanelByName(kAlwaysVisibleRightHandPanelName);
+        if (!persistentPanel || !alwaysVisiblePanel || !alwaysVisibleRightHandPanel) {
             return;
         }
 
@@ -238,7 +265,7 @@ namespace dragonboard::ui::widgets
         // Mods (or any other content panel) does not cull them with MainPanel.
         auto fixedContainer = FindOrCreateContainer(persistentPanel, "FixedWidgetsContainer");
         auto worldMagicContainer = FindOrCreateContainer(alwaysVisiblePanel, "AlwaysVisibleWidgetsContainer");
-        auto hmdWorldMagicContainer = FindOrCreateContainer(alwaysVisibleHmdPanel, "AlwaysVisibleHmdWidgetsContainer");
+        auto rightHandMagicContainer = FindOrCreateContainer(alwaysVisibleRightHandPanel, "AlwaysVisibleRightHandWidgetsContainer");
 
         auto pinnedElements = vrui::VRUILayoutManager::getContainerElements(kDashboardContainerName);
         if (pinnedElements.empty() && !settings.fixedWidgets.empty()) {
@@ -252,7 +279,7 @@ namespace dragonboard::ui::widgets
                 element,
                 fixedContainer,
                 worldMagicContainer,
-                hmdWorldMagicContainer);
+                rightHandMagicContainer);
         }
 
         alwaysVisiblePanel->setActive(!worldMagicContainer->getChildren().empty());
@@ -261,38 +288,31 @@ namespace dragonboard::ui::widgets
             alwaysVisiblePanel->setVisible(false);
             alwaysVisiblePanel->detachFromParent();
         } else {
-            if (menuManager.isBoardWorldPinned()) {
-                if (auto* pinnedAttachNode = menuManager.resolvePinnedAttachNode(menuManager.getPlayerSkeletonRoot())) {
-                    alwaysVisiblePanel->attachToNode(pinnedAttachNode);
-                }
-            } else if (auto* menuHand = menuManager.getMenuHandNode()) {
+            if (auto* leftHand = menuManager.getLeftHandNode()) {
                 alwaysVisiblePanel->attachToHandNode(
-                    menuHand,
+                    leftHand,
                     menuManager.getPanelOffset());
             }
             alwaysVisiblePanel->show();
         }
 
-        alwaysVisibleHmdPanel->setActive(!hmdWorldMagicContainer->getChildren().empty());
-        if (hmdWorldMagicContainer->getChildren().empty()) {
-            alwaysVisibleHmdPanel->hide();
-            alwaysVisibleHmdPanel->setVisible(false);
-            alwaysVisibleHmdPanel->detachFromParent();
+        alwaysVisibleRightHandPanel->setActive(!rightHandMagicContainer->getChildren().empty());
+        if (rightHandMagicContainer->getChildren().empty()) {
+            alwaysVisibleRightHandPanel->hide();
+            alwaysVisibleRightHandPanel->setVisible(false);
+            alwaysVisibleRightHandPanel->detachFromParent();
         } else {
-            if (auto* headNode = menuManager.getHeadNode()) {
-                alwaysVisibleHmdPanel->attachToNode(headNode);
-                alwaysVisibleHmdPanel->setLocalPosition({ 0.0f, 0.0f, 0.0f });
-                RE::NiMatrix3 identityRotation;
-                identityRotation.SetEulerAnglesXYZ(0.0f, 0.0f, 0.0f);
-                alwaysVisibleHmdPanel->setLocalRotation(identityRotation);
-                alwaysVisibleHmdPanel->setLocalScale(1.0f);
+            if (auto* rightHand = menuManager.getRightHandNode()) {
+                alwaysVisibleRightHandPanel->attachToHandNode(
+                    rightHand,
+                    menuManager.getPanelOffset());
             }
-            alwaysVisibleHmdPanel->show();
+            alwaysVisibleRightHandPanel->show();
         }
 
         persistentPanel->recalculateLayout();
         alwaysVisiblePanel->recalculateLayout();
-        alwaysVisibleHmdPanel->recalculateLayout();
+        alwaysVisibleRightHandPanel->recalculateLayout();
     }
 
     void FixedWidgetPresenter::RefreshElement(
@@ -301,21 +321,21 @@ namespace dragonboard::ui::widgets
     {
         auto persistentPanel = menuManager.findPanelByName(kPersistentPanelName);
         auto alwaysVisiblePanel = menuManager.findPanelByName(kAlwaysVisiblePanelName);
-        auto alwaysVisibleHmdPanel = menuManager.findPanelByName(kAlwaysVisibleHmdPanelName);
-        if (!persistentPanel || !alwaysVisiblePanel || !alwaysVisibleHmdPanel) return;
+        auto alwaysVisibleRightHandPanel = menuManager.findPanelByName(kAlwaysVisibleRightHandPanelName);
+        if (!persistentPanel || !alwaysVisiblePanel || !alwaysVisibleRightHandPanel) return;
 
         auto fixedContainer = FindOrCreateContainer(
             persistentPanel, "FixedWidgetsContainer", false);
         auto worldMagicContainer = FindOrCreateContainer(
             alwaysVisiblePanel, "AlwaysVisibleWidgetsContainer", false);
-        auto hmdWorldMagicContainer = FindOrCreateContainer(
-            alwaysVisibleHmdPanel, "AlwaysVisibleHmdWidgetsContainer", false);
+        auto rightHandMagicContainer = FindOrCreateContainer(
+            alwaysVisibleRightHandPanel, "AlwaysVisibleRightHandWidgetsContainer", false);
 
         // A pin can change target (dashboard, left hand, or world), so remove
         // only this element from every destination before adding its new state.
         RemoveElementNamed(fixedContainer, elementId);
         RemoveElementNamed(worldMagicContainer, elementId);
-        RemoveElementNamed(hmdWorldMagicContainer, elementId);
+        RemoveElementNamed(rightHandMagicContainer, elementId);
 
         if (const auto element = vrui::VRUILayoutManager::findElementAnywhere(elementId)) {
             AddPinnedWidgetToTarget(
@@ -323,7 +343,7 @@ namespace dragonboard::ui::widgets
                 *element,
                 fixedContainer,
                 worldMagicContainer,
-                hmdWorldMagicContainer);
+                rightHandMagicContainer);
         }
 
         // Keep the panel routing state correct without rebuilding unrelated pins.
@@ -333,31 +353,24 @@ namespace dragonboard::ui::widgets
             alwaysVisiblePanel->setVisible(false);
             alwaysVisiblePanel->detachFromParent();
         } else {
-            if (menuManager.isBoardWorldPinned()) {
-                if (auto* pinnedAttachNode = menuManager.resolvePinnedAttachNode(menuManager.getPlayerSkeletonRoot())) {
-                    alwaysVisiblePanel->attachToNode(pinnedAttachNode);
-                }
-            } else if (auto* menuHand = menuManager.getMenuHandNode()) {
-                alwaysVisiblePanel->attachToHandNode(menuHand, menuManager.getPanelOffset());
+            if (auto* leftHand = menuManager.getLeftHandNode()) {
+                alwaysVisiblePanel->attachToHandNode(leftHand, menuManager.getPanelOffset());
             }
             alwaysVisiblePanel->show();
         }
 
-        alwaysVisibleHmdPanel->setActive(!hmdWorldMagicContainer->getChildren().empty());
-        if (hmdWorldMagicContainer->getChildren().empty()) {
-            alwaysVisibleHmdPanel->hide();
-            alwaysVisibleHmdPanel->setVisible(false);
-            alwaysVisibleHmdPanel->detachFromParent();
+        alwaysVisibleRightHandPanel->setActive(!rightHandMagicContainer->getChildren().empty());
+        if (rightHandMagicContainer->getChildren().empty()) {
+            alwaysVisibleRightHandPanel->hide();
+            alwaysVisibleRightHandPanel->setVisible(false);
+            alwaysVisibleRightHandPanel->detachFromParent();
         } else {
-            if (auto* headNode = menuManager.getHeadNode()) {
-                alwaysVisibleHmdPanel->attachToNode(headNode);
-                alwaysVisibleHmdPanel->setLocalPosition({ 0.0f, 0.0f, 0.0f });
-                RE::NiMatrix3 identityRotation;
-                identityRotation.SetEulerAnglesXYZ(0.0f, 0.0f, 0.0f);
-                alwaysVisibleHmdPanel->setLocalRotation(identityRotation);
-                alwaysVisibleHmdPanel->setLocalScale(1.0f);
+            if (auto* rightHand = menuManager.getRightHandNode()) {
+                alwaysVisibleRightHandPanel->attachToHandNode(
+                    rightHand,
+                    menuManager.getPanelOffset());
             }
-            alwaysVisibleHmdPanel->show();
+            alwaysVisibleRightHandPanel->show();
         }
 
         // removeElement()/addElement() already recalculates the one container

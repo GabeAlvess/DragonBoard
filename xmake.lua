@@ -160,6 +160,20 @@ target('DragonBoardVR')
             'SKSE',
             'Plugins',
             'SpellWheelVR_CustomConsoleCommand_DragonBoardVR.ini'))
+        for _, configName in ipairs({
+            'DragonBoardVR.ini',
+            'DragonBoardVR_Layout.ini',
+            'DragonBoardVR_State.ini'
+        }) do
+            local configSource = path.join(os.projectdir(), 'Assets', 'config', configName)
+            local configDestination = path.join(outputDir, configName)
+            if not os.isfile(configDestination) then
+                os.cp(configSource, configDestination)
+                cprint('${green}seeded config:${clear} %s', configDestination)
+            else
+                cprint('${yellow}preserved existing config:${clear} %s', configDestination)
+            end
+        end
         cprint('${green}synced install_output:${clear} %s', installFile)
     end)
 

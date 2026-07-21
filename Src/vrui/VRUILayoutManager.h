@@ -34,7 +34,8 @@ namespace vrui {
         std::string category;
         bool hideLabel = false;
         bool pinToWorld = false;
-        bool pinToHmdWorld = false;
+        bool pinToRightHand = false;
+        bool legacyHmdPin = false;
         bool visualTransformComposed = false;
         UIJSONTransform transform;
         UIJSONVisuals visuals;
@@ -66,7 +67,7 @@ namespace vrui {
                                                    const std::string& nifPath = "", const std::string& category = "", uint32_t formID = 0,
                                                    const std::string& actionFunc = "", const std::string& label = "",
                                                    std::optional<bool> pinToWorld = std::nullopt,
-                                                   std::optional<bool> pinToHmdWorld = std::nullopt,
+                                                   std::optional<bool> pinToRightHand = std::nullopt,
                                                    std::optional<bool> visualTransformComposed = std::nullopt);
 
         static void updateElementTransformAnywhereDirect(const std::string& elementId,
@@ -74,12 +75,12 @@ namespace vrui {
                                                          const std::string& nifPath = "", const std::string& category = "", uint32_t formID = 0,
                                                          const std::string& actionFunc = "", const std::string& label = "",
                                                          std::optional<bool> pinToWorld = std::nullopt,
-                                                         std::optional<bool> pinToHmdWorld = std::nullopt,
+                                                         std::optional<bool> pinToRightHand = std::nullopt,
                                                          std::optional<bool> visualTransformComposed = std::nullopt);
 
         static void setElementHideLabel(const std::string& elementId, bool hide);
         static void setElementPinToWorld(const std::string& elementId, bool pinToWorld);
-        static void setElementPinToHmdWorld(const std::string& elementId, bool pinToHmdWorld);
+        static void setElementPinToRightHand(const std::string& elementId, bool pinToRightHand);
         static void removeElementAnywhere(const std::string& elementId);
 
         static void registerDefaultLayout(const std::string& containerId, const std::string& elementId,
