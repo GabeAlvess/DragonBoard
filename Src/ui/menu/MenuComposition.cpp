@@ -426,10 +426,26 @@ void dragonboard::ui::menu::Create()
     // Player Map Marker integration
     auto mapMarker = std::make_shared<vrui::VRUIMapMarker>(settings.mapMarkerNifPath);
     bgPanel->addElement(std::static_pointer_cast<vrui::VRUIWidget>(mapMarker));
-    auto questMarker = std::make_shared<vrui::VRUIMapMarker>(
-        settings.questMarkerNifPath,
-        vrui::MapMarkerSource::QuestObjective);
-    bgPanel->addElement(std::static_pointer_cast<vrui::VRUIWidget>(questMarker));
+    constexpr std::array<const char*, vrui::VRUIMapMarker::kQuestMarkerSlotCount>
+        questMarkerNifPaths{
+            "DragonBoardVR\\DBMarkerMain.nif",
+            "DragonBoardVR\\DBMarkerSide.nif",
+            "DragonBoardVR\\DBMarkerMisc.nif"
+        };
+    constexpr std::array<const char*, vrui::VRUIMapMarker::kQuestMarkerSlotCount>
+        questMarkerTextures{
+            "textures\\DBMarkerMain.dds",
+            "textures\\DBMarkerSide.dds",
+            "textures\\DBMarkerMisc.dds"
+        };
+    for (std::size_t slot = 0; slot < questMarkerTextures.size(); ++slot) {
+        auto questMarker = std::make_shared<vrui::VRUIMapMarker>(
+            questMarkerNifPaths[slot],
+            vrui::MapMarkerSource::QuestObjective,
+            slot,
+            questMarkerTextures[slot]);
+        bgPanel->addElement(std::static_pointer_cast<vrui::VRUIWidget>(questMarker));
+    }
     auto persistentPanel = std::make_shared<VRUIPanel>("Persistent_Panel", 1.0f, false);
     persistentPanel->setPointerSurface(true);
     auto alwaysVisiblePanel = std::make_shared<VRUIPanel>("AlwaysVisiblePanel", 1.0f, false);

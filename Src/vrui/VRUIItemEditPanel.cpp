@@ -19,15 +19,14 @@ namespace vrui
         inline constexpr float kEditPanelPreviewAnchorX = 0.0f;
         inline constexpr float kEditPanelPreviewAnchorY = 2.2f;
         inline constexpr float kEditPanelPreviewAnchorZ = 0.23f;
-        // In the transformed RmlUi preview, X maps visually to the vertical
-        // direction. Calibrated in-game after confirming the axis mapping.
-        inline constexpr float kInventoryPreviewAnchorX = 0.50f;
-        // Follow the RmlUi surface depth reduction from 0.72 to 0.50 without
-        // modifying per-item offsets or the Item Editor layout.
-        inline constexpr float kInventoryPreviewAnchorY = 1.98f;
-        // The horizontal correction belongs on Z; negative moves the preview
-        // toward the visual right with the current panel orientation.
-        inline constexpr float kInventoryPreviewAnchorZ = -1.30f;
+        // In-game capture comparison confirms that X is the horizontal axis:
+        // increasing X moves the common preview visually left.
+        inline constexpr float kInventoryPreviewAnchorX = 0.0f;
+        // Y is the preview depth axis. Keep the mesh close to the RmlUi panel
+        // on the previously validated surface plane.
+        inline constexpr float kInventoryPreviewAnchorY = 1.80f;
+        // Z is the visual height axis for the transformed preview.
+        inline constexpr float kInventoryPreviewAnchorZ = 0.0f;
         // Requested global RmlUi preview increase: previous 1.3 * 1.8 = 2.34.
         inline constexpr float kInventoryPreviewScaleMultiplier = 2.34f;
         inline constexpr float kEditPanelPageAreaX = -4.0f;
@@ -548,6 +547,12 @@ namespace vrui
     {
         const auto elementId = "Pinned_" + _targetItemName + "_" + std::to_string(_targetFormID);
         const auto existing = VRUILayoutManager::findElementAnywhere(elementId);
+        if (existing && VRUISettings::get().lockPins) {
+            logger::info(
+                "DragonBoardVR: label edit rejected for locked pin '{}'.",
+                elementId);
+            return existing->hideLabel;
+        }
         const bool hideLabel = existing ? !existing->hideLabel : true;
         VRUILayoutManager::setElementHideLabel(elementId, hideLabel);
         dragonboard::ui::widgets::FixedWidgetPresenter::RefreshElement(

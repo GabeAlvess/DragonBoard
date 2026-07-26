@@ -204,6 +204,35 @@ namespace vrui
         /// Get current off-hand grip state for polling (e.g., two-hand scale)
         bool isOffhandGripButtonDown() const { return _inputButtons.OffhandGrip(); }
 
+        /// While active, grip input is reserved for moving/scaling the whole
+        /// hand-relative DragonBoard and must not mutate child widgets.
+        void setPositionAdjustmentActive(bool active)
+        {
+            _positionAdjustmentActive = active;
+            if (!active) _hasPositionAdjustmentWorldTransform = false;
+        }
+        bool isPositionAdjustmentActive() const
+        {
+            return _positionAdjustmentActive;
+        }
+        void setPositionAdjustmentWorldTransform(const RE::NiTransform& transform)
+        {
+            _positionAdjustmentWorldTransform = transform;
+            _hasPositionAdjustmentWorldTransform = true;
+        }
+        void clearPositionAdjustmentWorldTransform()
+        {
+            _hasPositionAdjustmentWorldTransform = false;
+        }
+        bool hasPositionAdjustmentWorldTransform() const
+        {
+            return _hasPositionAdjustmentWorldTransform;
+        }
+        const RE::NiTransform& getPositionAdjustmentWorldTransform() const
+        {
+            return _positionAdjustmentWorldTransform;
+        }
+
         /// Get HMD/Camera node for billboarding
         RE::NiNode* getHeadNode() const;
 
@@ -273,6 +302,9 @@ namespace vrui
 
         bool _initialized = false;
         bool _rebuildOnNextOpen = false;
+        bool _positionAdjustmentActive = false;
+        bool _hasPositionAdjustmentWorldTransform = false;
+        RE::NiTransform _positionAdjustmentWorldTransform{};
         dragonboard::ui::menu::MenuSessionState _menuSession;
 
         // --- Input State ---

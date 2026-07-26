@@ -73,6 +73,7 @@ namespace vrui
         // -----------------------------------------------------------------------
         bool verboseLogging = false;        // Enable trace-level logging (very spammy)
         bool editModeEnabled = true;        // Master switch for item editing (MCM)
+        bool lockPins = false;               // Prevent pinned items from being edited, grabbed, or removed
 
         // -----------------------------------------------------------------------
         // [Combat]
@@ -163,8 +164,8 @@ namespace vrui
         float fingerTouchOffsetX = 0.0f;
         float fingerTouchOffsetY = -0.2f;
         float fingerTouchOffsetZ = 0.0f;
-        float fingerTouchEnterDistance = 3.5f;
-        float fingerTouchExitDistance = 5.0f;
+        float fingerTouchEnterDistance = 2.5f;
+        float fingerTouchExitDistance = 3.0f;
         float fingerTouchHoverDistance = 1.5f;
         float fingerTouchPressDistance = 0.45f;
         float fingerTouchReleaseDistance = 1.0f;
@@ -386,10 +387,14 @@ namespace vrui
         float questMarkerRotY = 0.0f;
         float questMarkerRotZ = 180.0f;
         std::string questMarkerNifPath = "meshes\\DragonBoardVR\\QuestMarker.nif";
-        std::uint32_t questMarkerLastFormID = 0;
-        std::uint32_t questMarkerLastQuestInstanceID = 0;
-        std::uint32_t questMarkerLastObjectiveInstanceID = 0;
-        std::uint16_t questMarkerLastObjectiveID = 0;
+        static constexpr std::size_t kQuestMarkerSlotCount = 3;
+        std::array<std::uint32_t, kQuestMarkerSlotCount> questMarkerLastFormIDs{};
+        std::array<std::uint32_t, kQuestMarkerSlotCount>
+            questMarkerLastQuestInstanceIDs{};
+        std::array<std::uint32_t, kQuestMarkerSlotCount>
+            questMarkerLastObjectiveInstanceIDs{};
+        std::array<std::uint16_t, kQuestMarkerSlotCount>
+            questMarkerLastObjectiveIDs{};
 
         // -----------------------------------------------------------------------
         // API

@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <utility>
 
 namespace dragonboard::ui::rml
@@ -87,6 +88,34 @@ namespace dragonboard::ui::rml
         ReconcileSelectionForSearchLocked();
     }
 
+    bool RmlInventoryPresenter::UpdateVitals(
+        float currentHealth,
+        float maximumHealth,
+        float currentStamina,
+        float maximumStamina,
+        float currentMagicka,
+        float maximumMagicka)
+    {
+        const auto displayValue = [](float value) {
+            return static_cast<std::int32_t>(std::lround(value));
+        };
+        std::scoped_lock lock(_mutex);
+        const bool changed =
+            displayValue(_player.currentHealth) != displayValue(currentHealth) ||
+            displayValue(_player.maximumHealth) != displayValue(maximumHealth) ||
+            displayValue(_player.currentStamina) != displayValue(currentStamina) ||
+            displayValue(_player.maximumStamina) != displayValue(maximumStamina) ||
+            displayValue(_player.currentMagicka) != displayValue(currentMagicka) ||
+            displayValue(_player.maximumMagicka) != displayValue(maximumMagicka);
+        _player.currentHealth = currentHealth;
+        _player.maximumHealth = maximumHealth;
+        _player.currentStamina = currentStamina;
+        _player.maximumStamina = maximumStamina;
+        _player.currentMagicka = currentMagicka;
+        _player.maximumMagicka = maximumMagicka;
+        return changed;
+    }
+
     bool RmlInventoryPresenter::TryMapVisibleIndex(
         std::size_t visibleIndex,
         std::size_t& inventoryIndex) const
@@ -134,6 +163,12 @@ namespace dragonboard::ui::rml
             info.gold = _player.gold;
             info.currentWeight = _player.currentWeight;
             info.carryWeight = _player.carryWeight;
+            info.currentHealth = _player.currentHealth;
+            info.maximumHealth = _player.maximumHealth;
+            info.currentStamina = _player.currentStamina;
+            info.maximumStamina = _player.maximumStamina;
+            info.currentMagicka = _player.currentMagicka;
+            info.maximumMagicka = _player.maximumMagicka;
             info.activeFilter = _activeFilter;
             info.searchQuery = _searchQuery;
             _visibleIndices.clear();

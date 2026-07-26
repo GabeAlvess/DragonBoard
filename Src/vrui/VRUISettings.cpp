@@ -67,6 +67,18 @@ namespace vrui
             if (compact == "righttoleft") return "rightToLeft";
             return "radial";
         }
+
+        void ReflectMenuPoseAcrossHands(
+            float& offsetX,
+            float& rotationY,
+            float& rotationZ)
+        {
+            // Reflection across the local YZ plane. For an XYZ Euler rotation
+            // this preserves X while reversing the Y and Z components.
+            offsetX = -offsetX;
+            rotationY = -rotationY;
+            rotationZ = -rotationZ;
+        }
     }
 
     VRUISettings& VRUISettings::get()
@@ -132,8 +144,7 @@ namespace vrui
         if (useLeftHandAsMenu == useLeftHand) return;
 
         useLeftHandAsMenu = useLeftHand;
-        menuRotY = -menuRotY;
-        menuRotZ = -menuRotZ;
+        ReflectMenuPoseAcrossHands(menuOffsetX, menuRotY, menuRotZ);
     }
 
     std::string VRUISettings::getDefaultIniPath()
@@ -182,6 +193,7 @@ namespace vrui
         // [General]
         verboseLogging = ini.GetBoolValue("General", "bVerboseLogging", verboseLogging);
         editModeEnabled = ini.GetBoolValue("General", "bEditModeEnabled", editModeEnabled);
+        lockPins = ini.GetBoolValue("General", "bLockPins", lockPins);
 
         // [Combat]
         const bool combatEnabledMissing = !ini.KeyExists("Combat", "bSlowTimeOnOpen");
@@ -256,9 +268,9 @@ namespace vrui
         
         // [Visual]
         if (layoutExists) {
-            // Split configs omit the remaining pose fields intentionally. Reset
-            // them to their left-hand base values on every load so reloading the
-            // same files is idempotent instead of mirroring the live value again.
+            // Split configs store the complete hand-relative board transform in
+            // DragonBoardVR_Layout.ini. Start from the left-hand defaults so
+            // older split layouts that omit a field remain compatible.
             menuOffsetX = 1.0f;
             menuOffsetY = -17.0f;
             menuOffsetZ = -3.5f;
@@ -369,7 +381,7 @@ namespace vrui
         fingerTouchExitDistance = std::clamp(
             static_cast<float>(ini.GetDoubleValue(
                 "Interaction", "fFingerTouchExitDistance", fingerTouchExitDistance)),
-            fingerTouchEnterDistance,
+            fingerTouchEnterDistance + 0.5f,
             60.0f);
         fingerTouchHoverDistance = std::clamp(
             static_cast<float>(ini.GetDoubleValue(
@@ -587,16 +599,29 @@ namespace vrui
         questMarkerRotY = (float)ini.GetDoubleValue("QuestMarker", "fRotY", questMarkerRotY);
         questMarkerRotZ = (float)ini.GetDoubleValue("QuestMarker", "fRotZ", questMarkerRotZ);
         questMarkerNifPath = ini.GetValue("QuestMarker", "sMarkerNifPath", questMarkerNifPath.c_str());
-        questMarkerLastFormID = static_cast<std::uint32_t>(
-            ini.GetLongValue("QuestMarker", "iLastFormID", questMarkerLastFormID));
-        questMarkerLastQuestInstanceID = static_cast<std::uint32_t>(
-            ini.GetLongValue(
-                "QuestMarker", "iLastQuestInstanceID", questMarkerLastQuestInstanceID));
-        questMarkerLastObjectiveInstanceID = static_cast<std::uint32_t>(
-            ini.GetLongValue(
-                "QuestMarker", "iLastObjectiveInstanceID", questMarkerLastObjectiveInstanceID));
-        questMarkerLastObjectiveID = static_cast<std::uint16_t>(
-            ini.GetLongValue("QuestMarker", "iLastObjectiveID", questMarkerLastObjectiveID));
+        for (std::size_t slot = 0; slot < kQuestMarkerSlotCount; ++slot) {
+            const auto suffix = slot == 0 ? std::string{} : std::to_string(slot + 1);
+            questMarkerLastFormIDs[slot] = static_cast<std::uint32_t>(
+                ini.GetLongValue(
+                    "QuestMarker",
+                    ("iLastFormID" + suffix).c_str(),
+                    questMarkerLastFormIDs[slot]));
+            questMarkerLastQuestInstanceIDs[slot] = static_cast<std::uint32_t>(
+                ini.GetLongValue(
+                    "QuestMarker",
+                    ("iLastQuestInstanceID" + suffix).c_str(),
+                    questMarkerLastQuestInstanceIDs[slot]));
+            questMarkerLastObjectiveInstanceIDs[slot] = static_cast<std::uint32_t>(
+                ini.GetLongValue(
+                    "QuestMarker",
+                    ("iLastObjectiveInstanceID" + suffix).c_str(),
+                    questMarkerLastObjectiveInstanceIDs[slot]));
+            questMarkerLastObjectiveIDs[slot] = static_cast<std::uint16_t>(
+                ini.GetLongValue(
+                    "QuestMarker",
+                    ("iLastObjectiveID" + suffix).c_str(),
+                    questMarkerLastObjectiveIDs[slot]));
+        }
         for (std::size_t i = 0; i < mapCalibrationPoints.size(); ++i) {
             const auto prefix = "Point" + std::to_string(i + 1);
             auto& point = mapCalibrationPoints[i];
@@ -650,10 +675,18 @@ namespace vrui
 
         if (layoutExists) {
             menuScale = (float)layoutIni.GetDoubleValue("Visual", "fMenuScale", menuScale);
-            if (layoutIni.KeyExists("Visual", "fMenuRotZ")) {
-                menuRotZ = (float)layoutIni.GetDoubleValue(
-                    "Visual", "fMenuRotZ", menuRotZ);
-            }
+            menuOffsetX = (float)layoutIni.GetDoubleValue(
+                "Visual", "fMenuOffsetX", menuOffsetX);
+            menuOffsetY = (float)layoutIni.GetDoubleValue(
+                "Visual", "fMenuOffsetY", menuOffsetY);
+            menuOffsetZ = (float)layoutIni.GetDoubleValue(
+                "Visual", "fMenuOffsetZ", menuOffsetZ);
+            menuRotX = (float)layoutIni.GetDoubleValue(
+                "Visual", "fMenuRotX", menuRotX);
+            menuRotY = (float)layoutIni.GetDoubleValue(
+                "Visual", "fMenuRotY", menuRotY);
+            menuRotZ = (float)layoutIni.GetDoubleValue(
+                "Visual", "fMenuRotZ", menuRotZ);
             bEnableMenuLerp = layoutIni.GetBoolValue(
                 "Visual", "bEnableMenuLerp", bEnableMenuLerp);
             fMenuLerpSpeed = (float)layoutIni.GetDoubleValue(
@@ -847,11 +880,10 @@ namespace vrui
             }
         }
 
-        // INI/layout rotations are stored as a left-hand base. Apply hand
-        // mirroring once, after all configuration sources have been layered.
+        // The INI/layout pose is stored as a left-hand base. Reflect the lateral
+        // translation and orientation once after all sources have been layered.
         if (!useLeftHandAsMenu) {
-            menuRotY = -menuRotY;
-            menuRotZ = -menuRotZ;
+            ReflectMenuPoseAcrossHands(menuOffsetX, menuRotY, menuRotZ);
         }
 
         if (stateExists) {
@@ -912,12 +944,25 @@ namespace vrui
         ini.SetDoubleValue("QuestMarker", "fRotY", questMarkerRotY);
         ini.SetDoubleValue("QuestMarker", "fRotZ", questMarkerRotZ);
         ini.SetValue("QuestMarker", "sMarkerNifPath", questMarkerNifPath.c_str());
-        ini.SetLongValue("QuestMarker", "iLastFormID", questMarkerLastFormID);
-        ini.SetLongValue(
-            "QuestMarker", "iLastQuestInstanceID", questMarkerLastQuestInstanceID);
-        ini.SetLongValue(
-            "QuestMarker", "iLastObjectiveInstanceID", questMarkerLastObjectiveInstanceID);
-        ini.SetLongValue("QuestMarker", "iLastObjectiveID", questMarkerLastObjectiveID);
+        for (std::size_t slot = 0; slot < kQuestMarkerSlotCount; ++slot) {
+            const auto suffix = slot == 0 ? std::string{} : std::to_string(slot + 1);
+            ini.SetLongValue(
+                "QuestMarker",
+                ("iLastFormID" + suffix).c_str(),
+                questMarkerLastFormIDs[slot]);
+            ini.SetLongValue(
+                "QuestMarker",
+                ("iLastQuestInstanceID" + suffix).c_str(),
+                questMarkerLastQuestInstanceIDs[slot]);
+            ini.SetLongValue(
+                "QuestMarker",
+                ("iLastObjectiveInstanceID" + suffix).c_str(),
+                questMarkerLastObjectiveInstanceIDs[slot]);
+            ini.SetLongValue(
+                "QuestMarker",
+                ("iLastObjectiveID" + suffix).c_str(),
+                questMarkerLastObjectiveIDs[slot]);
+        }
         for (std::size_t i = 0; i < mapCalibrationPoints.size(); ++i) {
             const auto prefix = "Point" + std::to_string(i + 1);
             const auto& point = mapCalibrationPoints[i];
@@ -931,6 +976,7 @@ namespace vrui
         // [General]
         ini.SetBoolValue("General", "bVerboseLogging", verboseLogging, "; Enable trace-level logging (default: false, very spammy)");
         ini.SetBoolValue("General", "bEditModeEnabled", editModeEnabled, "; Enable Pin to Dashboard and widget editing features");
+        ini.SetBoolValue("General", "bLockPins", lockPins, "; Prevent pinned items from being edited, grabbed, or removed");
 
         // [Combat]
         ini.SetBoolValue(
@@ -973,14 +1019,14 @@ namespace vrui
         
         // When saving, we must un-mirror the values if we are on the Right Hand
         // so that the INI file always stores "Left Hand Base" values.
+        float outOffsetX = menuOffsetX;
         float outRotY    = menuRotY;
         float outRotZ    = menuRotZ;
         if (!useLeftHandAsMenu) {
-            outRotY    = -outRotY;
-            outRotZ    = -outRotZ;
+            ReflectMenuPoseAcrossHands(outOffsetX, outRotY, outRotZ);
         }
 
-        ini.SetDoubleValue("Visual", "fMenuOffsetX", (double)menuOffsetX, "; X offset relative to hand (for ALL panels)");
+        ini.SetDoubleValue("Visual", "fMenuOffsetX", (double)outOffsetX, "; Mirrored X offset relative to hand (for ALL panels)");
         ini.SetDoubleValue("Visual", "fMenuOffsetY", (double)menuOffsetY, "; Y offset");
         ini.SetDoubleValue("Visual", "fMenuOffsetZ", (double)menuOffsetZ, "; Z offset");
         ini.SetDoubleValue("Visual", "fMenuRotX",    (double)menuRotX,    "; Panel rotation X (all panels)");
@@ -1267,13 +1313,17 @@ namespace vrui
         };
 
         copyKeys(mainOut, "General", {
-            "bVerboseLogging", "bEditModeEnabled"
+            "bVerboseLogging", "bEditModeEnabled", "bLockPins"
         });
         copyKeys(mainOut, "MapMarker", {
             "bEnableMapMarker", "bDynamicRotation", "sMarkerNifPath"
         });
         CopyIniSection(ini, mainOut, "QuestMarker");
-        copyKeys(mainOut, "Activation", { "iActivationMode" });
+        copyKeys(mainOut, "Activation", {
+            "iActivationMode", "fHoldTimeGrip", "fHoldTimeTrigger",
+            "fHoldTimeThumbstick", "fHoldTime", "bUseLeftHandAsMenu",
+            "bLastSavedLeftHand"
+        });
         CopyIniSection(ini, mainOut, "Combat");
         copyKeys(mainOut, "Interaction", {
             "fRaycastMaxDistance", "bEnableFingerTouch",
@@ -1290,7 +1340,11 @@ namespace vrui
         mainOut.SetValue("ItemOverrides", nullptr, nullptr);
 
         copyKeys(layoutOut, "Visual", {
-            "fMenuScale", "fMenuRotZ", "bEnableMenuLerp", "fMenuLerpSpeed"
+            "fMenuScale",
+            "fMenuOffsetX", "fMenuOffsetY", "fMenuOffsetZ",
+            "fMenuRotX", "fMenuRotY", "fMenuRotZ",
+            "bMenuFaceRotationZeroBased",
+            "bEnableMenuLerp", "fMenuLerpSpeed"
         });
         copyKeys(layoutOut, "Buttons", {
             "fItemWeaponScale", "fItemArmorScale", "fItemPotionScale",

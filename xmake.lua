@@ -35,7 +35,7 @@ option_end()
 target('DragonBoardVR')
     add_deps('commonlibsse-ng')
     add_packages('rmlui')
-    add_syslinks('d3d11', 'd3dcompiler', 'windowscodecs', 'ole32')
+    add_syslinks('d3d11', 'd3dcompiler', 'windowscodecs', 'ole32', 'bcrypt')
 
     on_config(function ()
         if has_config('skyrim_se') or has_config('skyrim_ae') or not has_config('skyrim_vr') then
@@ -64,8 +64,14 @@ target('DragonBoardVR')
     add_installfiles('Assets/ui/rml/assets/*.jpeg', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
     })
+    add_installfiles('Assets/ui/rml/assets/*.jpg', {
+        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
+    })
     add_installfiles('Assets/ui/rml/assets/*.ttf', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
+    })
+    add_installfiles('Assets/tools/DragonBoardIniScanner.exe', {
+        prefixdir = 'SKSE/Plugins/DragonBoardVR/tools'
     })
     add_installfiles('Src/papyrus/*.psc', {
         prefixdir = 'Scripts/Source'
@@ -82,10 +88,22 @@ target('DragonBoardVR')
     add_installfiles('Assets/meshes/DragonBoardVR/dragonboard.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
+    add_installfiles('Assets/meshes/DragonBoardVR/QuestMarker.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
+    add_installfiles('Assets/meshes/DragonBoardVR/DBMarker*.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
     add_installfiles('Assets/textures/ImGui0.dds', {
         prefixdir = 'textures'
     })
     add_installfiles('Assets/textures/DragonBoardMat_*.dds', {
+        prefixdir = 'textures'
+    })
+    add_installfiles('Assets/textures/DBQuestMark*.dds', {
+        prefixdir = 'textures'
+    })
+    add_installfiles('Assets/textures/DBMarker*.dds', {
         prefixdir = 'textures'
     })
     add_includedirs(
@@ -110,8 +128,13 @@ target('DragonBoardVR')
         os.cp(targetFile, installFile)
         local screenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'ImGuiScreen.nif')
         local spellWheelNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard.nif')
+        local questMarkerNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'QuestMarker.nif')
+        local categoryMarkerNifs = path.join(
+            os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'DBMarker*.nif')
         local screenTexture = path.join(os.projectdir(), 'Assets', 'textures', 'ImGui0.dds')
         local spellWheelTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DragonBoardMat_*.dds')
+        local questMarkerTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DBQuestMark*.dds')
+        local categoryMarkerTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DBMarker*.dds')
         os.mkdir(path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.mkdir(path.join(installRoot, 'textures'))
         os.cp(screenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'ImGuiScreen.nif'))
@@ -122,10 +145,24 @@ target('DragonBoardVR')
             '-Source', screenNif,
             '-Destination', path.join(installRoot, 'meshes', 'DragonBoardVR', 'StatusScreen.nif')
         })
+        os.vrunv('powershell', {
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', path.join(os.projectdir(), 'Tools', 'GenerateStatusScreen.ps1'),
+            '-Source', screenNif,
+            '-Destination', path.join(
+                installRoot, 'meshes', 'DragonBoardVR', 'KeyboardScreen.nif'),
+            '-Replacement', 'ImGui2.dds'
+        })
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
+        os.cp(questMarkerNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'QuestMarker.nif'))
+        os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui0.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui1.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui2.dds'))
         os.cp(spellWheelTextures, path.join(installRoot, 'textures'))
+        os.cp(questMarkerTextures, path.join(installRoot, 'textures'))
+        os.cp(categoryMarkerTextures, path.join(installRoot, 'textures'))
         local rmlUiDir = path.join(os.projectdir(), 'Assets', 'ui', 'rml')
         local installedRmlUiDir = path.join(outputDir, 'DragonBoardVR', 'ui')
         os.mkdir(installedRmlUiDir)
@@ -135,7 +172,17 @@ target('DragonBoardVR')
         os.mkdir(installedRmlUiAssetsDir)
         os.cp(path.join(rmlUiDir, 'assets', '*.png'), installedRmlUiAssetsDir)
         os.cp(path.join(rmlUiDir, 'assets', '*.jpeg'), installedRmlUiAssetsDir)
+        os.cp(path.join(rmlUiDir, 'assets', '*.jpg'), installedRmlUiAssetsDir)
         os.cp(path.join(rmlUiDir, 'assets', '*.ttf'), installedRmlUiAssetsDir)
+        local iniScanner = path.join(
+            os.projectdir(), 'Assets', 'tools', 'DragonBoardIniScanner.exe')
+        local installedToolsDir = path.join(outputDir, 'DragonBoardVR', 'tools')
+        if os.isfile(iniScanner) then
+            os.mkdir(installedToolsDir)
+            os.cp(iniScanner, path.join(installedToolsDir, 'DragonBoardIniScanner.exe'))
+        else
+            cprint('${yellow}INI scanner executable not found:${clear} %s', iniScanner)
+        end
         local papyrusSourceDir = path.join(installRoot, 'Scripts', 'Source')
         os.mkdir(papyrusSourceDir)
         os.cp(path.join(os.projectdir(), 'Src', 'papyrus', '*.psc'), papyrusSourceDir)
@@ -215,3 +262,14 @@ target('RmlEntranceAnimationTests')
         'Src/ui/rml/RmlEntranceAnimation.cpp'
     )
     add_includedirs('Src')
+
+target('IniEditorTests')
+    set_kind('binary')
+    set_default(false)
+    add_files(
+        'Tools/IniScanner/IniEditorTests.cpp',
+        'Src/ui/mods/IniCatalog.cpp',
+        'Src/ui/mods/IniFileWriter.cpp'
+    )
+    add_includedirs('Src', 'lib')
+    add_syslinks('bcrypt')

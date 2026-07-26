@@ -1,6 +1,8 @@
 #pragma once
 
 #include "DragonBoardVR_API.h"
+#include "ui/mods/IniCatalog.h"
+#include "ui/mods/IniScannerProcess.h"
 #include "ui/rml/RmlInputBridge.h"
 #include "ui/rml/RmlInventoryPresenter.h"
 #include "ui/rml/RmlJournalPresenter.h"
@@ -22,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -99,9 +102,11 @@ namespace dragonboard::ui::rml
 
         [[nodiscard]] bool SampleFingerTouchSurface(
             const RE::NiPoint3& worldPoint,
+            const RE::NiPoint3& frontReferencePoint,
             float& pointerU,
             float& pointerV,
-            float& signedDistance) const;
+            float& signedDistance,
+            float& frontSign) const;
         void SetFingerTouchInput(
             bool active,
             bool pointerOnPanel,
@@ -255,7 +260,7 @@ namespace dragonboard::ui::rml
 
         struct SettingsDraft
         {
-            bool editModeEnabled = true;
+            bool lockPins = false;
             bool showDevButton = false;
             bool worldPinned = false;
             float menuScale = 1.0f;
@@ -330,11 +335,32 @@ namespace dragonboard::ui::rml
         void SyncRmlDeveloperInfo();
         void SyncRmlItemEdit();
         void SyncRmlMods();
+        void StartIniScanGameThread();
+        void PollIniScanGameThread();
+        bool LoadIniCatalogFromDisk(std::string_view completionMessage = {});
+        void LoadIniVisibility();
+        bool SaveIniVisibility();
         void SyncRmlInventory();
         void SyncRmlMagic();
         void SyncRmlJournal();
+        bool BeginSharedDeveloperKeyboardPresentThread();
+        bool BeginSharedIniKeyboardPresentThread(std::size_t visibleSettingIndex);
+        bool BeginSharedIniSearchKeyboardPresentThread();
+        bool BeginSharedInventoryKeyboardPresentThread();
+        bool BeginSharedMagicKeyboardPresentThread();
+        void UpdateSharedKeyboardPresentThread();
         bool BeginDeveloperCommandKeyboardPresentThread();
         void UpdateDeveloperCommandKeyboardPresentThread();
+        bool BeginIniValueKeyboardPresentThread(std::size_t visibleSettingIndex);
+        bool ShowIniValueKeyboardPresentThread();
+        void UpdateIniValueKeyboardPresentThread();
+        void SelectIniModPresentThread(std::size_t visibleModIndex);
+        void SelectIniFilePresentThread(std::size_t fileIndex);
+        void ToggleIniValuePresentThread(std::size_t visibleSettingIndex);
+        void ApplyIniSearchQueryPresentThread(std::string query);
+        void ToggleIniHiddenViewPresentThread();
+        void ToggleIniModVisibilityPresentThread(std::size_t visibleModIndex);
+        void DiscardIniChangesPresentThread();
         void QueueDeveloperCommandAdditionPresentThread(std::string command);
         bool BeginInventorySearchKeyboardPresentThread();
         void UpdateInventorySearchKeyboardPresentThread();
@@ -369,13 +395,28 @@ namespace dragonboard::ui::rml
             std::uint16_t objectiveID);
         bool SetQuestTrackedGameThread(std::uint32_t formID, bool tracked);
         bool CacheQuestObjectiveTargetGameThread(
+            std::size_t markerSlot,
             std::uint32_t formID,
             std::uint32_t instanceID,
             std::uint16_t objectiveID);
-        void RefreshTrackedQuestObjectiveGameThread();
-        void RefreshMovingQuestTargetGameThread();
+        void RefreshTrackedQuestObjectiveGameThread(std::size_t markerSlot);
+        void RefreshMovingQuestTargetGameThread(std::size_t markerSlot);
         bool RestoreQuestMarkerGameThread();
         void PersistQuestMarkerSelectionGameThread();
+        void RefreshQuestMarkersForPlayerCellGameThread();
+        bool ArmLatestQuestObjectiveGameThread(
+            std::size_t markerSlot,
+            std::uint32_t formID,
+            std::uint32_t questInstanceID);
+        [[nodiscard]] std::optional<std::size_t> FindQuestMarkerSlot(
+            std::uint32_t formID,
+            std::uint32_t questInstanceID) const;
+        [[nodiscard]] std::size_t AllocateQuestMarkerSlotGameThread(
+            std::uint32_t formID,
+            std::uint32_t questInstanceID);
+        void ClearQuestMarkerSlotGameThread(
+            std::size_t markerSlot,
+            bool persist);
         void ApplyRenderCommandsPresentThread();
         void CollectExternalEventsPresentThread();
         void DispatchExternalEventsGameThread();
@@ -390,6 +431,10 @@ namespace dragonboard::ui::rml
         // Built-in Settings adapter.
         void CaptureSettingsGameThread();
         void ApplyDraftGameThread();
+        void BeginPositionAdjustmentGameThread();
+        void CancelPositionAdjustmentGameThread();
+        void FinishPositionAdjustmentGameThread();
+        void UpdatePositionAdjustmentGameThread(float deltaTime);
 
         // Built-in Developer adapter.
         void CaptureDevGameInfoGameThread();
@@ -407,7 +452,10 @@ namespace dragonboard::ui::rml
         void CaptureStatusSurfaceGameThread(float deltaTime);
         void RenderStatusSurfacePresentThread();
         bool EnsureStatusRenderTargetPresentThread();
+        bool EnsureKeyboardRenderTargetPresentThread();
         bool UpdateStatusSceneSurfaceGameThread(RE::NiNode* backgroundNode);
+        bool UpdateKeyboardSceneSurfaceGameThread(RE::NiNode* backgroundNode);
+        void UpdateKeyboardSurfaceHoverGameThread();
         bool UpdateScenePanelGameThread(RE::NiNode* backgroundNode);
 
         ID3D11Device* _device = nullptr;
@@ -446,6 +494,9 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _visible{ false };
         std::atomic<bool> _applyPending{ false };
         std::atomic<bool> _savePending{ false };
+        std::atomic<bool> _positionAdjustmentTogglePending{ false };
+        std::atomic<bool> _positionAdjustmentCancelPending{ false };
+        std::atomic<bool> _positionAdjustmentActive{ false };
         std::atomic<bool> _worldPinTogglePending{ false };
         std::atomic<bool> _restartPending{ false };
         std::atomic<LocalPanelMode> _localPanelMode{ LocalPanelMode::kSettings };
@@ -460,6 +511,9 @@ namespace dragonboard::ui::rml
 
         std::mutex _draftMutex;
         SettingsDraft _draft;
+        SettingsDraft _positionAdjustmentStartDraft;
+        bool _positionAdjustmentStartedWorldPinned = false;
+        RmlSurfaceGrabController _boardGrabController;
         std::mutex _devMutex;
         std::vector<DevCommandEntry> _devCommands;
         DevGameInfoSnapshot _devGameInfo;
@@ -485,6 +539,54 @@ namespace dragonboard::ui::rml
         std::atomic<std::size_t> _modsOptionsPending{ static_cast<std::size_t>(-1) };
         std::atomic<std::size_t> _modsRemovePending{ static_cast<std::size_t>(-1) };
         std::atomic<std::size_t> _modsHoveredIndex{ static_cast<std::size_t>(-1) };
+        std::mutex _iniCatalogMutex;
+        dragonboard::ui::mods::IniCatalog _iniCatalog;
+        dragonboard::ui::mods::IniScannerProcess _iniScanner;
+        std::string _iniCatalogStatus =
+            "Select Refresh List to scan the active MO2 profile.";
+        std::vector<std::size_t> _iniVisibleModIndices;
+        struct IniSettingRef
+        {
+            std::size_t modIndex = 0;
+            std::size_t fileIndex = 0;
+            std::size_t settingIndex = 0;
+            std::string draftKey;
+        };
+        std::vector<IniSettingRef> _iniVisibleSettingRefs;
+        std::optional<std::size_t> _iniSelectedCatalogModIndex;
+        std::optional<std::size_t> _iniSelectedVisibleModIndex;
+        std::size_t _iniSelectedFileIndex = 0;
+        std::unordered_map<std::string, std::string> _iniDraftValues;
+        std::unordered_set<std::string> _iniHiddenModIds;
+        std::string _iniSearchQuery;
+        bool _iniShowHidden = false;
+        bool _iniVisibilityLoaded = false;
+        std::atomic<bool> _iniScanPending{ false };
+        std::atomic<bool> _iniSavePending{ false };
+        enum class SharedKeyboardPurpose : std::uint8_t
+        {
+            kNone,
+            kDeveloperCommand,
+            kIniValue,
+            kIniSearch,
+            kInventorySearch,
+            kMagicSearch
+        };
+        SharedKeyboardPurpose _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
+        std::atomic<bool> _iniKeyboardCloseRequested{ false };
+        std::uint64_t _iniKeyboardOverlayHandle = 0;
+        bool _iniKeyboardOpen = false;
+        bool _iniKeyboardOpenPending = false;
+        std::chrono::steady_clock::time_point _iniKeyboardNextOpenAttempt{};
+        std::chrono::steady_clock::time_point _iniKeyboardOpenedAt{};
+        std::uint64_t _iniKeyboardSessionSequence = 0;
+        std::uint64_t _iniKeyboardSessionValue = 0;
+        std::string _iniKeyboardPrompt;
+        std::string _iniKeyboardExistingValue;
+        std::string _iniKeyboardDraftKey;
+        std::string _iniKeyboardOriginalValue;
+        dragonboard::ui::mods::IniValueType _iniKeyboardValueType =
+            dragonboard::ui::mods::IniValueType::kString;
         std::mutex _inventoryMutex;
         RmlInventoryPresenter _inventoryPresenter;
         vrui::VRUIInventoryContainer* _inventoryBackend = nullptr;
@@ -518,18 +620,27 @@ namespace dragonboard::ui::rml
         std::atomic<std::uint32_t> _journalActionObjectiveInstanceID{ 0 };
         std::atomic<std::uint16_t> _journalActionObjectiveID{ 0 };
         float _journalPollAccumulator = 0.0f;
-        float _questTargetResolveDelay = -1.0f;
-        std::uint32_t _questTargetResolveFormID = 0;
-        std::uint32_t _questTargetResolveInstanceID = 0;
-        std::uint16_t _questTargetResolveObjectiveID = 0;
-        std::uint8_t _questTargetResolveAttempts = 0;
-        float _questMarkerPollAccumulator = 0.0f;
-        std::uint32_t _questMarkerWatchFormID = 0;
-        std::uint32_t _questMarkerWatchQuestInstanceID = 0;
-        std::uint32_t _questMarkerWatchObjectiveInstanceID = 0;
-        std::uint16_t _questMarkerWatchObjectiveID = 0;
-        float _questMovingTargetPollAccumulator = 0.0f;
-        RE::ObjectRefHandle _questMovingTargetHandle{};
+        struct QuestMarkerSlotState
+        {
+            float targetResolveDelay = -1.0f;
+            std::uint32_t targetResolveFormID = 0;
+            std::uint32_t targetResolveInstanceID = 0;
+            std::uint16_t targetResolveObjectiveID = 0;
+            std::uint8_t targetResolveAttempts = 0;
+            bool unresolvedDiagnosticLogged = false;
+            float pollAccumulator = 0.0f;
+            std::uint32_t watchFormID = 0;
+            std::uint32_t watchQuestInstanceID = 0;
+            std::uint32_t watchObjectiveInstanceID = 0;
+            std::uint16_t watchObjectiveID = 0;
+            float movingTargetPollAccumulator = 0.0f;
+            RE::ObjectRefHandle movingTargetHandle{};
+            std::uint64_t assignmentSequence = 0;
+        };
+        static constexpr std::size_t kQuestMarkerSlotCount = 3;
+        std::array<QuestMarkerSlotState, kQuestMarkerSlotCount> _questMarkerSlots{};
+        std::uint64_t _questMarkerAssignmentSequence = 0;
+        std::uint32_t _questMarkerPlayerCellFormID = 0;
         float _questMarkerRestoreDelay = -1.0f;
         std::uint8_t _questMarkerRestoreAttempts = 0;
         std::mutex _itemEditMutex;
@@ -561,6 +672,7 @@ namespace dragonboard::ui::rml
         StatusSurfaceSnapshot _statusSurfaceSnapshot;
         std::atomic<bool> _statusSurfaceDataPending{ true };
         std::atomic<bool> _statusSurfaceHomeVisible{ false };
+        std::atomic<bool> _keyboardSurfaceVisible{ false };
         float _statusSurfacePollAccumulator = 0.0f;
         struct SurfacePointerState
         {
@@ -605,9 +717,11 @@ namespace dragonboard::ui::rml
         };
         static constexpr DragonBoardVR_API::SurfaceHandle kMainSurfaceHandle = 1;
         static constexpr DragonBoardVR_API::SurfaceHandle kStatusSurfaceHandle = 2;
+        static constexpr DragonBoardVR_API::SurfaceHandle kKeyboardSurfaceHandle = 3;
         [[nodiscard]] SurfaceState& MainSceneSurface();
         [[nodiscard]] const SurfaceState& MainSceneSurface() const;
         [[nodiscard]] SurfaceState& StatusSceneSurface();
+        [[nodiscard]] SurfaceState& KeyboardSceneSurface();
         static bool HasSurfaceFlag(
             const SurfaceState& surface,
             DragonBoardVR_API::SurfaceFlags flag);

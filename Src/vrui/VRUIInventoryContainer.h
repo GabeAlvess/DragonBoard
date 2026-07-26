@@ -72,6 +72,22 @@ namespace vrui
             std::int32_t gold = 0;
             float currentWeight = 0.0f;
             float carryWeight = 0.0f;
+            float currentHealth = 0.0f;
+            float maximumHealth = 0.0f;
+            float currentStamina = 0.0f;
+            float maximumStamina = 0.0f;
+            float currentMagicka = 0.0f;
+            float maximumMagicka = 0.0f;
+        };
+
+        struct RmlPlayerVitals
+        {
+            float currentHealth = 0.0f;
+            float maximumHealth = 0.0f;
+            float currentStamina = 0.0f;
+            float maximumStamina = 0.0f;
+            float currentMagicka = 0.0f;
+            float maximumMagicka = 0.0f;
         };
 
         explicit VRUIInventoryContainer(const std::string& name, 
@@ -89,6 +105,7 @@ namespace vrui
         int _totalValidItems = 0;
 
         [[nodiscard]] RmlInventorySnapshot buildRmlInventorySnapshot() const;
+        [[nodiscard]] RmlPlayerVitals buildRmlPlayerVitals() const;
         [[nodiscard]] std::uint64_t buildRmlInventorySignature() const;
         bool interactWithItem(RE::FormID formID, EquipHand hand);
         bool activateItem(RE::FormID formID, EquipHand hand);

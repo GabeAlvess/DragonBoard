@@ -261,10 +261,23 @@ namespace vrui
             auto& settings = VRUISettings::get();
             auto& manager = VRMenuManager::get();
 
-            if (manager.isBoardWorldPinned() &&
+            if (manager.isPositionAdjustmentActive() &&
+                manager.hasPositionAdjustmentWorldTransform() &&
+                _handFollowBasis == HandFollowBasis::kMenu) {
+                // During a whole-board grab every board-following panel uses
+                // the exact same world pose. The menu hand is deliberately not
+                // an authority until the pose is converted back on release.
+                _node->local = MakeRelativeTransform(
+                    _node->parent->world,
+                    manager.getPositionAdjustmentWorldTransform());
+                _hasTargetTransform = false;
+                _smoothHandoffPosition = false;
+                _handoffElapsed = 0.0f;
+            } else if (manager.isBoardWorldPinned() &&
                 _handFollowBasis == HandFollowBasis::kMenu) {
                 applyPinnedWorldTransform();
-            } else if (_trackingHandNode && settings.bEnableMenuLerp) {
+            } else if (_trackingHandNode && settings.bEnableMenuLerp &&
+                       !manager.isPositionAdjustmentActive()) {
                 // Calculate target world transform from hand node
                 RE::NiPoint3 targetWorldPos = _trackingHandNode->world.translate;
                 
@@ -384,6 +397,14 @@ namespace vrui
                 _node->local.scale = settings.menuScale;
             } else if (_trackingHandNode) {
                 // Direct attach mode (Standard rigid following)
+                if (manager.isPositionAdjustmentActive()) {
+                    // The whole-board grab owns the local transform during this
+                    // mode. Discard the old smoothing basis so releasing does
+                    // not blend back toward a stale pre-grab orientation.
+                    _hasTargetTransform = false;
+                    _smoothHandoffPosition = false;
+                    _handoffElapsed = 0.0f;
+                }
                 _node->local.translate = _offset;
                 
                 float rotX = 0.0f;

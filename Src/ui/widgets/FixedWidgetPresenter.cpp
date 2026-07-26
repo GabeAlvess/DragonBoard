@@ -142,7 +142,7 @@ namespace dragonboard::ui::widgets
             const std::string elementID = element.id;
             widget->setOnSecondaryLongPressHandler([elementID](vrui::VRUIButton* button, vrui::EquipHand) {
                 auto& currentSettings = vrui::VRUISettings::get();
-                if (currentSettings.editModeEnabled) {
+                if (!currentSettings.lockPins && currentSettings.editModeEnabled) {
                     // Give immediate visual feedback without destroying the
                     // button while its own callback is still on the stack.
                     if (button) {
@@ -153,6 +153,9 @@ namespace dragonboard::ui::widgets
                         menuManager,
                         0.0f,
                         [elementID]() {
+                            if (vrui::VRUISettings::get().lockPins) {
+                                return;
+                            }
                             auto& deferredManager = vrui::VRMenuManager::get();
                             deferredManager.clearHover();
                             deferredManager.clearGrabbedWidget(nullptr);

@@ -10,13 +10,15 @@
         <aside class="dev-sidebar journal-sidebar">
             <div class="brand">
                 <div class="brand-copy">
-                    <div class="brand-name"><span>DragonBoard / Journal</span></div>
+                    <div class="brand-name"><span>Journal</span></div>
                 </div>
             </div>
 
-            <div class="journal-player">
-                <span id="journal-player-name">Dragonborn</span>
-                <span class="journal-player-level">LEVEL <span id="journal-player-level">1</span></span>
+            <div class="journal-quest-filters">
+                <button id="journal-filter-all" class="journal-filter-button active"><span>All</span></button>
+                <button id="journal-filter-main" class="journal-filter-button"><span>Main</span></button>
+                <button id="journal-filter-side" class="journal-filter-button"><span>Side</span></button>
+                <button id="journal-filter-misc" class="journal-filter-button"><span>Misc</span></button>
             </div>
 
             <div id="journal-quest-list" class="journal-quest-list">
@@ -26,13 +28,11 @@
 
         <div class="content-shell dev-shell journal-shell">
             <header class="dev-header journal-header">
-                <div class="breadcrumb"><span>Journal</span></div>
                 <div class="journal-top-tabs">
                     <button id="journal-tab-quests" class="journal-top-tab active"><span>Quests</span></button>
                     <button id="journal-tab-stats" class="journal-top-tab"><span>Statistics</span></button>
                     <button id="journal-settings" class="journal-top-tab journal-config"><span>Settings</span></button>
                 </div>
-                <button id="journal-close" class="close-button"><span>X</span></button>
             </header>
 
             <main class="dev-main journal-main">

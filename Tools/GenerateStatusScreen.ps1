@@ -3,12 +3,14 @@ param(
     [string]$Source,
 
     [Parameter(Mandatory = $true)]
-    [string]$Destination
+    [string]$Destination,
+
+    [string]$Replacement = 'ImGui1.dds'
 )
 
 $sourceBytes = [System.IO.File]::ReadAllBytes($Source)
 $searchBytes = [System.Text.Encoding]::ASCII.GetBytes('ImGui0.dds')
-$replacementBytes = [System.Text.Encoding]::ASCII.GetBytes('ImGui1.dds')
+$replacementBytes = [System.Text.Encoding]::ASCII.GetBytes($Replacement)
 
 if ($searchBytes.Length -ne $replacementBytes.Length) {
     throw 'Status texture replacement must preserve the NIF string length.'

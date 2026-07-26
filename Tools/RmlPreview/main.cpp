@@ -376,7 +376,24 @@ namespace
             case WM_MOUSEWHEEL:
                 if (_context) {
                     const float steps = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA;
-                    _context->ProcessMouseWheel(Rml::Vector2f(0.0f, -steps), GetModifiers());
+                    const auto previewFile = _documentPath.filename().string();
+                    if (previewFile == "inventory.rml" ||
+                        previewFile == "magic.rml") {
+                        const float itemCount = static_cast<float>(
+                            kSyntheticDatasetSizes[_syntheticDatasetIndex]);
+                        const float maximum = std::max(0.0f, itemCount * 120.0f - 600.0f);
+                        auto& logicalScrollTop = previewFile == "inventory.rml" ?
+                            _inventoryPreviewSyncedScrollTop :
+                            _magicPreviewSyncedScrollTop;
+                        logicalScrollTop = std::clamp(
+                            logicalScrollTop - steps * 120.0f,
+                            0.0f,
+                            maximum);
+                        UpdateSyntheticVirtualRows(true);
+                    } else {
+                        _context->ProcessMouseWheel(
+                            Rml::Vector2f(0.0f, -steps), GetModifiers());
+                    }
                 }
                 return 0;
             case WM_KEYDOWN:
@@ -455,6 +472,10 @@ namespace
                 SelectPage(kSettingsPages, "tab-", "page-", id.substr(4));
             } else if (id.starts_with("dev-tab-")) {
                 SelectPage(kDeveloperPages, "dev-tab-", "dev-page-", id.substr(8));
+            } else if (id == "mods-tab-actions") {
+                SelectModsPreviewPage(false);
+            } else if (id == "mods-tab-ini") {
+                SelectModsPreviewPage(true);
             } else if (id == "edit-tab-pin") {
                 SetStatus("Action: pin to dashboard");
             } else if (id.starts_with("edit-tab-")) {
@@ -762,20 +783,64 @@ namespace
             } else if (fileName == "dev.rml") {
                 PopulateDeveloperDocument();
                 SelectPage(kDeveloperPages, "dev-tab-", "dev-page-", "commands");
+            } else if (fileName == "journal.rml") {
+                PopulateJournalDocument();
             } else if (fileName == "edit.rml") {
                 PopulateItemEditDocument();
                 SelectPage(kItemEditPages, "edit-tab-", "edit-page-", "position");
             } else if (fileName == "mods.rml") {
-                if (auto* list = _document->GetElementById("mods-list")) {
-                    list->SetInnerRML(
-                        "<div id=\"mods-card-0\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Campfire</span></div>"
-                        "<div id=\"mods-card-1\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Whirlwind Sprint</span></div>"
-                        "<div id=\"mods-card-2\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Travel Lantern</span></div>");
-                }
+                PopulateModsDocument();
             } else if (fileName == "inventory.rml") {
                 PopulateInventoryDocument();
             } else if (fileName == "magic.rml") {
                 PopulateMagicDocument();
+            }
+        }
+
+        void PopulateJournalDocument()
+        {
+            if (auto* page = _document->GetElementById("journal-page-quests")) {
+                page->SetProperty("display", "block");
+            }
+            if (auto* page = _document->GetElementById("journal-page-stats")) {
+                page->SetProperty("display", "none");
+            }
+            SetText("journal-quest-type", "MAIN QUEST");
+            SetText("journal-tracking-state", "TRACKED");
+            SetText("journal-quest-title", "The Horn of Jurgen Windcaller");
+            SetText(
+                "journal-quest-summary",
+                "Retrieve the Horn of Jurgen Windcaller from Ustengrav and return it to the Greybeards.");
+            SetText("journal-active-quest", "Active quest: The Horn of Jurgen Windcaller");
+
+            if (auto* list = _document->GetElementById("journal-quest-list")) {
+                list->SetInnerRML(
+                    "<div class=\"journal-section-label active-section\"><span>ACTIVE QUESTS</span></div>"
+                    "<button id=\"journal-quest-20-1\" class=\"journal-quest-button quest-category-main active\"><i class=\"fade-layer fade-1\"></i>"
+                    "<i class=\"fade-layer fade-2\"></i><i class=\"fade-layer fade-3\"></i>"
+                    "<i class=\"fade-layer fade-4\"></i><i class=\"fade-layer fade-5\"></i>"
+                    "<span class=\"journal-quest-marker\">&gt;</span><span id=\"journal-quest-name-20-1\" class=\"journal-quest-title\">"
+                    "<span id=\"journal-quest-name-track-20-1\" class=\"journal-quest-title-track\">The Horn of Jurgen Windcaller</span></span></button>"
+                    "<button class=\"journal-quest-button quest-category-side\"><span class=\"journal-quest-marker\"></span>"
+                    "<span class=\"journal-quest-title\"><span class=\"journal-quest-title-track\">"
+                    "A Blade in the Dark</span></span></button>"
+                    "<button class=\"journal-quest-button quest-category-misc\"><span class=\"journal-quest-marker\"></span>"
+                    "<span class=\"journal-quest-title\"><span class=\"journal-quest-title-track\">"
+                    "Forbidden Legend of the Ancient Nords</span></span></button>"
+                    "<div class=\"journal-section-label inactive-section\"><span>INACTIVE QUESTS</span></div>"
+                    "<button class=\"journal-quest-button quest-category-side\"><span class=\"journal-quest-marker\"></span>"
+                    "<span class=\"journal-quest-title\"><span class=\"journal-quest-title-track\">"
+                    "The Golden Claw</span></span></button>");
+            }
+
+            if (auto* objectives = _document->GetElementById("journal-objective-list")) {
+                objectives->SetInnerRML(
+                    "<button class=\"journal-objective\"><span class=\"journal-objective-state\">ACTIVE</span>"
+                    "<span class=\"journal-objective-text\">Retrieve the Horn of Jurgen Windcaller</span>"
+                    "<span class=\"journal-map-marker\">&gt;</span></button>"
+                    "<button class=\"journal-objective completed\"><span class=\"journal-objective-state\">DONE</span>"
+                    "<span class=\"journal-objective-text\">Speak to Arngeir</span>"
+                    "<span class=\"journal-map-marker\"></span></button>");
             }
         }
 
@@ -788,6 +853,128 @@ namespace
             SetText("edit-label-state", "Visible");
         }
 
+        void PopulateModsDocument()
+        {
+            if (auto* actions = _document->GetElementById("mods-list")) {
+                actions->SetInnerRML(
+                    "<div id=\"mods-card-0\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Campfire</span></div>"
+                    "<div id=\"mods-card-1\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Whirlwind Sprint</span></div>"
+                    "<div id=\"mods-card-2\" class=\"mod-card\" tabindex=\"0\"><span class=\"mod-card-mark\">&lt;&gt;</span><span class=\"mod-card-label\">Travel Lantern</span></div>");
+            }
+
+            if (auto* list = _document->GetElementById("mods-ini-list")) {
+                const auto appendCard = [](std::string& markup, std::string_view name,
+                                            std::string_view, bool active) {
+                    markup += "<div class=\"ini-mod-row\"><button class=\"ini-mod-card";
+                    if (active) markup += " active";
+                    markup += "\">"
+                        "<div class=\"sidebar-fade sidebar-fade-whisper\"></div>"
+                        "<div class=\"sidebar-fade sidebar-fade-soft\"></div>"
+                        "<div class=\"sidebar-fade sidebar-fade-mid\"></div>"
+                        "<div class=\"sidebar-fade sidebar-fade-strong\"></div>"
+                        "<div class=\"sidebar-fade sidebar-fade-solid\"></div>"
+                        "<span class=\"ini-mod-name\">";
+                    markup += name;
+                    markup += "</span></button>"
+                        "<button class=\"ini-row-visibility\"><span>X</span></button></div>";
+                };
+                std::string markup;
+                appendCard(markup, "Aetherius - A Race Overhaul", "1 INI", false);
+                appendCard(markup, "Apothecary - An Alchemy Overhaul", "1 INI", false);
+                appendCard(markup, "Auto Parallax", "1 INI", false);
+                appendCard(markup, "Azurite Weathers II", "1 INI", false);
+                appendCard(markup, "Behavior Data Injector", "1 INI", true);
+                appendCard(markup, "HIGGS - Hand Interaction and Gravity Gloves for Skyrim VR", "1 INI", false);
+                appendCard(markup, "Blade and Blunt - A Combat Overhaul", "3 INI", false);
+                appendCard(markup, "BOS Handcarts 2K", "1 INI", false);
+                appendCard(markup, "Dragonborn Voice Over", "2 INI", false);
+                appendCard(markup, "Enhanced Volumetric Lighting", "1 INI", false);
+                list->SetInnerRML(markup);
+            }
+
+            if (auto* detail = _document->GetElementById("mods-ini-detail")) {
+                detail->SetInnerRML(
+                    "<div class=\"ini-file\">"
+                    "<div class=\"ini-section-name\">[Debug]</div>"
+                    "<div class=\"ini-setting-row\"><span class=\"ini-setting-key\">EnableDebugLog</span><div class=\"ini-setting-value-column\"><div class=\"ini-setting-description\">Writes diagnostic events to the SKSE log.</div><button class=\"ini-setting-value boolean\"><span>FALSE</span></button></div></div>"
+                    "<div class=\"ini-setting-row\"><span class=\"ini-setting-key\">EnableAnimationLog</span><div class=\"ini-setting-value-column\"><button class=\"ini-setting-value boolean enabled\"><span>TRUE</span></button></div></div>"
+                    "<div class=\"ini-section-name\">[General]</div>"
+                    "<div class=\"ini-setting-row\"><span class=\"ini-setting-key\">AnimationEventCacheSize</span><div class=\"ini-setting-value-column\"><div class=\"ini-setting-description\">Maximum number of animation events retained in memory.</div><button class=\"ini-setting-value\"><span>2048</span></button></div></div>"
+                    "<div class=\"ini-setting-row\"><span class=\"ini-setting-key\">ExcludedBehaviorProjectPath</span><div class=\"ini-setting-value-column\"><button class=\"ini-setting-value\"><span>meshes/actors/character/behaviors/0_master.hkx</span></button></div></div>"
+                    "<div class=\"ini-setting-row\"><span class=\"ini-setting-key\">VeryLongSettingNameForVRReadability</span><div class=\"ini-setting-value-column\"><div class=\"ini-setting-description\">Selecting this card opens the SteamVR keyboard.</div><button class=\"ini-setting-value\"><span>A long value opened with the VR keyboard</span></button></div></div>"
+                    "<div class=\"ini-setting-row\"><span class=\"ini-setting-key\">ReloadBehaviorGraph</span><div class=\"ini-setting-value-column\"><button class=\"ini-setting-value boolean\"><span>FALSE</span></button></div></div>"
+                    "</div>");
+            }
+
+            if (auto* head = _document->GetElementById("mods-ini-editor-head")) {
+                head->SetProperty("display", "flex");
+            }
+            SetText("mods-ini-mod-title", "Behavior Data Injector");
+            if (auto* tabs = _document->GetElementById("mods-ini-file-tabs")) {
+                tabs->SetInnerRML(
+                    "<button class=\"ini-file-tab active\"><span>BehaviorDataInjector.ini</span></button>"
+                    "<button class=\"ini-file-tab\"><span>AnimationEvents.ini</span></button>"
+                    "<button class=\"ini-file-tab conflict\"><span>Compatibility.ini</span></button>"
+                    "<button class=\"ini-file-tab\"><span>AdvancedOverrides.ini</span></button>"
+                    "<button class=\"ini-file-tab\"><span>RuntimePatches.ini</span></button>"
+                    "<button class=\"ini-file-tab\"><span>DebugProfiles.ini</span></button>");
+            }
+
+            SetText("mods-ini-status", "Profile: FUS RO DAH | Mods: 422 | INIs: 239");
+            SetText("mods-ini-search-text", "SEARCH");
+            if (auto* hidden =
+                    _document->GetElementById("mods-ini-show-hidden")) {
+                hidden->SetInnerRML("<span>HIDDEN (12)</span>");
+            }
+            if (auto* clear =
+                    _document->GetElementById("mods-ini-search-clear")) {
+                clear->SetProperty("display", "none");
+            }
+            SelectModsPreviewPage(true);
+        }
+
+        void SelectModsPreviewPage(bool ini)
+        {
+            if (auto* tab = _document->GetElementById("mods-tab-actions")) {
+                tab->SetClass("active", !ini);
+            }
+            if (auto* tab = _document->GetElementById("mods-tab-ini")) {
+                tab->SetClass("active", ini);
+            }
+            if (auto* view = _document->GetElementById("mods-actions-view")) {
+                view->SetProperty("display", ini ? "none" : "block");
+            }
+            if (auto* view = _document->GetElementById("mods-ini-view")) {
+                view->SetProperty("display", ini ? "block" : "none");
+            }
+            if (auto* list = _document->GetElementById("mods-ini-list")) {
+                list->SetProperty("display", ini ? "block" : "none");
+            }
+            if (auto* tools =
+                    _document->GetElementById("mods-ini-sidebar-tools")) {
+                tools->SetProperty("display", ini ? "block" : "none");
+            }
+            if (auto* hidden =
+                    _document->GetElementById("mods-ini-show-hidden")) {
+                hidden->SetProperty("display", ini ? "flex" : "none");
+            }
+            if (auto* footer = _document->GetElementById("mods-actions-footer")) {
+                footer->SetProperty("display", ini ? "none" : "flex");
+            }
+            if (auto* footer = _document->GetElementById("mods-ini-footer")) {
+                footer->SetProperty("display", ini ? "block" : "none");
+            }
+            if (auto* add = _document->GetElementById("mods-add")) {
+                add->SetProperty("display", ini ? "none" : "flex");
+            }
+            if (auto* discard = _document->GetElementById("mods-ini-discard")) {
+                discard->SetProperty("display", ini ? "flex" : "none");
+            }
+            if (auto* save = _document->GetElementById("mods-ini-save")) {
+                save->SetProperty("display", ini ? "flex" : "none");
+            }
+        }
+
         void PopulateDeveloperDocument()
         {
             auto* list = _document->GetElementById("dev-command-list");
@@ -795,7 +982,8 @@ namespace
             std::string markup;
             for (std::size_t index = 0; index < kMockCommands.size(); ++index) {
                 markup += "<button id=\"dev-command-" + std::to_string(index) +
-                    "\" class=\"command-item\">" + kMockCommands[index].label + "</button><br />";
+                    "\" class=\"command-item\"><span>" +
+                    kMockCommands[index].label + "</span></button><br />";
             }
             list->SetInnerRML(markup);
             SelectMockCommand(0);
@@ -943,10 +1131,24 @@ namespace
             const char* listId = inventory ? "inventory-item-list" : "magic-spell-list";
             auto* listElement = _document->GetElementById(listId);
             if (!listElement) return;
+            auto* scrollElement = inventory ?
+                _document->GetElementById("inventory-scroll-proxy") :
+                _document->GetElementById("magic-scroll-proxy");
 
             if (_syntheticEmptySearch) {
                 if (!force) return;
                 (inventory ? _inventoryPreviewList : _magicPreviewList).Reset();
+                if (scrollElement) scrollElement->SetScrollTop(0.0f);
+                if (inventory) {
+                    _inventoryPreviewSyncedScrollTop = 0.0f;
+                } else {
+                    _magicPreviewSyncedScrollTop = 0.0f;
+                }
+                if (auto* thumb = _document->GetElementById(
+                        inventory ? "inventory-scroll-thumb" : "magic-scroll-thumb")) {
+                    thumb->SetProperty("top", "0px");
+                    thumb->SetProperty("height", "600px");
+                }
                 listElement->SetInnerRML(inventory ?
                     "<div class=\"inventory-empty\">No matching items</div>" :
                     "<div class=\"magic-empty\">No matching spells</div>");
@@ -957,16 +1159,52 @@ namespace
             const auto itemCount = kSyntheticDatasetSizes[_syntheticDatasetIndex];
             auto& virtualList = inventory ? _inventoryPreviewList : _magicPreviewList;
             virtualList.SetItemCount(itemCount);
-            const float scrollTop = listElement->GetScrollTop();
-            const bool windowChanged = virtualList.Update(scrollTop);
-            if (!force && !windowChanged) return;
+            float scrollTop = inventory ?
+                _inventoryPreviewSyncedScrollTop :
+                _magicPreviewSyncedScrollTop;
+            {
+                const float totalHeight =
+                    static_cast<float>(itemCount) * 120.0f;
+                const float maximumScroll =
+                    std::max(0.0f, totalHeight - 600.0f);
+                scrollTop = std::clamp(scrollTop, 0.0f, maximumScroll);
+                listElement->SetScrollTop(0.0f);
+                if (inventory) {
+                    _inventoryPreviewSyncedScrollTop = scrollTop;
+                } else {
+                    _magicPreviewSyncedScrollTop = scrollTop;
+                }
+                if (auto* thumb = _document->GetElementById(
+                        inventory ? "inventory-scroll-thumb" : "magic-scroll-thumb")) {
+                    const float thumbHeight = totalHeight > 0.0f ?
+                        std::clamp(600.0f * 600.0f / totalHeight, 104.0f, 600.0f) :
+                        600.0f;
+                    const float thumbTravel = 600.0f - thumbHeight;
+                    const float thumbTop = maximumScroll > 0.0f ?
+                        thumbTravel * scrollTop / maximumScroll : 0.0f;
+                    thumb->SetProperty(
+                        "height", Rml::CreateString("%.0fpx", thumbHeight));
+                    thumb->SetProperty(
+                        "top", Rml::CreateString("%.0fpx", thumbTop));
+                }
+            }
+            const bool windowChanged = virtualList.Update(
+                scrollTop + 60.0f);
+            if (!force && !windowChanged) {
+                if (auto* content = _document->GetElementById(
+                        inventory ?
+                            "inventory-virtual-content" :
+                            "magic-virtual-content")) {
+                    content->RemoveProperty("top");
+                }
+                return;
+            }
 
             const auto& window = virtualList.GetWindow();
             const char* contentClass = inventory ?
                 "inventory-virtual-content" : "magic-virtual-content";
             std::string markup = "<div class=\"" + std::string(contentClass) +
-                "\" style=\"height: " + std::to_string(static_cast<int>(window.totalHeight)) +
-                "px;\">";
+                "\" style=\"height: 600px;\">";
             for (std::size_t slot = 0; slot < window.rowCount; ++slot) {
                 const auto itemIndex = window.firstIndex + slot;
                 std::string marker;
@@ -986,8 +1224,14 @@ namespace
                 markup += "<button id=\"" +
                     std::string(inventory ? "inventory-item-" : "magic-spell-") +
                     indexText + "\" class=\"" + classes + "\" style=\"top: " +
-                    std::to_string(static_cast<int>(virtualList.GetRowOffset(itemIndex))) +
+                    std::to_string(static_cast<int>(
+                        static_cast<float>(slot) * 120.0f)) +
                     "px;\">";
+                markup += "<span class=\"row-fade row-fade-solid\"></span>"
+                    "<span class=\"row-fade row-fade-strong\"></span>"
+                    "<span class=\"row-fade row-fade-mid\"></span>"
+                    "<span class=\"row-fade row-fade-soft\"></span>"
+                    "<span class=\"row-fade row-fade-whisper\"></span>";
                 markup += "<span class=\"" +
                     std::string(inventory ? "item-state-mark" : "spell-state-mark") +
                     "\">" + marker + "</span>";
@@ -1005,7 +1249,7 @@ namespace
             }
             markup += "</div>";
             listElement->SetInnerRML(markup);
-            listElement->SetScrollTop(scrollTop);
+            listElement->SetScrollTop(0.0f);
             SetText(
                 inventory ? "inventory-item-count" : "magic-spell-count",
                 std::to_string(itemCount));
@@ -1018,9 +1262,12 @@ namespace
             _syntheticEmptySearch = false;
             _inventoryPreviewList.Reset();
             _magicPreviewList.Reset();
+            _inventoryPreviewSyncedScrollTop = 0.0f;
+            _magicPreviewSyncedScrollTop = 0.0f;
             if (_document) {
-                if (auto* list = _document->GetElementById("inventory-item-list")) {
-                    list->SetScrollTop(0.0f);
+                if (auto* scroll =
+                        _document->GetElementById("inventory-scroll-proxy")) {
+                    scroll->SetScrollTop(0.0f);
                 }
                 if (auto* list = _document->GetElementById("magic-spell-list")) {
                     list->SetScrollTop(0.0f);
@@ -1055,7 +1302,16 @@ namespace
         {
             _syntheticEmptySearch = false;
             _inventoryPreviewList.Reset();
+            _inventoryPreviewSyncedScrollTop = 0.0f;
+            if (auto* scroll =
+                    _document->GetElementById("inventory-scroll-proxy")) {
+                scroll->SetScrollTop(0.0f);
+            }
             UpdateSyntheticVirtualRows(true);
+            if (auto* scroll =
+                    _document->GetElementById("inventory-scroll-proxy")) {
+                scroll->SetScrollTop(0.0f);
+            }
             if (auto* filter = _document->GetElementById("inventory-filter-weapons")) {
                 filter->SetClass("active", true);
             }
@@ -1063,6 +1319,18 @@ namespace
             SetText("inventory-player-level", "42");
             SetText("inventory-gold", "12.840");
             SetText("inventory-carry-weight", "218.5 / 420");
+            SetText("inventory-health-text", "276 / 320");
+            SetText("inventory-stamina-text", "188 / 240");
+            SetText("inventory-magicka-text", "92 / 180");
+            if (auto* fill = _document->GetElementById("inventory-health-fill")) {
+                fill->SetProperty("width", "455px");
+            }
+            if (auto* fill = _document->GetElementById("inventory-stamina-fill")) {
+                fill->SetProperty("width", "414px");
+            }
+            if (auto* fill = _document->GetElementById("inventory-magicka-fill")) {
+                fill->SetProperty("width", "270px");
+            }
             SetText(
                 "inventory-item-count",
                 std::to_string(kSyntheticDatasetSizes[_syntheticDatasetIndex]));
@@ -1071,7 +1339,7 @@ namespace
                 "inventory-selected-name",
                 "Nordic Bow of the Ancient Dragonborn Champion");
             if (auto* left = _document->GetElementById("inventory-left-hand-state")) {
-                left->SetClass("active", false);
+                left->SetClass("active", true);
             }
             if (auto* right = _document->GetElementById("inventory-right-hand-state")) {
                 right->SetClass("active", true);
@@ -1089,6 +1357,11 @@ namespace
         {
             _syntheticEmptySearch = false;
             _magicPreviewList.Reset();
+            _magicPreviewSyncedScrollTop = 0.0f;
+            if (auto* scroll =
+                    _document->GetElementById("magic-scroll-proxy")) {
+                scroll->SetScrollTop(0.0f);
+            }
             UpdateSyntheticVirtualRows(true);
             if (auto* filter = _document->GetElementById("magic-filter-conjuration")) {
                 filter->SetClass("active", true);
@@ -1111,6 +1384,9 @@ namespace
                 "Summons an ancient Dragon Priest guardian for 60 seconds wherever the caster is aiming.");
             SetText("magic-equip-label", "UNEQUIP");
             SetText("magic-magicka", "248 / 310");
+            if (auto* fill = _document->GetElementById("magic-magicka-fill")) {
+                fill->SetProperty("width", "422px");
+            }
             if (auto* left = _document->GetElementById("magic-left-hand-state")) {
                 left->SetClass("active", false);
             }
@@ -1295,8 +1571,10 @@ namespace
         std::chrono::steady_clock::time_point _lastReloadCheck{};
         std::size_t _selectedMockCommand = 0;
         std::size_t _syntheticDatasetIndex = 0;
-        RmlVirtualList _inventoryPreviewList{ 548.0f, 108.0f, 4 };
-        RmlVirtualList _magicPreviewList{ 548.0f, 108.0f, 4 };
+        RmlVirtualList _inventoryPreviewList{ 600.0f, 120.0f, 0 };
+        float _inventoryPreviewSyncedScrollTop = 0.0f;
+        RmlVirtualList _magicPreviewList{ 600.0f, 120.0f, 0 };
+        float _magicPreviewSyncedScrollTop = 0.0f;
         RmlPerformanceMetrics _previewMetrics;
         std::string _status;
         std::string _performanceSummary;

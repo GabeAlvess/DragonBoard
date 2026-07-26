@@ -77,6 +77,42 @@ namespace dragonboard::ui::rml
                    id.starts_with("mods-card-");
         }
 
+        bool IsScrollbarElement(const Rml::Element* element)
+        {
+            for (auto* candidate = element; candidate;
+                 candidate = candidate->GetParentNode()) {
+                const std::string_view tag(candidate->GetTagName());
+                if (tag == "sliderbar" || tag == "slidertrack" ||
+                    tag == "sliderarrowdec" || tag == "sliderarrowinc" ||
+                    tag == "scrollbarvertical" || tag == "scrollbarhorizontal" ||
+                    tag == "scrollbarcorner") {
+                    return true;
+                }
+                if (candidate->GetTagName() == "body") break;
+            }
+            return false;
+        }
+
+        bool IsInventoryScrollbarElement(const Rml::Element* element)
+        {
+            for (auto* candidate = element; candidate;
+                 candidate = candidate->GetParentNode()) {
+                if (candidate->GetId() == "inventory-scroll-proxy") return true;
+                if (candidate->GetTagName() == "body") break;
+            }
+            return false;
+        }
+
+        bool IsMagicScrollbarElement(const Rml::Element* element)
+        {
+            for (auto* candidate = element; candidate;
+                 candidate = candidate->GetParentNode()) {
+                if (candidate->GetId() == "magic-scroll-proxy") return true;
+                if (candidate->GetTagName() == "body") break;
+            }
+            return false;
+        }
+
         constexpr const char* kContextName = "dragonboard_local_panels_rml";
 
         constexpr std::array<const char*, 3> kDocumentCandidates{
@@ -119,6 +155,78 @@ namespace dragonboard::ui::rml
             "Data/SKSE/Plugins/DragonBoardVR/ui/journal.rml",
             "SKSE/Plugins/DragonBoardVR/ui/journal.rml",
             "Assets/ui/rml/journal.rml"
+        };
+
+        constexpr std::array<const char*, 3> kKeyboardDocumentCandidates{
+            "Data/SKSE/Plugins/DragonBoardVR/ui/keyboard.rml",
+            "SKSE/Plugins/DragonBoardVR/ui/keyboard.rml",
+            "Assets/ui/rml/keyboard.rml"
+        };
+
+        struct KeyboardKeyDefinition
+        {
+            const char* id;
+            char normal;
+            char shifted;
+        };
+
+        constexpr std::array<KeyboardKeyDefinition, 47> kKeyboardKeys{ {
+            { "keyboard-key-grave", '`', '~' },
+            { "keyboard-key-1", '1', '!' },
+            { "keyboard-key-2", '2', '@' },
+            { "keyboard-key-3", '3', '#' },
+            { "keyboard-key-4", '4', '$' },
+            { "keyboard-key-5", '5', '%' },
+            { "keyboard-key-6", '6', '^' },
+            { "keyboard-key-7", '7', '&' },
+            { "keyboard-key-8", '8', '*' },
+            { "keyboard-key-9", '9', '(' },
+            { "keyboard-key-0", '0', ')' },
+            { "keyboard-key-minus", '-', '_' },
+            { "keyboard-key-equals", '=', '+' },
+            { "keyboard-key-q", 'q', 'Q' },
+            { "keyboard-key-w", 'w', 'W' },
+            { "keyboard-key-e", 'e', 'E' },
+            { "keyboard-key-r", 'r', 'R' },
+            { "keyboard-key-t", 't', 'T' },
+            { "keyboard-key-y", 'y', 'Y' },
+            { "keyboard-key-u", 'u', 'U' },
+            { "keyboard-key-i", 'i', 'I' },
+            { "keyboard-key-o", 'o', 'O' },
+            { "keyboard-key-p", 'p', 'P' },
+            { "keyboard-key-left-bracket", '[', '{' },
+            { "keyboard-key-right-bracket", ']', '}' },
+            { "keyboard-key-backslash", '\\', '|' },
+            { "keyboard-key-a", 'a', 'A' },
+            { "keyboard-key-s", 's', 'S' },
+            { "keyboard-key-d", 'd', 'D' },
+            { "keyboard-key-f", 'f', 'F' },
+            { "keyboard-key-g", 'g', 'G' },
+            { "keyboard-key-h", 'h', 'H' },
+            { "keyboard-key-j", 'j', 'J' },
+            { "keyboard-key-k", 'k', 'K' },
+            { "keyboard-key-l", 'l', 'L' },
+            { "keyboard-key-semicolon", ';', ':' },
+            { "keyboard-key-apostrophe", '\'', '"' },
+            { "keyboard-key-z", 'z', 'Z' },
+            { "keyboard-key-x", 'x', 'X' },
+            { "keyboard-key-c", 'c', 'C' },
+            { "keyboard-key-v", 'v', 'V' },
+            { "keyboard-key-b", 'b', 'B' },
+            { "keyboard-key-n", 'n', 'N' },
+            { "keyboard-key-m", 'm', 'M' },
+            { "keyboard-key-comma", ',', '<' },
+            { "keyboard-key-period", '.', '>' },
+            { "keyboard-key-slash", '/', '?' }
+        } };
+
+        constexpr std::array<const char*, 6> kKeyboardControlIds{
+            "keyboard-backspace",
+            "keyboard-shift",
+            "keyboard-clear",
+            "keyboard-space",
+            "keyboard-cancel",
+            "keyboard-confirm"
         };
 
         constexpr std::array<const char*, 3> kFontCandidates{
@@ -328,7 +436,7 @@ namespace dragonboard::ui::rml
 
     bool DragonBoardRmlUi::LoadNextBuiltinDocument()
     {
-        constexpr std::size_t kBuiltinDocumentCount = 7;
+        constexpr std::size_t kBuiltinDocumentCount = 8;
         if (!_context || !_eventListener || _builtinDocumentLoadStep >= kBuiltinDocumentCount) {
             return false;
         }
@@ -371,7 +479,8 @@ namespace dragonboard::ui::rml
                 for (const auto* slider : kSliders) BindSlider(_settingsDocument, slider);
                 BindClick(_settingsDocument, "save");
                 BindClick(_settingsDocument, "close");
-                BindClick(_settingsDocument, "toggle-edit-mode");
+                BindClick(_settingsDocument, "position-adjustment");
+                BindClick(_settingsDocument, "toggle-lock-pins");
                 BindClick(_settingsDocument, "toggle-dev-panel");
                 BindClick(_settingsDocument, "toggle-world-pin");
                 BindClick(_settingsDocument, "restart-dragonboard");
@@ -431,7 +540,15 @@ namespace dragonboard::ui::rml
             loadedDocument = _modsDocument;
             if (_modsDocument) {
                 BindClick(_modsDocument, "mods-add");
-                BindClick(_modsDocument, "mods-close");
+                BindClick(_modsDocument, "mods-tab-actions");
+                BindClick(_modsDocument, "mods-tab-ini");
+                BindClick(_modsDocument, "mods-ini-refresh");
+                BindClick(_modsDocument, "mods-ini-save");
+                BindClick(_modsDocument, "mods-ini-discard");
+                BindClick(_modsDocument, "mods-ini-search");
+                BindClick(_modsDocument, "mods-ini-search-clear");
+                BindClick(_modsDocument, "mods-ini-show-hidden");
+                SelectModsPage(false);
                 _modsDocument->Hide();
                 logger::info("DragonBoardVR: external RmlUi mods panel loaded from '{}'.", path);
             }
@@ -481,12 +598,31 @@ namespace dragonboard::ui::rml
                 for (const auto* id : {
                          "journal-tab-quests", "journal-tab-stats",
                          "journal-settings", "journal-close",
-                         "journal-toggle-tracking" }) {
+                         "journal-toggle-tracking", "journal-filter-all",
+                         "journal-filter-main", "journal-filter-side",
+                         "journal-filter-misc" }) {
                     BindClick(_journalDocument, id);
                 }
                 SelectJournalPage("quests");
                 _journalDocument->Hide();
                 logger::info("DragonBoardVR: external RmlUi journal loaded from '{}'.", path);
+            }
+            break;
+        }
+        case 7: {
+            const auto* path = loadDocument(
+                kKeyboardDocumentCandidates, _keyboardDocument, "Keyboard");
+            loadedDocument = _keyboardDocument;
+            if (_keyboardDocument) {
+                for (const auto& key : kKeyboardKeys) {
+                    BindClick(_keyboardDocument, key.id);
+                }
+                for (const auto* id : kKeyboardControlIds) {
+                    BindClick(_keyboardDocument, id);
+                }
+                _keyboardDocument->Hide();
+                logger::info(
+                    "DragonBoardVR: shared RmlUi keyboard loaded from '{}'.", path);
             }
             break;
         }
@@ -502,7 +638,7 @@ namespace dragonboard::ui::rml
 
     bool DragonBoardRmlUi::AreBuiltinDocumentsLoaded() const
     {
-        return _builtinDocumentLoadStep >= 7;
+        return _builtinDocumentLoadStep >= 8;
     }
 
     void DragonBoardRmlUi::Shutdown()
@@ -523,6 +659,7 @@ namespace dragonboard::ui::rml
         _gripScrollTarget = nullptr;
         _gripScrollTargetTop = 0.0f;
         _gripPointerScrollAccumulator = 0.0f;
+        _gripScrollMovedLogged = false;
         _settingsDocument = nullptr;
         _developerDocument = nullptr;
         _itemEditDocument = nullptr;
@@ -530,7 +667,14 @@ namespace dragonboard::ui::rml
         _inventoryDocument = nullptr;
         _magicDocument = nullptr;
         _journalDocument = nullptr;
+        _keyboardDocument = nullptr;
         _activeDocument = nullptr;
+        _keyboardReturnDocument = nullptr;
+        _keyboardText.clear();
+        _keyboardPrompt.clear();
+        _keyboardResult.reset();
+        _keyboardShift = false;
+        _keyboardMaximumLength = 0;
         _modsListMarkup.clear();
         _developerCommandListMarkup.clear();
         ResetInventoryVirtualRows();
@@ -601,9 +745,20 @@ namespace dragonboard::ui::rml
         return _renderer && _renderer->IsReady() && _context && _journalDocument;
     }
 
+    bool DragonBoardRmlUi::IsKeyboardReady() const
+    {
+        return _renderer && _renderer->IsReady() && _context && _keyboardDocument;
+    }
+
+    bool DragonBoardRmlUi::IsKeyboardOpen() const
+    {
+        return IsKeyboardReady() && _activeDocument == _keyboardDocument;
+    }
+
     bool DragonBoardRmlUi::ShowSettings()
     {
         if (!IsSettingsReady()) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == _settingsDocument) return true;
         HideAllDocuments();
         _settingsDocument->Show();
@@ -614,6 +769,7 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ShowDeveloper()
     {
         if (!IsDeveloperReady()) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == _developerDocument) return true;
         HideAllDocuments();
         _developerDocument->Show();
@@ -624,6 +780,7 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ShowItemEdit()
     {
         if (!IsItemEditReady()) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == _itemEditDocument) return true;
         HideAllDocuments();
         _itemEditDocument->Show();
@@ -634,6 +791,7 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ShowMods()
     {
         if (!IsModsReady()) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == _modsDocument) return true;
         HideAllDocuments();
         _modsDocument->Show();
@@ -644,6 +802,7 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ShowInventory()
     {
         if (!IsInventoryReady()) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == _inventoryDocument) return true;
         HideAllDocuments();
         _inventoryDocument->Show();
@@ -654,6 +813,7 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ShowMagic()
     {
         if (!IsMagicReady()) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == _magicDocument) return true;
         HideAllDocuments();
         _magicDocument->Show();
@@ -664,11 +824,50 @@ namespace dragonboard::ui::rml
     bool DragonBoardRmlUi::ShowJournal()
     {
         if (!IsJournalReady()) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == _journalDocument) return true;
         HideAllDocuments();
         _journalDocument->Show();
         _activeDocument = _journalDocument;
         return true;
+    }
+
+    bool DragonBoardRmlUi::OpenKeyboard(
+        std::string prompt,
+        std::string initialText,
+        std::size_t maximumLength)
+    {
+        if (!IsKeyboardReady() || IsKeyboardOpen()) return false;
+        _keyboardReturnDocument = _activeDocument;
+        _keyboardPrompt = std::move(prompt);
+        _keyboardMaximumLength = std::max<std::size_t>(1, maximumLength);
+        if (initialText.size() > _keyboardMaximumLength) {
+            initialText.resize(_keyboardMaximumLength);
+        }
+        _keyboardText = std::move(initialText);
+        _keyboardShift = false;
+        _keyboardResult.reset();
+        UpdateKeyboardVisuals();
+        HideAllDocuments();
+        _keyboardDocument->Show();
+        _activeDocument = _keyboardDocument;
+        logger::info(
+            "DragonBoardVR: shared RmlUi keyboard opened (limit={}).",
+            _keyboardMaximumLength);
+        return true;
+    }
+
+    std::optional<DragonBoardRmlUi::KeyboardResult>
+    DragonBoardRmlUi::ConsumeKeyboardResult()
+    {
+        auto result = std::move(_keyboardResult);
+        _keyboardResult.reset();
+        return result;
+    }
+
+    void DragonBoardRmlUi::CancelKeyboard()
+    {
+        CloseKeyboard(false);
     }
 
     bool DragonBoardRmlUi::RegisterPanel(
@@ -741,6 +940,7 @@ namespace dragonboard::ui::rml
     {
         auto* panel = FindPanel(handle);
         if (!panel || !panel->document) return false;
+        if (IsKeyboardOpen()) return true;
         if (_activeDocument == panel->document) return true;
         HideAllDocuments();
         panel->document->Show();
@@ -941,55 +1141,319 @@ namespace dragonboard::ui::rml
         // Keep the global DragonBoard grip mapping intact. Smooth the scroll
         // locally while grip is held, then discard all pending motion on
         // release so the next trigger press can never inherit inertia.
-        if (scrollArmed && pointerOnPanel) {
+        if (scrollArmed && (pointerOnPanel || _gripScrollActive)) {
             if (!_gripScrollActive) {
                 _gripScrollActive = true;
+                _gripScrollHorizontal = false;
+                _gripScrollPointerX = pointerX;
                 _gripScrollPointerY = pointerY;
                 _gripPointerScrollAccumulator = 0.0f;
+                _gripScrollMovedLogged = false;
                 auto* hovered = _context->GetHoverElement();
-                _gripScrollTarget = hovered ? hovered->GetClosestScrollableContainer() : nullptr;
+                _gripScrollTarget = nullptr;
+                if (_activeDocument == _modsDocument && _modsIniEditorSelected) {
+                    for (auto* candidate = hovered;
+                         candidate && candidate != _activeDocument;
+                         candidate = candidate->GetParentNode()) {
+                        const std::string_view id(candidate->GetId());
+                        if (id == "mods-ini-list" || id == "mods-ini-detail" ||
+                            id == "mods-ini-file-tabs") {
+                            _gripScrollTarget = candidate;
+                            _gripScrollHorizontal = id == "mods-ini-file-tabs";
+                            break;
+                        }
+                    }
+                    if (!_gripScrollTarget) {
+                        if (auto* tabs =
+                                _activeDocument->GetElementById("mods-ini-file-tabs")) {
+                            const auto offset =
+                                tabs->GetAbsoluteOffset(Rml::BoxArea::Border);
+                            const float right =
+                                offset.x + static_cast<float>(tabs->GetClientWidth());
+                            const float bottom =
+                                offset.y + static_cast<float>(tabs->GetClientHeight());
+                            if (static_cast<float>(pointerX) >= offset.x &&
+                                static_cast<float>(pointerX) <= right &&
+                                static_cast<float>(pointerY) >= offset.y &&
+                                static_cast<float>(pointerY) <= bottom) {
+                                _gripScrollTarget = tabs;
+                                _gripScrollHorizontal = true;
+                            }
+                        }
+                    }
+                    if (!_gripScrollTarget) {
+                        const char* fallbackId =
+                            pointerX < 468 ? "mods-ini-list" : "mods-ini-detail";
+                        _gripScrollTarget =
+                            _activeDocument->GetElementById(fallbackId);
+                    }
+                }
+                if (!_gripScrollTarget && hovered) {
+                    if (_activeDocument == _inventoryDocument) {
+                        auto* list =
+                            _inventoryDocument->GetElementById("inventory-item-list");
+                        auto* proxy =
+                            _inventoryDocument->GetElementById("inventory-scroll-proxy");
+                        for (auto* element = hovered;
+                             element && element != _inventoryDocument;
+                             element = element->GetParentNode()) {
+                            if (element == list || element == proxy) {
+                                _gripScrollTarget = proxy;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!_gripScrollTarget && hovered) {
+                    if (_activeDocument == _magicDocument) {
+                        auto* list =
+                            _magicDocument->GetElementById("magic-spell-list");
+                        auto* proxy =
+                            _magicDocument->GetElementById("magic-scroll-proxy");
+                        for (auto* element = hovered;
+                             element && element != _magicDocument;
+                             element = element->GetParentNode()) {
+                            if (element == list || element == proxy) {
+                                _gripScrollTarget = proxy;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!_gripScrollTarget && hovered) {
+                    _gripScrollTarget = hovered->GetClosestScrollableContainer();
+                }
                 if (!_gripScrollTarget && _activeDocument) {
                     _gripScrollTarget = _activeDocument->GetElementById("page-scroll");
                 }
-                _gripScrollTargetTop = _gripScrollTarget ?
-                    _gripScrollTarget->GetScrollTop() : 0.0f;
+                const bool inventoryLogicalScroll =
+                    _activeDocument == _inventoryDocument &&
+                    _gripScrollTarget &&
+                    _gripScrollTarget->GetId() == "inventory-scroll-proxy";
+                const bool magicLogicalScroll =
+                    _activeDocument == _magicDocument &&
+                    _gripScrollTarget &&
+                    _gripScrollTarget->GetId() == "magic-scroll-proxy";
+                const bool virtualLogicalScroll =
+                    inventoryLogicalScroll || magicLogicalScroll;
+                _gripScrollTargetTop = inventoryLogicalScroll ?
+                    _inventorySyncedScrollTop :
+                    (magicLogicalScroll ? _magicSyncedScrollTop :
+                    (_gripScrollTarget ?
+                        (_gripScrollHorizontal ?
+                            _gripScrollTarget->GetScrollLeft() :
+                            _gripScrollTarget->GetScrollTop()) :
+                        0.0f));
+                if (_gripScrollTarget) {
+                    const float maximum = virtualLogicalScroll ?
+                        std::max(
+                            0.0f,
+                            static_cast<float>(
+                                inventoryLogicalScroll ?
+                                    _inventoryVirtualItems.size() :
+                                    _magicVirtualItems.size()) *
+                                    120.0f -
+                                600.0f) :
+                        (_gripScrollHorizontal ?
+                            std::max(
+                                0.0f,
+                                _gripScrollTarget->GetScrollWidth() -
+                                    _gripScrollTarget->GetClientWidth()) :
+                            std::max(
+                                0.0f,
+                                _gripScrollTarget->GetScrollHeight() -
+                                    _gripScrollTarget->GetClientHeight()));
+                    logger::info(
+                        "DragonBoardVR: grip scroll captured '{}' "
+                        "(tag={}, top={:.1f}, max={:.1f}, pointerOnPanel={}).",
+                        _gripScrollTarget->GetId(),
+                        _gripScrollTarget->GetTagName(),
+                        _gripScrollTargetTop,
+                        maximum,
+                        pointerOnPanel);
+                } else {
+                    logger::warn(
+                        "DragonBoardVR: grip scroll started without a scroll target.");
+                }
                 CaptureGripScrollHoverLock();
             } else {
+                const float pointerDeltaX =
+                    static_cast<float>(pointerX - _gripScrollPointerX);
                 const float pointerDelta = static_cast<float>(pointerY - _gripScrollPointerY);
+                _gripScrollPointerX = pointerX;
                 _gripScrollPointerY = pointerY;
-                constexpr float pointerFilter = 0.32f;
-                _gripPointerScrollAccumulator +=
-                    (pointerDelta - _gripPointerScrollAccumulator) * pointerFilter;
-                constexpr float pointerSensitivity = 0.78f;
-                _gripScrollTargetTop -= _gripPointerScrollAccumulator * pointerSensitivity;
+                const bool inventoryLogicalScroll =
+                    _activeDocument == _inventoryDocument &&
+                    _gripScrollTarget &&
+                    _gripScrollTarget->GetId() == "inventory-scroll-proxy";
+                const bool magicLogicalScroll =
+                    _activeDocument == _magicDocument &&
+                    _gripScrollTarget &&
+                    _gripScrollTarget->GetId() == "magic-scroll-proxy";
+                if (inventoryLogicalScroll || magicLogicalScroll) {
+                    constexpr float pointerSensitivity = 1.0f;
+                    _gripScrollTargetTop -= pointerDelta * pointerSensitivity;
+                } else {
+                    constexpr float pointerFilter = 0.32f;
+                    const float axisDelta =
+                        _gripScrollHorizontal ? pointerDeltaX : pointerDelta;
+                    _gripPointerScrollAccumulator +=
+                        (axisDelta - _gripPointerScrollAccumulator) * pointerFilter;
+                    constexpr float pointerSensitivity = 0.78f;
+                    if (_gripScrollHorizontal) {
+                        _gripScrollTargetTop -=
+                            _gripPointerScrollAccumulator * pointerSensitivity;
+                    } else {
+                        _gripScrollTargetTop -=
+                            _gripPointerScrollAccumulator * pointerSensitivity;
+                    }
+                }
             }
 
             if (_gripScrollTarget) {
+                const bool inventoryLogicalScroll =
+                    _activeDocument == _inventoryDocument &&
+                    _gripScrollTarget->GetId() == "inventory-scroll-proxy";
+                const bool magicLogicalScroll =
+                    _activeDocument == _magicDocument &&
+                    _gripScrollTarget->GetId() == "magic-scroll-proxy";
+                const bool virtualLogicalScroll =
+                    inventoryLogicalScroll || magicLogicalScroll;
                 constexpr float stickDeadzone = 0.15f;
-                constexpr float stickPixelsPerFrame = 9.0f;
-                if (std::abs(stickY) > stickDeadzone) {
-                    _gripScrollTargetTop += stickY * stickPixelsPerFrame;
+                const float stickPixelsPerFrame =
+                    virtualLogicalScroll ? 15.0f : 9.0f;
+                const float stickAxis = _gripScrollHorizontal ? -stickX : stickY;
+                if (std::abs(stickAxis) > stickDeadzone) {
+                    _gripScrollTargetTop += stickAxis * stickPixelsPerFrame;
                 }
-                const float maximum = std::max(
-                    0.0f,
-                    _gripScrollTarget->GetScrollHeight() - _gripScrollTarget->GetClientHeight());
+                const float maximum = virtualLogicalScroll ?
+                    std::max(
+                        0.0f,
+                        static_cast<float>(
+                            inventoryLogicalScroll ?
+                                _inventoryVirtualItems.size() :
+                                _magicVirtualItems.size()) *
+                                120.0f -
+                                600.0f) :
+                    (_gripScrollHorizontal ?
+                        std::max(
+                            0.0f,
+                            _gripScrollTarget->GetScrollWidth() -
+                                _gripScrollTarget->GetClientWidth()) :
+                        std::max(
+                            0.0f,
+                            _gripScrollTarget->GetScrollHeight() -
+                                _gripScrollTarget->GetClientHeight()));
                 _gripScrollTargetTop = std::clamp(_gripScrollTargetTop, 0.0f, maximum);
 
-                const float current = _gripScrollTarget->GetScrollTop();
+                const float current = inventoryLogicalScroll ?
+                    _inventorySyncedScrollTop :
+                    (magicLogicalScroll ?
+                        _magicSyncedScrollTop :
+                        (_gripScrollHorizontal ?
+                            _gripScrollTarget->GetScrollLeft() :
+                            _gripScrollTarget->GetScrollTop()));
                 const float difference = _gripScrollTargetTop - current;
                 if (std::abs(difference) >= 0.5f) {
-                    constexpr float easing = 0.24f;
-                    float step = difference * easing;
-                    if (std::abs(step) < 1.0f) step = std::copysign(1.0f, step);
-                    _gripScrollTarget->SetScrollTop(current + step);
+                    float step = difference;
+                    if (!virtualLogicalScroll) {
+                        constexpr float easing = 0.24f;
+                        step *= easing;
+                        if (std::abs(step) < 1.0f) {
+                            step = std::copysign(1.0f, step);
+                        }
+                    }
+                    const float next = std::clamp(current + step, 0.0f, maximum);
+                    if (inventoryLogicalScroll) {
+                        _inventorySyncedScrollTop = next;
+                    } else if (magicLogicalScroll) {
+                        _magicSyncedScrollTop = next;
+                    } else {
+                        if (_gripScrollHorizontal) {
+                            _gripScrollTarget->SetScrollLeft(next);
+                        } else {
+                            _gripScrollTarget->SetScrollTop(next);
+                        }
+                    }
+                    if (!_gripScrollMovedLogged) {
+                        logger::info(
+                            "DragonBoardVR: grip scroll moved '{}' {:.1f} -> {:.1f}.",
+                            _gripScrollTarget->GetId(),
+                            current,
+                            inventoryLogicalScroll ?
+                                _inventorySyncedScrollTop :
+                                (magicLogicalScroll ?
+                                    _magicSyncedScrollTop :
+                                    (_gripScrollHorizontal ?
+                                        _gripScrollTarget->GetScrollLeft() :
+                                        _gripScrollTarget->GetScrollTop())));
+                        _gripScrollMovedLogged = true;
+                    }
                 }
             }
         } else {
             if (_gripScrollActive) ClearGripScrollHoverLock();
             _gripScrollActive = false;
             _gripScrollTarget = nullptr;
+            _gripScrollHorizontal = false;
+            _gripScrollPointerX = 0;
             _gripScrollTargetTop = 0.0f;
             _gripPointerScrollAccumulator = 0.0f;
+            _gripScrollMovedLogged = false;
+        }
+        if (triggerDown && _inventoryScrollbarDragging &&
+            _activeDocument == _inventoryDocument) {
+            constexpr float kViewportHeight = 600.0f;
+            constexpr float kRowHeight = 120.0f;
+            const float totalHeight =
+                static_cast<float>(_inventoryVirtualItems.size()) * kRowHeight;
+            const float maximumScroll =
+                std::max(0.0f, totalHeight - kViewportHeight);
+            const float thumbHeight = totalHeight > 0.0f ?
+                std::clamp(
+                    kViewportHeight * kViewportHeight / totalHeight,
+                    104.0f,
+                    kViewportHeight) :
+                kViewportHeight;
+            const float thumbTravel = kViewportHeight - thumbHeight;
+            if (auto* proxy =
+                    _inventoryDocument->GetElementById("inventory-scroll-proxy")) {
+                const float pointerOnTrack =
+                    static_cast<float>(pointerY) -
+                    proxy->GetAbsoluteOffset(Rml::BoxArea::Border).y -
+                    thumbHeight * 0.5f;
+                const float ratio = thumbTravel > 0.0f ?
+                    std::clamp(pointerOnTrack / thumbTravel, 0.0f, 1.0f) :
+                    0.0f;
+                _inventorySyncedScrollTop = ratio * maximumScroll;
+            }
+        }
+        if (triggerDown && _magicScrollbarDragging &&
+            _activeDocument == _magicDocument) {
+            constexpr float kViewportHeight = 600.0f;
+            constexpr float kRowHeight = 120.0f;
+            const float totalHeight =
+                static_cast<float>(_magicVirtualItems.size()) * kRowHeight;
+            const float maximumScroll =
+                std::max(0.0f, totalHeight - kViewportHeight);
+            const float thumbHeight = totalHeight > 0.0f ?
+                std::clamp(
+                    kViewportHeight * kViewportHeight / totalHeight,
+                    104.0f,
+                    kViewportHeight) :
+                kViewportHeight;
+            const float thumbTravel = kViewportHeight - thumbHeight;
+            if (auto* proxy =
+                    _magicDocument->GetElementById("magic-scroll-proxy")) {
+                const float pointerOnTrack =
+                    static_cast<float>(pointerY) -
+                    proxy->GetAbsoluteOffset(Rml::BoxArea::Border).y -
+                    thumbHeight * 0.5f;
+                const float ratio = thumbTravel > 0.0f ?
+                    std::clamp(pointerOnTrack / thumbTravel, 0.0f, 1.0f) :
+                    0.0f;
+                _magicSyncedScrollTop = ratio * maximumScroll;
+            }
         }
         if (_activeDocument == _inventoryDocument && _inventoryVirtualInitialized) {
             UpdateInventoryVirtualRows();
@@ -1012,13 +1476,34 @@ namespace dragonboard::ui::rml
                     _triggerCapturedActionId.clear();
                     _triggerCaptureProgrammatic = false;
                     auto* captureElement = _context->GetHoverElement();
-                    while (captureElement && captureElement != _activeDocument &&
-                           captureElement->GetTagName() != "button" &&
-                           captureElement->GetTagName() != "input" &&
-                           !IsActionCard(captureElement)) {
-                        captureElement = captureElement->GetParentNode();
+                    const bool inventoryScrollbarCapture =
+                        _activeDocument == _inventoryDocument &&
+                        IsInventoryScrollbarElement(captureElement);
+                    const bool magicScrollbarCapture =
+                        _activeDocument == _magicDocument &&
+                        IsMagicScrollbarElement(captureElement);
+                    const bool scrollbarCapture =
+                        inventoryScrollbarCapture || magicScrollbarCapture ||
+                        IsScrollbarElement(captureElement);
+                    _inventoryScrollbarDragging = inventoryScrollbarCapture;
+                    _magicScrollbarDragging = magicScrollbarCapture;
+                    if (!scrollbarCapture) {
+                        while (captureElement && captureElement != _activeDocument &&
+                               captureElement->GetTagName() != "button" &&
+                               captureElement->GetTagName() != "input" &&
+                               !IsActionCard(captureElement)) {
+                            captureElement = captureElement->GetParentNode();
+                        }
                     }
-                    if (captureElement && captureElement->GetTagName() == "input") {
+                    if (scrollbarCapture) {
+                        _triggerCaptureMode = TriggerCaptureMode::kScrollbar;
+                        _triggerScrollLockDocument = nullptr;
+                        _triggerScrollTarget = nullptr;
+                        _triggerScrollLockActive = false;
+                        _triggerScrollReleasePending = false;
+                        _triggerScrollSuppressionLogged = false;
+                    } else if (captureElement &&
+                               captureElement->GetTagName() == "input") {
                         const auto inputType = captureElement->GetAttribute<Rml::String>(
                             "type", "text");
                         _triggerCaptureMode = inputType == "range" ?
@@ -1054,7 +1539,12 @@ namespace dragonboard::ui::rml
                     _triggerCaptureX = pointerX;
                     _triggerCaptureY = pointerY;
                     const char* captureName = _triggerCaptureMode == TriggerCaptureMode::kSlider ?
-                        "slider" : (_triggerCaptureMode == TriggerCaptureMode::kButton ? "button" : "none");
+                        "slider" :
+                        (_triggerCaptureMode == TriggerCaptureMode::kScrollbar ?
+                             "scrollbar" :
+                             (_triggerCaptureMode == TriggerCaptureMode::kButton ?
+                                  "button" :
+                                  "none"));
                     logger::info("DragonBoardVR: RmlUi trigger captured {} target.", captureName);
                     if (_triggerCaptureMode != TriggerCaptureMode::kSlider &&
                         !_triggerCaptureProgrammatic) {
@@ -1073,6 +1563,8 @@ namespace dragonboard::ui::rml
                         _context->ProcessMouseButtonUp(0, 0);
                     }
                     _triggerScrollReleasePending = true;
+                    _inventoryScrollbarDragging = false;
+                    _magicScrollbarDragging = false;
                     _triggerCaptureMode = TriggerCaptureMode::kNone;
                     _triggerCapturedSliderId.clear();
                     _sliderPointerInitialized = false;
@@ -1175,6 +1667,7 @@ namespace dragonboard::ui::rml
     {
         return _pointerMotionActive || _inventoryMarqueeActive || _gripScrollActive ||
                _triggerCaptureMode == TriggerCaptureMode::kSlider ||
+               _triggerCaptureMode == TriggerCaptureMode::kScrollbar ||
                !_inventoryLongPressElementId.empty();
     }
 
@@ -1270,6 +1763,7 @@ namespace dragonboard::ui::rml
         if (_inventoryDocument) _inventoryDocument->Hide();
         if (_magicDocument) _magicDocument->Hide();
         if (_journalDocument) _journalDocument->Hide();
+        if (_keyboardDocument) _keyboardDocument->Hide();
         for (auto& [handle, panel] : _registeredPanels) {
             (void)handle;
             if (panel.document) panel.document->Hide();
@@ -1332,6 +1826,10 @@ namespace dragonboard::ui::rml
             if (auto* element =
                     _activeDocument->GetElementById(_inventoryMarqueeElementId)) {
                 element->SetProperty("left", "0px");
+                element->RemoveProperty("width");
+                element->RemoveProperty("max-width");
+                element->RemoveProperty("overflow");
+                element->RemoveProperty("text-overflow");
             }
         }
         _inventoryMarqueeElementId.clear();
@@ -1404,6 +1902,12 @@ namespace dragonboard::ui::rml
             _inventoryMarqueeActive = false;
             return;
         }
+        const auto trackWidth =
+            Rml::CreateString("%.1fpx", std::max(textWidth, viewport->GetClientWidth()));
+        track->SetProperty("width", trackWidth);
+        track->SetProperty("max-width", trackWidth);
+        track->SetProperty("overflow", "visible");
+        track->SetProperty("text-overflow", "clip");
         _inventoryMarqueeActive = true;
 
         const float frameTime = std::clamp(deltaTime, 0.0f, 0.05f);
@@ -1490,6 +1994,14 @@ namespace dragonboard::ui::rml
         auto* page = _activeDocument ? _activeDocument->GetElementById("page-scroll") : nullptr;
         auto* nested = _activeDocument ? _activeDocument->GetElementById("dev-command-list") : nullptr;
         auto* hovered = _context ? _context->GetHoverElement() : nullptr;
+        if (IsScrollbarElement(hovered)) {
+            _triggerScrollLockDocument = nullptr;
+            _triggerScrollTarget = nullptr;
+            _triggerScrollLockActive = false;
+            _triggerScrollReleasePending = false;
+            _triggerScrollSuppressionLogged = false;
+            return;
+        }
         _triggerScrollTarget = hovered ? hovered->GetClosestScrollableContainer() : nullptr;
         _triggerScrollLockPageTop = page ? page->GetScrollTop() : 0.0f;
         _triggerScrollLockNestedTop = nested ? nested->GetScrollTop() : 0.0f;
@@ -1592,6 +2104,7 @@ namespace dragonboard::ui::rml
         else if (_activeDocument == _inventoryDocument) _lastRenderTiming.activeDocument = "Inventory";
         else if (_activeDocument == _magicDocument) _lastRenderTiming.activeDocument = "Magic";
         else if (_activeDocument == _journalDocument) _lastRenderTiming.activeDocument = "Journal";
+        else if (_activeDocument == _keyboardDocument) _lastRenderTiming.activeDocument = "Keyboard";
         else if (const auto handle = FindPanelHandle(_activeDocument); handle != 0) {
             if (const auto* panel = FindPanel(handle)) {
                 _lastRenderTiming.activeDocument = panel->id;
@@ -1691,14 +2204,19 @@ namespace dragonboard::ui::rml
         return std::exchange(_saveRequested, false);
     }
 
+    bool DragonBoardRmlUi::ConsumePositionAdjustmentRequested()
+    {
+        return std::exchange(_positionAdjustmentRequested, false);
+    }
+
     bool DragonBoardRmlUi::ConsumeDeveloperPanelToggleRequested()
     {
         return std::exchange(_developerPanelToggleRequested, false);
     }
 
-    bool DragonBoardRmlUi::ConsumeEditModeToggleRequested()
+    bool DragonBoardRmlUi::ConsumeLockPinsToggleRequested()
     {
-        return std::exchange(_editModeToggleRequested, false);
+        return std::exchange(_lockPinsToggleRequested, false);
     }
 
     bool DragonBoardRmlUi::ConsumeWorldPinToggleRequested()
@@ -1822,6 +2340,199 @@ namespace dragonboard::ui::rml
         }
     }
 
+    void DragonBoardRmlUi::SetIniMods(
+        const std::vector<IniModInfo>& mods,
+        std::string_view status,
+        bool scanning,
+        std::size_t selectedIndex,
+        std::string_view searchQuery,
+        bool showHidden,
+        std::size_t hiddenCount)
+    {
+        if (!_modsDocument) return;
+        if (auto* statusElement = _modsDocument->GetElementById("mods-ini-status")) {
+            statusElement->SetInnerRML(EscapeRml(status));
+        }
+        if (auto* refresh = _modsDocument->GetElementById("mods-ini-refresh")) {
+            refresh->SetClass("disabled", scanning);
+        }
+        if (auto* searchText =
+                _modsDocument->GetElementById("mods-ini-search-text")) {
+            searchText->SetInnerRML(EscapeRml(
+                searchQuery.empty() ? std::string_view("SEARCH") : searchQuery));
+        }
+        if (auto* search = _modsDocument->GetElementById("mods-ini-search")) {
+            search->SetClass("active", !searchQuery.empty());
+        }
+        if (auto* clear = _modsDocument->GetElementById("mods-ini-search-clear")) {
+            clear->SetProperty("display", searchQuery.empty() ? "none" : "flex");
+        }
+        if (auto* hidden = _modsDocument->GetElementById("mods-ini-show-hidden")) {
+            hidden->SetClass("active", showHidden);
+            hidden->SetInnerRML(
+                "<span>" + std::string(showHidden ? "VISIBLE" : "HIDDEN (") +
+                (showHidden ? "" : std::to_string(hiddenCount) + ")") + "</span>");
+        }
+        auto* list = _modsDocument->GetElementById("mods-ini-list");
+        if (!list) return;
+        std::string markup;
+        if (mods.empty()) {
+            markup = showHidden ?
+                "<div class=\"mods-empty\">No hidden INI mods</div>" :
+                "<div class=\"mods-empty\">No matching editable INIs</div>";
+        } else {
+            for (std::size_t index = 0; index < mods.size(); ++index) {
+                const auto& mod = mods[index];
+                markup += "<div class=\"ini-mod-row\"><div id=\"ini-mod-" +
+                    std::to_string(index) +
+                    "\" class=\"ini-mod-card";
+                if (index == selectedIndex) markup += " active";
+                if (mod.conflictCount > 0) markup += " ini-conflict";
+                if (mod.hidden) markup += " hidden-entry";
+                markup += "\" tabindex=\"0\">"
+                    "<div class=\"sidebar-fade sidebar-fade-whisper\"></div>"
+                    "<div class=\"sidebar-fade sidebar-fade-soft\"></div>"
+                    "<div class=\"sidebar-fade sidebar-fade-mid\"></div>"
+                    "<div class=\"sidebar-fade sidebar-fade-strong\"></div>"
+                    "<div class=\"sidebar-fade sidebar-fade-solid\"></div>"
+                    "<span class=\"ini-mod-name\">" +
+                    EscapeRml(mod.name) + "</span></div>"
+                    "<button id=\"ini-visibility-" + std::to_string(index) +
+                    "\" class=\"ini-row-visibility" +
+                    std::string(mod.hidden ? " restore" : "") +
+                    "\"><span>" + (mod.hidden ? "+" : "X") +
+                    "</span></button></div>";
+            }
+        }
+        if (markup == _iniModsListMarkup) return;
+        list->SetInnerRML(markup);
+        _iniModsListMarkup = std::move(markup);
+        _hoveredElementId.clear();
+        for (std::size_t index = 0; index < mods.size(); ++index) {
+            BindClick(_modsDocument, ("ini-mod-" + std::to_string(index)).c_str());
+            BindClick(
+                _modsDocument,
+                ("ini-visibility-" + std::to_string(index)).c_str());
+        }
+    }
+
+    void DragonBoardRmlUi::SetIniEditor(const std::optional<IniEditorInfo>& info)
+    {
+        if (!_modsDocument) return;
+        auto* head = _modsDocument->GetElementById("mods-ini-editor-head");
+        auto* title = _modsDocument->GetElementById("mods-ini-mod-title");
+        auto* tabs = _modsDocument->GetElementById("mods-ini-file-tabs");
+        auto* detail = _modsDocument->GetElementById("mods-ini-detail");
+        if (!head || !title || !tabs || !detail) return;
+
+        std::string markup;
+        std::string tabsMarkup;
+        std::vector<bool> booleanTypes;
+        if (!info) {
+            head->SetProperty("display", "none");
+            title->SetInnerRML("");
+            if (!_iniFileTabsMarkup.empty()) {
+                tabs->SetInnerRML("");
+                _iniFileTabsMarkup.clear();
+            }
+            markup =
+                "<div class=\"ini-detail-empty\">Select a mod to view its settings</div>";
+        } else {
+            head->SetProperty("display", "flex");
+            title->SetInnerRML(EscapeRml(info->modName));
+            for (std::size_t fileIndex = 0; fileIndex < info->files.size(); ++fileIndex) {
+                const auto& file = info->files[fileIndex];
+                tabsMarkup += "<button id=\"ini-file-tab-" +
+                    std::to_string(fileIndex) + "\" class=\"ini-file-tab";
+                if (fileIndex == info->selectedFileIndex) tabsMarkup += " active";
+                if (file.hasConflict) tabsMarkup += " conflict";
+                tabsMarkup += "\"><span>" + EscapeRml(file.name) + "</span></button>";
+            }
+            if (tabsMarkup != _iniFileTabsMarkup) {
+                tabs->SetInnerRML(tabsMarkup);
+                _iniFileTabsMarkup = tabsMarkup;
+                for (std::size_t fileIndex = 0; fileIndex < info->files.size();
+                     ++fileIndex) {
+                    BindClick(
+                        _modsDocument,
+                        ("ini-file-tab-" + std::to_string(fileIndex)).c_str());
+                }
+            }
+
+            std::size_t settingIndex = 0;
+            if (info->selectedFileIndex < info->files.size()) {
+                const auto& file = info->files[info->selectedFileIndex];
+                markup += "<div class=\"ini-file";
+                if (file.hasConflict) markup += " conflict";
+                markup += "\">";
+                std::string currentSection;
+                bool sectionStarted = false;
+                for (const auto& setting : file.settings) {
+                    if (!sectionStarted || setting.section != currentSection) {
+                        currentSection = setting.section;
+                        sectionStarted = true;
+                        markup += "<div class=\"ini-section-name\">[" +
+                            EscapeRml(
+                                currentSection.empty() ? "General" : currentSection) +
+                            "]</div>";
+                    }
+                    markup += "<div class=\"ini-setting-row\"><span class=\"ini-setting-key\">" +
+                        EscapeRml(setting.key) +
+                        "</span><div class=\"ini-setting-value-column\">";
+                    if (!setting.description.empty()) {
+                        markup += "<div class=\"ini-setting-description\">" +
+                            EscapeRml(setting.description) + "</div>";
+                    }
+                    markup += "<button id=\"";
+                    if (setting.isBoolean) {
+                        markup += "ini-toggle-" + std::to_string(settingIndex) +
+                            "\" class=\"ini-setting-value boolean";
+                        if (setting.booleanValue) markup += " enabled";
+                    } else {
+                        markup += "ini-value-" + std::to_string(settingIndex) +
+                            "\" class=\"ini-setting-value";
+                    }
+                    if (setting.dirty) markup += " dirty";
+                    markup += "\"><span>";
+                    if (setting.sensitive) {
+                        markup += "********";
+                    } else if (setting.isBoolean) {
+                        markup += setting.booleanValue ? "true" : "false";
+                    } else {
+                        markup += EscapeRml(setting.value);
+                    }
+                    markup += "</span></button></div></div>";
+                    booleanTypes.push_back(setting.isBoolean);
+                    ++settingIndex;
+                }
+                markup += "</div>";
+            }
+        }
+
+        if (markup != _iniEditorMarkup) {
+            detail->SetInnerRML(markup);
+            _iniEditorMarkup = std::move(markup);
+            for (std::size_t index = 0; index < booleanTypes.size(); ++index) {
+                const auto prefix = booleanTypes[index] ? "ini-toggle-" : "ini-value-";
+                BindClick(_modsDocument, (prefix + std::to_string(index)).c_str());
+            }
+        }
+
+        const auto dirtyCount = info ? info->dirtyCount : 0;
+        if (auto* dirty = _modsDocument->GetElementById("mods-ini-dirty-status")) {
+            dirty->SetInnerRML(
+                dirtyCount == 0 ?
+                    "NO UNSAVED CHANGES" :
+                    std::to_string(dirtyCount) + " UNSAVED CHANGE" +
+                        (dirtyCount == 1 ? "" : "S"));
+        }
+        for (const auto* id : { "mods-ini-save", "mods-ini-discard" }) {
+            if (auto* button = _modsDocument->GetElementById(id)) {
+                button->SetClass("disabled", dirtyCount == 0);
+            }
+        }
+    }
+
     void DragonBoardRmlUi::ResetInventoryVirtualRows()
     {
         ResetInventoryMarquee();
@@ -1829,6 +2540,7 @@ namespace dragonboard::ui::rml
         _inventoryVirtualList.Reset();
         _inventoryVirtualSelectedIndex = static_cast<std::size_t>(-1);
         _inventoryVirtualInitialized = false;
+        _inventorySyncedScrollTop = 0.0f;
         if (_hoveredElementId.starts_with("inventory-item-")) {
             _hoveredElementId.clear();
         }
@@ -1853,6 +2565,11 @@ namespace dragonboard::ui::rml
                 markup +=
                     "<button id=\"inventory-virtual-row-slot-" + suffix +
                     "\" class=\"inventory-list-item\" style=\"display: none;\">"
+                    "<span class=\"row-fade row-fade-solid\"></span>"
+                    "<span class=\"row-fade row-fade-strong\"></span>"
+                    "<span class=\"row-fade row-fade-mid\"></span>"
+                    "<span class=\"row-fade row-fade-soft\"></span>"
+                    "<span class=\"row-fade row-fade-whisper\"></span>"
                     "<span id=\"inventory-virtual-state-slot-" + suffix +
                     "\" class=\"item-state-mark\"></span>"
                     "<span id=\"inventory-virtual-name-slot-" + suffix +
@@ -1895,11 +2612,36 @@ namespace dragonboard::ui::rml
         }
         if (!content) return;
 
-        const bool windowChanged = _inventoryVirtualList.Update(list->GetScrollTop());
+        constexpr float kViewportHeight = 600.0f;
+        constexpr float kRowHeight = 120.0f;
+        const float totalHeight =
+            static_cast<float>(_inventoryVirtualItems.size()) * kRowHeight;
+        const float maximumScroll = std::max(0.0f, totalHeight - kViewportHeight);
+        const float scrollTop =
+            std::clamp(_inventorySyncedScrollTop, 0.0f, maximumScroll);
+        _inventorySyncedScrollTop = scrollTop;
+        list->SetScrollTop(0.0f);
+        const bool windowChanged =
+            _inventoryVirtualList.Update(scrollTop + kRowHeight * 0.5f);
         const auto& window = _inventoryVirtualList.GetWindow();
+        content->SetProperty("height", "600px");
+        content->RemoveProperty("top");
+        if (auto* thumb =
+                _inventoryDocument->GetElementById("inventory-scroll-thumb")) {
+            const float thumbHeight = totalHeight > 0.0f ?
+                std::clamp(
+                    kViewportHeight * kViewportHeight / totalHeight,
+                    104.0f,
+                    kViewportHeight) :
+                kViewportHeight;
+            const float thumbTravel = kViewportHeight - thumbHeight;
+            const float thumbTop = maximumScroll > 0.0f ?
+                thumbTravel * scrollTop / maximumScroll : 0.0f;
+            thumb->SetProperty(
+                "height", Rml::CreateString("%.0fpx", thumbHeight));
+            thumb->SetProperty("top", Rml::CreateString("%.0fpx", thumbTop));
+        }
         if (!windowChanged && !refreshVisibleRows) return;
-        content->SetProperty(
-            "height", Rml::CreateString("%.0fpx", window.totalHeight));
         if (windowChanged) {
             ResetInventoryMarquee();
             if (_hoveredElementId.starts_with("inventory-item-")) {
@@ -1946,11 +2688,13 @@ namespace dragonboard::ui::rml
                     row.nameTrack->SetId("inventory-item-name-track-" + indexText);
                 }
                 row.button->RemoveProperty("display");
-                row.button->SetProperty(
-                    "top",
-                    Rml::CreateString(
-                        "%.0fpx", _inventoryVirtualList.GetRowOffset(itemIndex)));
             }
+            row.button->SetProperty(
+                "top",
+                Rml::CreateString(
+                    "%.0fpx",
+                    static_cast<float>(itemIndex - window.firstIndex) *
+                        kRowHeight));
 
             std::string classes = "inventory-list-item";
             if (itemIndex == _inventoryVirtualSelectedIndex) classes += " active";
@@ -1997,6 +2741,37 @@ namespace dragonboard::ui::rml
         setText(
             "inventory-carry-weight",
             Rml::CreateString("%.1f / %.0f", info.currentWeight, info.carryWeight));
+        const auto setVital = [&](const char* textId,
+                                  const char* fillId,
+                                  float current,
+                                  float maximum) {
+            const float safeMaximum = std::max(0.0f, maximum);
+            const float safeCurrent = std::clamp(current, 0.0f, safeMaximum);
+            setText(
+                textId,
+                Rml::CreateString("%.0f / %.0f", safeCurrent, safeMaximum));
+            if (auto* fill = _inventoryDocument->GetElementById(fillId)) {
+                const float percent = safeMaximum > 0.0f ?
+                    safeCurrent * 100.0f / safeMaximum : 0.0f;
+                fill->SetProperty(
+                    "width", Rml::CreateString("%.0fpx", 528.0f * percent / 100.0f));
+            }
+        };
+        setVital(
+            "inventory-health-text",
+            "inventory-health-fill",
+            info.currentHealth,
+            info.maximumHealth);
+        setVital(
+            "inventory-stamina-text",
+            "inventory-stamina-fill",
+            info.currentStamina,
+            info.maximumStamina);
+        setVital(
+            "inventory-magicka-text",
+            "inventory-magicka-fill",
+            info.currentMagicka,
+            info.maximumMagicka);
         setText("inventory-item-count", std::to_string(info.items.size()));
         setText(
             "inventory-search-text",
@@ -2035,12 +2810,19 @@ namespace dragonboard::ui::rml
         if (auto* list = _inventoryDocument->GetElementById("inventory-item-list")) {
             if (_inventoryVirtualItems.empty()) {
                 ResetInventoryVirtualRows();
+                if (auto* thumb =
+                        _inventoryDocument->GetElementById("inventory-scroll-thumb")) {
+                    thumb->SetProperty("top", "0px");
+                    thumb->SetProperty("height", "600px");
+                }
                 list->SetInnerRML(info.searchQuery.empty() ?
                     "<div class=\"inventory-empty\">Inventory is empty</div>" :
                     "<div class=\"inventory-empty\">No matching items</div>");
             } else {
                 _inventoryVirtualList.SetItemCount(_inventoryVirtualItems.size());
-                if (resetScroll) list->SetScrollTop(0.0f);
+                if (resetScroll) {
+                    _inventorySyncedScrollTop = 0.0f;
+                }
                 UpdateInventoryVirtualRows(true);
             }
         }
@@ -2112,6 +2894,7 @@ namespace dragonboard::ui::rml
         ResetInventoryMarquee();
         _magicVirtualRows.clear();
         _magicVirtualList.Reset();
+        _magicSyncedScrollTop = 0.0f;
         _magicVirtualSelectedIndex = static_cast<std::size_t>(-1);
         _magicVirtualInitialized = false;
         if (_hoveredElementId.starts_with("magic-spell-")) {
@@ -2138,6 +2921,11 @@ namespace dragonboard::ui::rml
                 markup +=
                     "<button id=\"magic-virtual-row-slot-" + suffix +
                     "\" class=\"magic-list-item\" style=\"display: none;\">"
+                    "<span class=\"row-fade row-fade-solid\"></span>"
+                    "<span class=\"row-fade row-fade-strong\"></span>"
+                    "<span class=\"row-fade row-fade-mid\"></span>"
+                    "<span class=\"row-fade row-fade-soft\"></span>"
+                    "<span class=\"row-fade row-fade-whisper\"></span>"
                     "<span id=\"magic-virtual-state-slot-" + suffix +
                     "\" class=\"spell-state-mark\"></span>"
                     "<span id=\"magic-virtual-name-slot-" + suffix +
@@ -2176,11 +2964,37 @@ namespace dragonboard::ui::rml
         }
         if (!content) return;
 
-        const bool windowChanged = _magicVirtualList.Update(list->GetScrollTop());
+        constexpr float kViewportHeight = 600.0f;
+        constexpr float kRowHeight = 120.0f;
+        const float totalHeight =
+            static_cast<float>(_magicVirtualItems.size()) * kRowHeight;
+        const float maximumScroll =
+            std::max(0.0f, totalHeight - kViewportHeight);
+        const float scrollTop =
+            std::clamp(_magicSyncedScrollTop, 0.0f, maximumScroll);
+        _magicSyncedScrollTop = scrollTop;
+        list->SetScrollTop(0.0f);
+        const bool windowChanged =
+            _magicVirtualList.Update(scrollTop + kRowHeight * 0.5f);
         const auto& window = _magicVirtualList.GetWindow();
+        content->SetProperty("height", "600px");
+        if (auto* thumb = _magicDocument->GetElementById("magic-scroll-thumb")) {
+            const float thumbHeight = totalHeight > 0.0f ?
+                std::clamp(
+                    kViewportHeight * kViewportHeight / totalHeight,
+                    104.0f,
+                    kViewportHeight) :
+                kViewportHeight;
+            const float thumbTravel = kViewportHeight - thumbHeight;
+            const float thumbTop = maximumScroll > 0.0f ?
+                thumbTravel * scrollTop / maximumScroll :
+                0.0f;
+            thumb->SetProperty(
+                "height", Rml::CreateString("%.0fpx", thumbHeight));
+            thumb->SetProperty(
+                "top", Rml::CreateString("%.0fpx", thumbTop));
+        }
         if (!windowChanged && !refreshVisibleRows) return;
-        content->SetProperty(
-            "height", Rml::CreateString("%.0fpx", window.totalHeight));
         if (windowChanged) {
             ResetInventoryMarquee();
             if (_hoveredElementId.starts_with("magic-spell-")) {
@@ -2224,8 +3038,7 @@ namespace dragonboard::ui::rml
                 row.button->RemoveProperty("display");
                 row.button->SetProperty(
                     "top",
-                    Rml::CreateString(
-                        "%.0fpx", _magicVirtualList.GetRowOffset(itemIndex)));
+                    Rml::CreateString("%.0fpx", static_cast<float>(slot) * kRowHeight));
             }
 
             std::string classes = "magic-list-item";
@@ -2267,9 +3080,19 @@ namespace dragonboard::ui::rml
             "magic-player-name",
             info.playerName.empty() ? "Dragonborn" : info.playerName);
         setText("magic-player-level", std::to_string(info.playerLevel));
+        const float safeMaximumMagicka = std::max(0.0f, info.maximumMagicka);
+        const float safeCurrentMagicka =
+            std::clamp(info.currentMagicka, 0.0f, safeMaximumMagicka);
         setText(
             "magic-magicka",
-            Rml::CreateString("%.0f / %.0f", info.currentMagicka, info.maximumMagicka));
+            Rml::CreateString(
+                "%.0f / %.0f", safeCurrentMagicka, safeMaximumMagicka));
+        if (auto* fill = _magicDocument->GetElementById("magic-magicka-fill")) {
+            const float ratio = safeMaximumMagicka > 0.0f ?
+                safeCurrentMagicka / safeMaximumMagicka :
+                0.0f;
+            fill->SetProperty("width", Rml::CreateString("%.0fpx", 528.0f * ratio));
+        }
         setText("magic-spell-count", std::to_string(info.items.size()));
         setText(
             "magic-search-text",
@@ -2311,9 +3134,17 @@ namespace dragonboard::ui::rml
                 list->SetInnerRML(info.searchQuery.empty() ?
                     "<div class=\"magic-empty\">No spells available</div>" :
                     "<div class=\"magic-empty\">No matching spells</div>");
+                if (auto* thumb =
+                        _magicDocument->GetElementById("magic-scroll-thumb")) {
+                    thumb->SetProperty("top", "0px");
+                    thumb->SetProperty("height", "600px");
+                }
             } else {
                 _magicVirtualList.SetItemCount(_magicVirtualItems.size());
-                if (resetScroll) list->SetScrollTop(0.0f);
+                if (resetScroll) {
+                    _magicSyncedScrollTop = 0.0f;
+                    list->SetScrollTop(0.0f);
+                }
                 UpdateMagicVirtualRows(true);
             }
         }
@@ -2399,6 +3230,7 @@ namespace dragonboard::ui::rml
     void DragonBoardRmlUi::SetJournal(const JournalInfo& info)
     {
         if (!_journalDocument) return;
+        _journalInfo = info;
 
         const auto setText = [this](const char* id, const std::string& value) {
             if (auto* element = _journalDocument->GetElementById(id)) {
@@ -2420,6 +3252,34 @@ namespace dragonboard::ui::rml
 
         setText("journal-player-name", info.playerName.empty() ? "Dragonborn" : info.playerName);
         setText("journal-player-level", std::to_string(info.playerLevel));
+
+        const auto questMatchesFilter = [this](const JournalQuestInfo& quest) {
+            if (_journalQuestFilter == "all") return true;
+            if (_journalQuestFilter == "main") return quest.type == "MAIN QUEST";
+            if (_journalQuestFilter == "misc") return quest.type == "MISCELLANEOUS";
+            return quest.type != "MAIN QUEST" && quest.type != "MISCELLANEOUS";
+        };
+        for (const auto* filter : { "all", "main", "side", "misc" }) {
+            const std::string id = std::string("journal-filter-") + filter;
+            if (auto* button = _journalDocument->GetElementById(id)) {
+                button->SetClass("active", _journalQuestFilter == filter);
+            }
+        }
+        std::vector<std::size_t> visibleQuestIndices;
+        visibleQuestIndices.reserve(info.quests.size());
+        for (std::size_t index = 0; index < info.quests.size(); ++index) {
+            if (questMatchesFilter(info.quests[index])) {
+                visibleQuestIndices.push_back(index);
+            }
+        }
+        std::size_t selectedQuestIndex = static_cast<std::size_t>(-1);
+        if (!visibleQuestIndices.empty()) {
+            selectedQuestIndex =
+                std::ranges::find(visibleQuestIndices, info.selectedIndex) !=
+                        visibleQuestIndices.end() ?
+                    info.selectedIndex :
+                    visibleQuestIndices.front();
+        }
 
         const auto questKey = [](const JournalQuestInfo& quest) {
             return (static_cast<std::uint64_t>(quest.formID) << 32) |
@@ -2465,24 +3325,39 @@ namespace dragonboard::ui::rml
             std::string markup;
             const auto appendSection = [&](const char* title, bool active) {
                 bool headingAdded = false;
-                for (std::size_t index = 0; index < info.quests.size(); ++index) {
+                for (const auto index : visibleQuestIndices) {
                     const auto& quest = info.quests[index];
                     if (quest.active != active) continue;
                     if (!headingAdded) {
-                        markup += "<div class=\"journal-section-label\">" +
-                            std::string(title) + "</div>";
+                        markup += "<div class=\"journal-section-label " +
+                            std::string(active ? "active-section" : "inactive-section") +
+                            "\"><span>" +
+                            std::string(title) + "</span></div>";
                         headingAdded = true;
                     }
+                    const auto identity =
+                        std::to_string(quest.formID) + "-" +
+                        std::to_string(quest.instanceID);
                     std::string classes = "journal-quest-button";
-                    if (index == info.selectedIndex) classes += " active";
+                    if (quest.type == "MAIN QUEST") {
+                        classes += " quest-category-main";
+                    } else if (quest.type == "MISCELLANEOUS") {
+                        classes += " quest-category-misc";
+                    } else {
+                        classes += " quest-category-side";
+                    }
+                    if (index == selectedQuestIndex) classes += " active";
                     if (quest.completed) classes += " completed";
                     if (quest.failed) classes += " failed";
                     markup += "<button id=\"" + questButtonId(quest) +
-                        "\" class=\"" + classes + "\"><span class=\"journal-quest-marker\">" +
+                        "\" class=\"" + classes + "\"><i class=\"fade-layer fade-1\"></i>"
+                        "<i class=\"fade-layer fade-2\"></i><i class=\"fade-layer fade-3\"></i>"
+                        "<i class=\"fade-layer fade-4\"></i><i class=\"fade-layer fade-5\"></i>"
+                        "<span class=\"journal-quest-marker\">" +
                         (quest.active ? "&gt;" : "") +
-                        "</span><span id=\"journal-quest-name-" + std::to_string(index) +
+                        "</span><span id=\"journal-quest-name-" + identity +
                         "\" class=\"journal-quest-title\"><span id=\"journal-quest-name-track-" +
-                        std::to_string(index) + "\" class=\"journal-quest-title-track\">" +
+                        identity + "\" class=\"journal-quest-title-track\">" +
                         EscapeRml(quest.title) + "</span></span></button>";
                 }
             };
@@ -2495,18 +3370,22 @@ namespace dragonboard::ui::rml
                 ResetInventoryMarquee();
                 _journalQuestListMarkup = markup;
                 list->SetInnerRML(markup);
-                for (std::size_t index = 0; index < info.quests.size(); ++index) {
-                    BindClick(_journalDocument, questButtonId(info.quests[index]).c_str());
+                for (const auto index : visibleQuestIndices) {
+                    BindClick(
+                        _journalDocument,
+                        questButtonId(info.quests[index]).c_str());
                 }
             }
         }
 
-        if (info.quests.empty()) {
+        if (visibleQuestIndices.empty()) {
             _journalSelectedFormID = 0;
             _journalSelectedInstanceID = 0;
-            setText("journal-quest-type", "JOURNAL");
-            setText("journal-quest-title", "No quest selected");
-            setText("journal-quest-summary", "Quest information will appear here.");
+            setText("journal-quest-type", "QUEST FILTER");
+            setText("journal-quest-title", "No matching quests");
+            setText(
+                "journal-quest-summary",
+                "No quests are available in the selected category.");
             setText("journal-tracking-state", "NOT TRACKED");
             if (auto* objectives = _journalDocument->GetElementById("journal-objective-list")) {
                 objectives->SetInnerRML(
@@ -2517,8 +3396,7 @@ namespace dragonboard::ui::rml
                 tracking->SetInnerRML("<span>TRACK QUEST</span>");
             }
         } else {
-            const auto selectedIndex = std::min(info.selectedIndex, info.quests.size() - 1);
-            const auto& selected = info.quests[selectedIndex];
+            const auto& selected = info.quests[selectedQuestIndex];
             _journalSelectedFormID = selected.formID;
             _journalSelectedInstanceID = selected.instanceID;
             setText("journal-quest-type", selected.type.empty() ? "QUEST" : selected.type);
@@ -2668,21 +3546,38 @@ namespace dragonboard::ui::rml
         }
     }
 
-    void DragonBoardRmlUi::SetEditModeEnabled(bool enabled)
+    void DragonBoardRmlUi::SetPinsLocked(bool locked)
     {
-        if (_settingsDocument) {
-            if (auto* toggle = _settingsDocument->GetElementById("toggle-edit-mode")) {
-                toggle->SetClass("enabled", enabled);
-            }
-            if (auto* state = _settingsDocument->GetElementById("toggle-edit-state")) {
-                state->SetInnerRML(enabled ? "Enabled" : "Disabled");
-            }
+        if (!_settingsDocument) return;
+        if (auto* toggle = _settingsDocument->GetElementById("toggle-lock-pins")) {
+            toggle->SetClass("enabled", locked);
         }
-        if (_magicDocument) {
-            if (auto* edit = _magicDocument->GetElementById("magic-edit")) {
-                edit->SetClass("enabled", enabled);
-                edit->SetClass("disabled", !enabled);
-            }
+        if (auto* state = _settingsDocument->GetElementById("toggle-lock-pins-state")) {
+            state->SetInnerRML(locked ? "Locked" : "Unlocked");
+        }
+    }
+
+    void DragonBoardRmlUi::SetPositionAdjustmentActive(bool active)
+    {
+        if (!_settingsDocument) return;
+        if (auto* button =
+                _settingsDocument->GetElementById("position-adjustment")) {
+            button->SetClass("enabled", active);
+        }
+        if (auto* state =
+                _settingsDocument->GetElementById("position-adjustment-state")) {
+            state->SetInnerRML(active ? "Adjusting..." : "Start adjustment");
+        }
+        if (auto* help =
+                _settingsDocument->GetElementById("position-adjustment-help")) {
+            help->SetInnerRML(active ?
+                "Laser-hand grip moves the board; hold both grips and move the controllers apart or together to scale" :
+                "Grab with the laser hand; hold both grips and move the controllers apart or together to scale");
+        }
+        if (auto* status = _settingsDocument->QuerySelector(".save-status")) {
+            status->SetInnerRML(active ?
+                "Adjusting relative to menu hand - select Save changes when finished" :
+                "Ready to save");
         }
     }
 
@@ -2711,7 +3606,8 @@ namespace dragonboard::ui::rml
         std::string markup;
         for (std::size_t index = 0; index < _developerCommands.size(); ++index) {
             markup += "<button id=\"dev-command-" + std::to_string(index) +
-                "\" class=\"command-item\">" + EscapeRml(_developerCommands[index].label) + "</button><br />";
+                "\" class=\"command-item\"><span>" +
+                EscapeRml(_developerCommands[index].label) + "</span></button><br />";
         }
         if (markup.empty()) markup = "<div class=\"empty-state\">No commands configured.</div>";
         if (markup != _developerCommandListMarkup) {
@@ -2798,11 +3694,115 @@ namespace dragonboard::ui::rml
         }
     }
 
+    void DragonBoardRmlUi::UpdateKeyboardVisuals()
+    {
+        if (!_keyboardDocument) return;
+        if (auto* prompt = _keyboardDocument->GetElementById("keyboard-prompt")) {
+            prompt->SetInnerRML(EscapeRml(_keyboardPrompt));
+        }
+        if (auto* display = _keyboardDocument->GetElementById("keyboard-text")) {
+            display->SetClass("empty", _keyboardText.empty());
+            display->SetInnerRML(
+                EscapeRml(_keyboardText.empty() ? "Tap a key to begin" : _keyboardText));
+        }
+        if (auto* count = _keyboardDocument->GetElementById("keyboard-count")) {
+            count->SetInnerRML(
+                std::to_string(_keyboardText.size()) + " / " +
+                std::to_string(_keyboardMaximumLength));
+        }
+        if (auto* shift = _keyboardDocument->GetElementById("keyboard-shift")) {
+            shift->SetClass("active", _keyboardShift);
+        }
+        for (const auto& key : kKeyboardKeys) {
+            if (auto* element = _keyboardDocument->GetElementById(key.id)) {
+                const char character = _keyboardShift ? key.shifted : key.normal;
+                element->SetInnerRML(
+                    "<span>" + EscapeRml(std::string(1, character)) + "</span>");
+            }
+        }
+    }
+
+    void DragonBoardRmlUi::CloseKeyboard(bool accepted)
+    {
+        if (!IsKeyboardOpen()) return;
+        _keyboardResult = KeyboardResult{ accepted, accepted ? _keyboardText : std::string{} };
+        _keyboardDocument->Hide();
+        _activeDocument = nullptr;
+        if (_keyboardReturnDocument) {
+            _keyboardReturnDocument->Show();
+            _activeDocument = _keyboardReturnDocument;
+        }
+        _keyboardReturnDocument = nullptr;
+        _keyboardShift = false;
+        logger::info(
+            "DragonBoardVR: shared RmlUi keyboard {}.",
+            accepted ? "confirmed" : "cancelled");
+    }
+
     void DragonBoardRmlUi::HandleClick(const char* id)
     {
         if (!id) return;
         RequestHaptic(ResolveClickHaptic(id));
         logger::info("DragonBoardVR: RmlUi click on '{}'.", id);
+        const std::string_view value(id);
+        if (_activeDocument == _keyboardDocument) {
+            if (value == "keyboard-cancel") {
+                CloseKeyboard(false);
+                return;
+            }
+            if (value == "keyboard-confirm") {
+                CloseKeyboard(true);
+                return;
+            }
+            if (value == "keyboard-clear") {
+                _keyboardText.clear();
+                UpdateKeyboardVisuals();
+                return;
+            }
+            if (value == "keyboard-backspace") {
+                if (!_keyboardText.empty()) {
+                    auto offset = _keyboardText.size() - 1;
+                    while (offset > 0 &&
+                           (static_cast<unsigned char>(_keyboardText[offset]) & 0xC0) == 0x80) {
+                        --offset;
+                    }
+                    _keyboardText.erase(offset);
+                    UpdateKeyboardVisuals();
+                }
+                return;
+            }
+            if (value == "keyboard-shift") {
+                _keyboardShift = !_keyboardShift;
+                UpdateKeyboardVisuals();
+                return;
+            }
+            if (value == "keyboard-space") {
+                if (_keyboardText.size() < _keyboardMaximumLength) {
+                    _keyboardText.push_back(' ');
+                    UpdateKeyboardVisuals();
+                } else {
+                    RequestHaptic(HapticCue::kError);
+                }
+                return;
+            }
+            const auto key = std::find_if(
+                kKeyboardKeys.begin(),
+                kKeyboardKeys.end(),
+                [value](const KeyboardKeyDefinition& candidate) {
+                    return value == candidate.id;
+                });
+            if (key != kKeyboardKeys.end()) {
+                if (_keyboardText.size() < _keyboardMaximumLength) {
+                    _keyboardText.push_back(_keyboardShift ? key->shifted : key->normal);
+                    if (_keyboardShift) _keyboardShift = false;
+                    UpdateKeyboardVisuals();
+                } else {
+                    RequestHaptic(HapticCue::kError);
+                }
+                return;
+            }
+            return;
+        }
         if (const auto panel = FindPanelHandle(_activeDocument); panel != 0) {
             std::string value;
             if (const auto* element = _activeDocument->GetElementById(id)) {
@@ -2816,7 +3816,6 @@ namespace dragonboard::ui::rml
                 panel, PanelEventType::kClick, id, std::move(value), 0.0f });
             return;
         }
-        const std::string_view value(id);
         if (value == "close" || value == "dev-close") {
             _closeRequested = true;
         } else if (value == "edit-close" || value == "edit-back") {
@@ -2839,6 +3838,62 @@ namespace dragonboard::ui::rml
             _modsAction = ModsAction::kAdd;
         } else if (value == "mods-close") {
             _modsAction = ModsAction::kClose;
+        } else if (value == "mods-tab-actions") {
+            SelectModsPage(false);
+        } else if (value == "mods-tab-ini") {
+            SelectModsPage(true);
+        } else if (value == "mods-ini-refresh") {
+            _modsAction = ModsAction::kRefreshIni;
+        } else if (value == "mods-ini-save") {
+            _modsAction = ModsAction::kSaveIni;
+        } else if (value == "mods-ini-discard") {
+            _modsAction = ModsAction::kDiscardIni;
+        } else if (value == "mods-ini-search-clear") {
+            _modsAction = ModsAction::kClearIniSearch;
+        } else if (value == "mods-ini-search") {
+            _modsAction = ModsAction::kSearchIni;
+        } else if (value == "mods-ini-show-hidden") {
+            _modsAction = ModsAction::kToggleHiddenIniView;
+        } else if (value.starts_with("ini-visibility-")) {
+            try {
+                _modsActionIndex =
+                    static_cast<std::size_t>(std::stoul(std::string(value.substr(15))));
+                _modsAction = ModsAction::kToggleIniModVisibility;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid INI visibility id '{}'.", id);
+            }
+        } else if (value.starts_with("ini-toggle-")) {
+            try {
+                _modsActionIndex =
+                    static_cast<std::size_t>(std::stoul(std::string(value.substr(11))));
+                _modsAction = ModsAction::kToggleIniValue;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid INI toggle id '{}'.", id);
+            }
+        } else if (value.starts_with("ini-value-")) {
+            try {
+                _modsActionIndex =
+                    static_cast<std::size_t>(std::stoul(std::string(value.substr(10))));
+                _modsAction = ModsAction::kEditIniValue;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid INI value id '{}'.", id);
+            }
+        } else if (value.starts_with("ini-file-tab-")) {
+            try {
+                _modsActionIndex =
+                    static_cast<std::size_t>(std::stoul(std::string(value.substr(13))));
+                _modsAction = ModsAction::kSelectIniFile;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid INI file tab id '{}'.", id);
+            }
+        } else if (value.starts_with("ini-mod-")) {
+            try {
+                _modsActionIndex =
+                    static_cast<std::size_t>(std::stoul(std::string(value.substr(8))));
+                _modsAction = ModsAction::kSelectIniMod;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid INI mod id '{}'.", id);
+            }
         } else if (value.starts_with("mods-card-")) {
             try {
                 _modsActionIndex = static_cast<std::size_t>(std::stoul(std::string(value.substr(10))));
@@ -2941,6 +3996,14 @@ namespace dragonboard::ui::rml
             SelectJournalPage("quests");
         } else if (value == "journal-tab-stats") {
             SelectJournalPage("stats");
+        } else if (value == "journal-filter-all" ||
+                   value == "journal-filter-main" ||
+                   value == "journal-filter-side" ||
+                   value == "journal-filter-misc") {
+            _journalQuestFilter = std::string(value.substr(15));
+            _journalQuestListMarkup.clear();
+            const auto snapshot = _journalInfo;
+            SetJournal(snapshot);
         } else if (value.starts_with("journal-quest-")) {
             if (ParseJournalQuestIdentity(
                     value.substr(14),
@@ -2963,8 +4026,10 @@ namespace dragonboard::ui::rml
             }
         } else if (value == "save") {
             _saveRequested = true;
-        } else if (value == "toggle-edit-mode") {
-            _editModeToggleRequested = true;
+        } else if (value == "position-adjustment") {
+            _positionAdjustmentRequested = true;
+        } else if (value == "toggle-lock-pins") {
+            _lockPinsToggleRequested = true;
         } else if (value == "toggle-dev-panel") {
             _developerPanelToggleRequested = true;
         } else if (value == "toggle-world-pin") {
@@ -3126,6 +4191,50 @@ namespace dragonboard::ui::rml
             if (auto* content = _itemEditDocument->GetElementById(pageId)) {
                 content->SetProperty("display", active ? "block" : "none");
             }
+        }
+    }
+
+    void DragonBoardRmlUi::SelectModsPage(bool iniEditor)
+    {
+        if (!_modsDocument) return;
+        _modsIniEditorSelected = iniEditor;
+        if (auto* tab = _modsDocument->GetElementById("mods-tab-actions")) {
+            tab->SetClass("active", !iniEditor);
+        }
+        if (auto* tab = _modsDocument->GetElementById("mods-tab-ini")) {
+            tab->SetClass("active", iniEditor);
+        }
+        if (auto* view = _modsDocument->GetElementById("mods-actions-view")) {
+            view->SetProperty("display", iniEditor ? "none" : "block");
+        }
+        if (auto* view = _modsDocument->GetElementById("mods-ini-view")) {
+            view->SetProperty("display", iniEditor ? "block" : "none");
+        }
+        if (auto* list = _modsDocument->GetElementById("mods-ini-list")) {
+            list->SetProperty("display", iniEditor ? "block" : "none");
+        }
+        if (auto* tools =
+                _modsDocument->GetElementById("mods-ini-sidebar-tools")) {
+            tools->SetProperty("display", iniEditor ? "block" : "none");
+        }
+        if (auto* hidden =
+                _modsDocument->GetElementById("mods-ini-show-hidden")) {
+            hidden->SetProperty("display", iniEditor ? "flex" : "none");
+        }
+        if (auto* footer = _modsDocument->GetElementById("mods-actions-footer")) {
+            footer->SetProperty("display", iniEditor ? "none" : "flex");
+        }
+        if (auto* footer = _modsDocument->GetElementById("mods-ini-footer")) {
+            footer->SetProperty("display", iniEditor ? "block" : "none");
+        }
+        if (auto* record = _modsDocument->GetElementById("mods-add")) {
+            record->SetProperty("display", iniEditor ? "none" : "flex");
+        }
+        if (auto* save = _modsDocument->GetElementById("mods-ini-save")) {
+            save->SetProperty("display", iniEditor ? "flex" : "none");
+        }
+        if (auto* discard = _modsDocument->GetElementById("mods-ini-discard")) {
+            discard->SetProperty("display", iniEditor ? "flex" : "none");
         }
     }
 

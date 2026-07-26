@@ -84,6 +84,11 @@ namespace vrui
                             if (!dragonboard::ui::menu::IsCreated()) {
                                 dragonboard::ui::menu::Create();
                             }
+                            // kPostLoadGame can arrive before MenuInitializationController
+                            // loads DragonBoardVR.ini. Re-arm persisted quest markers only
+                            // after settings and the three marker widgets are ready.
+                            dragonboard::ui::rml::RmlPanelHost::GetSingleton()
+                                .RequestQuestMarkerRestore();
                             firstSafeFrameRan = true;
                         } else {
                             // Reset wait counter if we fall back into loading state

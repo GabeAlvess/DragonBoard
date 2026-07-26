@@ -11,6 +11,14 @@ namespace dragonboard::ui::input
     {
         auto& settings = vrui::VRUISettings::get();
 
+        if (manager.isPositionAdjustmentActive()) {
+            // Feed a released state so a partially accumulated activation hold
+            // cannot close the board while grip is reserved for adjustment.
+            manager._activationHoldTracker.Update(
+                settings.activationMode, {}, {}, deltaTime);
+            return;
+        }
+
         const ActivationInputs inputs{
             .grip = manager._inputButtons.Grip(),
             .trigger = manager._inputButtons.ActivationTrigger(),

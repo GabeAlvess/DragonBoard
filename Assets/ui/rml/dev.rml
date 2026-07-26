@@ -9,14 +9,13 @@
         <aside class="dev-sidebar">
             <div class="brand">
                 <div class="brand-copy">
-                    <div class="brand-name"><span>DragonBoard / Dev</span></div>
+                    <div class="brand-name"><span>Developer Mode</span></div>
                 </div>
             </div>
 
             <div class="dev-nav">
-                <button id="dev-tab-commands" class="nav-item"><span>Console commands</span></button>
-                <button id="dev-tab-info" class="nav-item"><span>Game information</span></button>
-                <button id="dev-tab-calibration" class="nav-item"><span>Map calibration</span></button>
+                <button id="dev-tab-commands" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>Console commands</span></button>
+                <button id="dev-tab-info" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>Game information</span></button>
             </div>
 
             <div class="sidebar-status developer-status">
@@ -25,10 +24,7 @@
         </aside>
 
         <div class="content-shell dev-shell">
-            <header class="dev-header">
-                <div class="breadcrumb"><span>Dev</span></div>
-                <button id="dev-close" class="close-button"><span>X</span></button>
-            </header>
+            <header class="dev-header"></header>
 
             <main id="page-scroll" class="dev-main">
                 <section id="dev-page-commands" class="page dev-page">

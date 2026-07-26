@@ -77,9 +77,9 @@ namespace vrui
             [&]() { return settings.menuScale; },
             [&](float val) { settings.menuScale = val; });
 
-        addToggleRow(pageGeneral, "Edit Mode", "bEditModeEnabled",
-            [&]() { return settings.editModeEnabled; },
-            [&](bool val) { settings.editModeEnabled = val; });
+        addToggleRow(pageGeneral, "Lock Pins", "bLockPins",
+            [&]() { return settings.lockPins; },
+            [&](bool val) { settings.lockPins = val; });
 
         {
             auto worldPinBtn = std::make_shared<VRUIButton>("Board World Pin", "DragonBoardVR/slot01.nif", "textures/test.dds", 4.0f, 0.8f);

@@ -7,31 +7,52 @@
 <body>
     <div id="app" class="mods-app">
         <aside class="mods-sidebar">
-            <div class="brand"><div class="brand-copy"><div class="brand-name"><span>DragonBoard / Mods</span></div></div></div>
-            <div class="mods-sidebar-copy">
-                <div class="mods-sidebar-line"><span>Save your actions to</span></div>
-                <div class="mods-sidebar-line"><span>execute them quickly.</span></div>
-                <div class="mods-sidebar-gap"></div>
-                <div class="mods-sidebar-line"><span>Click <strong>Record</strong> and perform the</span></div>
-                <div class="mods-sidebar-line"><span>desired action within 10 seconds.</span></div>
+            <div class="brand"></div>
+            <div id="mods-ini-sidebar-tools" class="ini-sidebar-tools">
+                <button id="mods-ini-search" class="ini-search">
+                    <span id="mods-ini-search-text">SEARCH</span>
+                </button>
+                <button id="mods-ini-search-clear" class="ini-search-clear"><span>X</span></button>
             </div>
+            <div id="mods-ini-list" class="ini-mod-list"><div class="mods-empty">No INI catalog loaded</div></div>
+            <button id="mods-ini-show-hidden" class="ini-hidden-button"><span>HIDDEN</span></button>
         </aside>
         <div class="content-shell mods-shell">
             <header class="mods-header">
-                <div class="breadcrumb">Mods</div>
-                <button id="mods-close" class="close-button"><span>X</span></button>
+                <div class="mods-tabs">
+                    <button id="mods-tab-actions" class="mods-tab active"><span>Actions</span></button>
+                    <button id="mods-tab-ini" class="mods-tab"><span>INI Editor</span></button>
+                </div>
             </header>
             <main class="mods-main">
-                <div id="mods-list" class="mods-grid"><div class="mods-empty">No mods added yet</div></div>
+                <div id="mods-actions-view">
+                    <div id="mods-list" class="mods-grid"><div class="mods-empty">No mods added yet</div></div>
+                </div>
+                <div id="mods-ini-view">
+                    <div class="ini-toolbar">
+                        <div id="mods-ini-status" class="ini-status">Select Refresh List to scan the active MO2 profile.</div>
+                        <button id="mods-ini-refresh" class="ini-refresh"><span>Refresh List</span></button>
+                    </div>
+                    <div id="mods-ini-editor-head" class="ini-editor-head">
+                        <div id="mods-ini-mod-title" class="ini-detail-title"></div>
+                        <div id="mods-ini-file-tabs" class="ini-file-tabs"></div>
+                    </div>
+                    <div id="mods-ini-detail" class="ini-detail"><div class="ini-detail-empty">Select a mod to view its settings</div></div>
+                </div>
             </main>
             <footer class="mods-footer">
-                <div class="mods-control-hints">
+                <div id="mods-actions-footer" class="mods-control-hints">
                     <span>HOLD Y/B TO REMOVE</span>
                     <span class="mods-hint-divider"></span>
                     <span>SHORT Y/B OPTIONS</span>
                 </div>
+                <div id="mods-ini-footer" class="ini-footer-copy">
+                    <span id="mods-ini-dirty-status">NO UNSAVED CHANGES</span>
+                </div>
                 <div class="footer-spacer"></div>
                 <div id="mods-add" class="mods-add-button" tabindex="0"><span class="mods-add-label">Record</span></div>
+                <button id="mods-ini-discard" class="mods-discard-button disabled"><span>Discard</span></button>
+                <button id="mods-ini-save" class="mods-save-button disabled"><span>Save Changes</span></button>
             </footer>
         </div>
         <div id="vr-cursor"></div>

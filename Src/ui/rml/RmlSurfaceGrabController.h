@@ -14,6 +14,11 @@ namespace dragonboard::ui::rml
             bool dominantGripDown = false;
             bool offHandGripDown = false;
             bool hovered = false;
+            float minimumScale = 0.05f;
+            float maximumScale = 20.0f;
+            bool requireHover = true;
+            float grabHoldSeconds = 1.0f;
+            bool updateSceneGraph = true;
         };
 
         struct UpdateResult

@@ -1,8 +1,8 @@
 * { box-sizing: border-box; }
 
 body {
-    width: 250px;
-    height: 32px;
+    width: 310px;
+    height: 85px;
     margin: 0;
     color: #e8e3d6;
     font-family: DragonBoard;

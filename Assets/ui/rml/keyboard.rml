@@ -1,0 +1,93 @@
+<rml>
+<head>
+    <title>DragonBoard Keyboard</title>
+    <link type="text/rcss" href="settings.rcss" />
+    <link type="text/rcss" href="keyboard.rcss" />
+</head>
+<body>
+    <div id="keyboard-app">
+        <div class="keyboard-frame">
+            <div class="keyboard-header">
+                <div class="keyboard-brand">DragonBoard / Keyboard</div>
+                <div id="keyboard-prompt" class="keyboard-prompt">Enter text</div>
+            </div>
+
+            <div class="keyboard-display-shell">
+                <div id="keyboard-text" class="keyboard-display">DragonBoard</div>
+                <div id="keyboard-count" class="keyboard-count">11 / 256</div>
+            </div>
+
+            <div class="keyboard-keys">
+                <div class="keyboard-row number-row">
+                    <button id="keyboard-key-grave" class="key"><span>`</span></button>
+                    <button id="keyboard-key-1" class="key"><span>1</span></button>
+                    <button id="keyboard-key-2" class="key"><span>2</span></button>
+                    <button id="keyboard-key-3" class="key"><span>3</span></button>
+                    <button id="keyboard-key-4" class="key"><span>4</span></button>
+                    <button id="keyboard-key-5" class="key"><span>5</span></button>
+                    <button id="keyboard-key-6" class="key"><span>6</span></button>
+                    <button id="keyboard-key-7" class="key"><span>7</span></button>
+                    <button id="keyboard-key-8" class="key"><span>8</span></button>
+                    <button id="keyboard-key-9" class="key"><span>9</span></button>
+                    <button id="keyboard-key-0" class="key"><span>0</span></button>
+                    <button id="keyboard-key-minus" class="key"><span>-</span></button>
+                    <button id="keyboard-key-equals" class="key"><span>=</span></button>
+                    <button id="keyboard-backspace" class="key key-wide key-action"><span>Backspace</span></button>
+                </div>
+
+                <div class="keyboard-row q-row">
+                    <button id="keyboard-key-q" class="key"><span>Q</span></button>
+                    <button id="keyboard-key-w" class="key"><span>W</span></button>
+                    <button id="keyboard-key-e" class="key"><span>E</span></button>
+                    <button id="keyboard-key-r" class="key"><span>R</span></button>
+                    <button id="keyboard-key-t" class="key"><span>T</span></button>
+                    <button id="keyboard-key-y" class="key"><span>Y</span></button>
+                    <button id="keyboard-key-u" class="key"><span>U</span></button>
+                    <button id="keyboard-key-i" class="key"><span>I</span></button>
+                    <button id="keyboard-key-o" class="key"><span>O</span></button>
+                    <button id="keyboard-key-p" class="key"><span>P</span></button>
+                    <button id="keyboard-key-left-bracket" class="key"><span>[</span></button>
+                    <button id="keyboard-key-right-bracket" class="key"><span>]</span></button>
+                    <button id="keyboard-key-backslash" class="key"><span>\</span></button>
+                </div>
+
+                <div class="keyboard-row a-row">
+                    <button id="keyboard-key-a" class="key"><span>A</span></button>
+                    <button id="keyboard-key-s" class="key"><span>S</span></button>
+                    <button id="keyboard-key-d" class="key"><span>D</span></button>
+                    <button id="keyboard-key-f" class="key"><span>F</span></button>
+                    <button id="keyboard-key-g" class="key"><span>G</span></button>
+                    <button id="keyboard-key-h" class="key"><span>H</span></button>
+                    <button id="keyboard-key-j" class="key"><span>J</span></button>
+                    <button id="keyboard-key-k" class="key"><span>K</span></button>
+                    <button id="keyboard-key-l" class="key"><span>L</span></button>
+                    <button id="keyboard-key-semicolon" class="key"><span>;</span></button>
+                    <button id="keyboard-key-apostrophe" class="key"><span>'</span></button>
+                </div>
+
+                <div class="keyboard-row z-row">
+                    <button id="keyboard-shift" class="key key-shift"><span>Shift</span></button>
+                    <button id="keyboard-key-z" class="key"><span>Z</span></button>
+                    <button id="keyboard-key-x" class="key"><span>X</span></button>
+                    <button id="keyboard-key-c" class="key"><span>C</span></button>
+                    <button id="keyboard-key-v" class="key"><span>V</span></button>
+                    <button id="keyboard-key-b" class="key"><span>B</span></button>
+                    <button id="keyboard-key-n" class="key"><span>N</span></button>
+                    <button id="keyboard-key-m" class="key"><span>M</span></button>
+                    <button id="keyboard-key-comma" class="key"><span>,</span></button>
+                    <button id="keyboard-key-period" class="key"><span>.</span></button>
+                    <button id="keyboard-key-slash" class="key"><span>/</span></button>
+                </div>
+
+                <div class="keyboard-row action-row">
+                    <button id="keyboard-clear" class="key key-command"><span>Clear</span></button>
+                    <button id="keyboard-space" class="key key-space"><span>Space</span></button>
+                    <button id="keyboard-cancel" class="key key-command"><span>Cancel</span></button>
+                    <button id="keyboard-confirm" class="key key-confirm"><span>Confirm</span></button>
+                </div>
+            </div>
+        </div>
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

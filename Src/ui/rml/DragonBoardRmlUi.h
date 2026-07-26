@@ -61,6 +61,12 @@ namespace dragonboard::ui::rml
             float value = 0.0f;
         };
 
+        struct KeyboardResult
+        {
+            bool accepted = false;
+            std::string text;
+        };
+
         struct DeveloperCommand
         {
             std::string label;
@@ -158,7 +164,60 @@ namespace dragonboard::ui::rml
             kToggleLabel
         };
 
-        enum class ModsAction : std::uint8_t { kNone, kAdd, kClose, kActivate };
+        struct IniModInfo
+        {
+            std::string name;
+            std::size_t fileCount = 0;
+            std::size_t conflictCount = 0;
+            bool hidden = false;
+        };
+
+        struct IniSettingInfo
+        {
+            std::string section;
+            std::string key;
+            std::string value;
+            std::string description;
+            bool booleanValue = false;
+            bool isBoolean = false;
+            bool sensitive = false;
+            bool dirty = false;
+        };
+
+        struct IniFileInfo
+        {
+            std::string name;
+            std::string relativePath;
+            bool hasConflict = false;
+            std::vector<IniSettingInfo> settings;
+        };
+
+        struct IniEditorInfo
+        {
+            std::string modName;
+            std::vector<IniFileInfo> files;
+            std::size_t selectedFileIndex = 0;
+            std::size_t dirtyCount = 0;
+        };
+
+        enum class ModsAction : std::uint8_t
+        {
+            kNone,
+            kAdd,
+            kClose,
+            kActivate,
+            kRefreshIni,
+            kSelectIniMod,
+            kSelectIniFile,
+            kToggleIniValue,
+            kEditIniValue,
+            kSaveIni,
+            kDiscardIni,
+            kSearchIni,
+            kClearIniSearch,
+            kToggleHiddenIniView,
+            kToggleIniModVisibility
+        };
         enum class InventoryAction : std::uint8_t
         {
             kNone,
@@ -249,6 +308,12 @@ namespace dragonboard::ui::rml
             std::int32_t gold = 0;
             float currentWeight = 0.0f;
             float carryWeight = 0.0f;
+            float currentHealth = 0.0f;
+            float maximumHealth = 0.0f;
+            float currentStamina = 0.0f;
+            float maximumStamina = 0.0f;
+            float currentMagicka = 0.0f;
+            float maximumMagicka = 0.0f;
             std::string activeFilter;
             std::string searchQuery;
         };
@@ -362,6 +427,8 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsInventoryReady() const;
         [[nodiscard]] bool IsMagicReady() const;
         [[nodiscard]] bool IsJournalReady() const;
+        [[nodiscard]] bool IsKeyboardReady() const;
+        [[nodiscard]] bool IsKeyboardOpen() const;
         bool ShowSettings();
         bool ShowDeveloper();
         bool ShowItemEdit();
@@ -369,6 +436,12 @@ namespace dragonboard::ui::rml
         bool ShowInventory();
         bool ShowMagic();
         bool ShowJournal();
+        bool OpenKeyboard(
+            std::string prompt,
+            std::string initialText,
+            std::size_t maximumLength);
+        void CancelKeyboard();
+        [[nodiscard]] std::optional<KeyboardResult> ConsumeKeyboardResult();
 
         // Generic document API. These methods are called only on the Present
         // thread; RmlPanelHost owns the cross-thread command queue.
@@ -413,7 +486,8 @@ namespace dragonboard::ui::rml
 
         [[nodiscard]] bool ConsumeCloseRequested();
         [[nodiscard]] bool ConsumeSaveRequested();
-        [[nodiscard]] bool ConsumeEditModeToggleRequested();
+        [[nodiscard]] bool ConsumePositionAdjustmentRequested();
+        [[nodiscard]] bool ConsumeLockPinsToggleRequested();
         [[nodiscard]] bool ConsumeDeveloperPanelToggleRequested();
         [[nodiscard]] bool ConsumeWorldPinToggleRequested();
         [[nodiscard]] bool ConsumeRestartRequested();
@@ -436,10 +510,20 @@ namespace dragonboard::ui::rml
         void SetSliderValue(const char* id, float value);
         void SetItemEditInfo(const ItemEditInfo& info);
         void SetMods(const std::vector<std::string>& labels);
+        void SetIniMods(
+            const std::vector<IniModInfo>& mods,
+            std::string_view status,
+            bool scanning,
+            std::size_t selectedIndex,
+            std::string_view searchQuery,
+            bool showHidden,
+            std::size_t hiddenCount);
+        void SetIniEditor(const std::optional<IniEditorInfo>& info);
         void SetInventory(InventoryInfo info);
         void SetMagic(MagicInfo info);
         void SetJournal(const JournalInfo& info);
-        void SetEditModeEnabled(bool enabled);
+        void SetPositionAdjustmentActive(bool active);
+        void SetPinsLocked(bool locked);
         void SetDeveloperButtonEnabled(bool enabled);
         void SetWorldPinned(bool pinned);
         void SetDeveloperCommands(
@@ -458,7 +542,8 @@ namespace dragonboard::ui::rml
         {
             kNone,
             kButton,
-            kSlider
+            kSlider,
+            kScrollbar
         };
 
         struct InteractiveBinding
@@ -490,6 +575,7 @@ namespace dragonboard::ui::rml
 
         void BindClick(Rml::ElementDocument* document, const char* id);
         void BindSlider(Rml::ElementDocument* document, const char* id);
+        void SelectModsPage(bool iniEditor);
         void HandleClick(const char* id);
         void HandleHover(const char* id);
         void HandleSliderChange(const char* id, float value);
@@ -502,6 +588,8 @@ namespace dragonboard::ui::rml
         void SelectJournalPage(const char* page);
         void SelectDeveloperCommand(std::size_t index);
         void UpdateDeveloperCommandDetails();
+        void UpdateKeyboardVisuals();
+        void CloseKeyboard(bool accepted);
         void UpdateCursor(bool visible, int x, int y);
         [[nodiscard]] Rml::Element* FindInteractiveAtPoint(
             int x, int y, TriggerCaptureMode& mode) const;
@@ -540,7 +628,9 @@ namespace dragonboard::ui::rml
         Rml::ElementDocument* _inventoryDocument = nullptr;
         Rml::ElementDocument* _magicDocument = nullptr;
         Rml::ElementDocument* _journalDocument = nullptr;
+        Rml::ElementDocument* _keyboardDocument = nullptr;
         Rml::ElementDocument* _activeDocument = nullptr;
+        Rml::ElementDocument* _keyboardReturnDocument = nullptr;
         std::unordered_map<std::uint32_t, RegisteredPanel> _registeredPanels;
         std::deque<PanelEvent> _panelEvents;
         std::optional<MapCalibrationRequest> _mapCalibrationRequest;
@@ -580,6 +670,8 @@ namespace dragonboard::ui::rml
         float _sliderSmoothedPointerX = 0.0f;
         std::string _triggerCapturedActionId;
         bool _triggerCaptureProgrammatic = false;
+        bool _inventoryScrollbarDragging = false;
+        bool _magicScrollbarDragging = false;
         std::vector<InteractiveBinding> _interactiveBindings;
         bool _gripScrollActive = false;
         enum class GripScrollHoverList : std::uint8_t
@@ -591,33 +683,50 @@ namespace dragonboard::ui::rml
         GripScrollHoverList _gripScrollHoverList = GripScrollHoverList::kNone;
         std::size_t _gripScrollHoverItemIndex = static_cast<std::size_t>(-1);
         Rml::Element* _gripScrollTarget = nullptr;
+        bool _gripScrollHorizontal = false;
+        int _gripScrollPointerX = 0;
         int _gripScrollPointerY = 0;
         float _gripScrollTargetTop = 0.0f;
         float _gripPointerScrollAccumulator = 0.0f;
+        bool _gripScrollMovedLogged = false;
         bool _closeRequested = false;
         bool _saveRequested = false;
-        bool _editModeToggleRequested = false;
+        bool _positionAdjustmentRequested = false;
+        bool _lockPinsToggleRequested = false;
         bool _developerPanelToggleRequested = false;
         bool _worldPinToggleRequested = false;
         bool _restartRequested = false;
+        bool _keyboardShift = false;
+        std::size_t _keyboardMaximumLength = 0;
+        std::string _keyboardText;
+        std::string _keyboardPrompt;
+        std::optional<KeyboardResult> _keyboardResult;
         HapticCue _pendingHapticCue = HapticCue::kNone;
         std::string _hoveredElementId;
         std::string _modsListMarkup;
+        std::string _iniModsListMarkup;
+        std::string _iniFileTabsMarkup;
+        std::string _iniEditorMarkup;
+        bool _modsIniEditorSelected = false;
         std::string _developerCommandListMarkup;
         std::string _inventoryMarqueeElementId;
-        RmlVirtualList _inventoryVirtualList{ 548.0f, 108.0f, 4 };
+        RmlVirtualList _inventoryVirtualList{ 600.0f, 120.0f, 0 };
         std::vector<InventoryItemInfo> _inventoryVirtualItems;
         std::vector<VirtualListRow> _inventoryVirtualRows;
         std::size_t _inventoryVirtualSelectedIndex = static_cast<std::size_t>(-1);
         std::string _inventoryVirtualContextKey;
         bool _inventoryVirtualInitialized = false;
-        RmlVirtualList _magicVirtualList{ 548.0f, 108.0f, 4 };
+        float _inventorySyncedScrollTop = 0.0f;
+        RmlVirtualList _magicVirtualList{ 600.0f, 120.0f, 0 };
         std::vector<MagicItemInfo> _magicVirtualItems;
         std::vector<VirtualListRow> _magicVirtualRows;
         std::size_t _magicVirtualSelectedIndex = static_cast<std::size_t>(-1);
         std::string _magicVirtualContextKey;
         bool _magicVirtualInitialized = false;
+        float _magicSyncedScrollTop = 0.0f;
         std::string _journalQuestListMarkup;
+        JournalInfo _journalInfo;
+        std::string _journalQuestFilter{ "all" };
         std::vector<std::uint64_t> _journalActiveQuestOrder;
         float _inventoryMarqueeOffset = 0.0f;
         float _inventoryMarqueePause = 0.0f;

@@ -1,0 +1,60 @@
+/* Large native RmlUi scrollbars sized for VR controller rays. */
+scrollbarvertical {
+    width: 30px;
+    background-color: rgba(26, 27, 27, 220);
+    border: 2px #555757;
+    border-radius: 5px;
+}
+
+scrollbarvertical sliderarrowdec,
+scrollbarvertical sliderarrowinc {
+    width: 0;
+    height: 0;
+}
+
+scrollbarvertical slidertrack {
+    width: 18px;
+    margin-left: 4px;
+    background-color: #303232;
+    border: 1px #555757;
+    border-radius: 5px;
+}
+
+scrollbarvertical sliderbar {
+    width: 18px;
+    min-height: 96px;
+    margin-left: 4px;
+    background-color: #b58a35;
+    border: 2px #e0ba5b;
+    border-radius: 5px;
+}
+
+scrollbarhorizontal {
+    height: 30px;
+    background-color: rgba(26, 27, 27, 220);
+    border: 2px #555757;
+    border-radius: 5px;
+}
+
+scrollbarhorizontal sliderarrowdec,
+scrollbarhorizontal sliderarrowinc {
+    width: 0;
+    height: 0;
+}
+
+scrollbarhorizontal slidertrack {
+    height: 18px;
+    margin-top: 4px;
+    background-color: #303232;
+    border: 1px #555757;
+    border-radius: 5px;
+}
+
+scrollbarhorizontal sliderbar {
+    min-width: 96px;
+    height: 18px;
+    margin-top: 4px;
+    background-color: #b58a35;
+    border: 2px #e0ba5b;
+    border-radius: 5px;
+}

@@ -53,6 +53,12 @@ namespace dragonboard::ui::rml
             std::int32_t gold = 0;
             float currentWeight = 0.0f;
             float carryWeight = 0.0f;
+            float currentHealth = 0.0f;
+            float maximumHealth = 0.0f;
+            float currentStamina = 0.0f;
+            float maximumStamina = 0.0f;
+            float currentMagicka = 0.0f;
+            float maximumMagicka = 0.0f;
         };
 
         struct Selection
@@ -77,6 +83,13 @@ namespace dragonboard::ui::rml
             PlayerInfo player,
             std::uint64_t stateSignature);
         void SetSearchQuery(std::string query);
+        bool UpdateVitals(
+            float currentHealth,
+            float maximumHealth,
+            float currentStamina,
+            float maximumStamina,
+            float currentMagicka,
+            float maximumMagicka);
         [[nodiscard]] bool TryMapVisibleIndex(
             std::size_t visibleIndex,
             std::size_t& inventoryIndex) const;

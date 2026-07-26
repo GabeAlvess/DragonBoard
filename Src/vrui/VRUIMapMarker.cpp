@@ -5,6 +5,9 @@
 #include <RE/P/PlayerCharacter.h>
 #include <RE/N/NiNode.h>
 #include <RE/N/NiAVObject.h>
+#include <RE/B/BSGeometry.h>
+#include <RE/B/BSEffectShaderProperty.h>
+#include <RE/B/BSVisit.h>
 #include "VRUIMapMarker.h"
 #include "VRUISettings.h"
 #include "MapCalibration.h"
@@ -32,7 +35,9 @@ namespace vrui
         };
 
         std::mutex g_questObjectivePositionMutex;
-        QuestObjectivePositionCache g_questObjectivePosition;
+        std::array<
+            QuestObjectivePositionCache,
+            VRUIMapMarker::kQuestMarkerSlotCount> g_questObjectivePositions{};
 
         constexpr float kAtlasSize = 4096.0f;
         constexpr float kRotatedMapSourceWidth = 1536.0f;
@@ -120,24 +125,32 @@ namespace vrui
 
     VRUIMapMarker::VRUIMapMarker(
         const std::string& nifPath,
-        MapMarkerSource source) :
+        MapMarkerSource source,
+        std::size_t questSlot,
+        std::string texturePath) :
         VRUIWidget(
-            source == MapMarkerSource::Player ? "MapMarker" : "QuestObjectiveMarker",
+            source == MapMarkerSource::Player ?
+                "MapMarker" :
+                "QuestObjectiveMarker" + std::to_string(questSlot + 1),
             0.5f,
             0.5f),
         _nifPath(nifPath),
-        _source(source)
+        _texturePath(std::move(texturePath)),
+        _source(source),
+        _questSlot(std::min(questSlot, kQuestMarkerSlotCount - 1))
     {
         initializeVisuals();
     }
 
     void VRUIMapMarker::SetQuestObjectivePosition(
+        std::size_t questSlot,
         RE::FormID questFormId,
         RE::FormID targetFormId,
         const RE::NiPoint3& worldPosition)
     {
+        if (questSlot >= kQuestMarkerSlotCount) return;
         std::scoped_lock lock(g_questObjectivePositionMutex);
-        g_questObjectivePosition = {
+        g_questObjectivePositions[questSlot] = {
             questFormId,
             targetFormId,
             worldPosition,
@@ -145,10 +158,17 @@ namespace vrui
         };
     }
 
-    void VRUIMapMarker::ClearQuestObjectivePosition()
+    void VRUIMapMarker::ClearQuestObjectivePosition(std::size_t questSlot)
+    {
+        if (questSlot >= kQuestMarkerSlotCount) return;
+        std::scoped_lock lock(g_questObjectivePositionMutex);
+        g_questObjectivePositions[questSlot] = {};
+    }
+
+    void VRUIMapMarker::ClearAllQuestObjectivePositions()
     {
         std::scoped_lock lock(g_questObjectivePositionMutex);
-        g_questObjectivePosition = {};
+        g_questObjectivePositions = {};
     }
 
     void VRUIMapMarker::initializeVisuals()
@@ -162,6 +182,24 @@ namespace vrui
 
         if (modelNode) {
             sanitizeModel(modelNode.get());
+            if (!_texturePath.empty()) {
+                RE::BSVisit::TraverseScenegraphGeometries(
+                    modelNode.get(),
+                    [&](RE::BSGeometry* geometry) {
+                        if (!geometry) {
+                            return RE::BSVisit::BSVisitControl::kContinue;
+                        }
+                        auto& runtimeData = geometry->GetGeometryRuntimeData();
+                        auto* effect = netimmerse_cast<RE::BSEffectShaderProperty*>(
+                            runtimeData
+                                .properties[RE::BSGeometry::States::kEffect]
+                                .get());
+                        if (effect && effect->GetMaterial()) {
+                            effect->GetMaterial()->sourceTexturePath = _texturePath;
+                        }
+                        return RE::BSVisit::BSVisitControl::kContinue;
+                    });
+            }
             _node->AttachChild(modelNode.get(), true);
         } else {
             // Fallback: create a small colored quad if NIF fails
@@ -188,11 +226,12 @@ namespace vrui
         RE::NiPoint3 worldPos{};
         if (questMarker) {
             std::scoped_lock lock(g_questObjectivePositionMutex);
-            if (!g_questObjectivePosition.valid) {
+            const auto& cached = g_questObjectivePositions[_questSlot];
+            if (!cached.valid) {
                 setVisible(false);
                 return;
             }
-            worldPos = g_questObjectivePosition.worldPosition;
+            worldPos = cached.worldPosition;
         } else {
             worldPos = player->GetPosition();
             RE::TESObjectCELL* currentCell = player->parentCell;

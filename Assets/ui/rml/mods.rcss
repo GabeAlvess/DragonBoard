@@ -1,31 +1,116 @@
-.mods-app { color: #d8d8d8; background-color: #0e0f0f; border-color: transparent; decorator: image("assets/mods_nordic_bg.png" fill); }
-.mods-sidebar { width: 468px; height: 1076px; padding: 0; background-color: rgba(11, 12, 12, 205); border-right-color: transparent; }
+#app.mods-app { color: #d8d8d8; background-color: #070808; border-color: transparent; decorator: image("assets/mods_nordic_bg.png" fill); }
+.mods-sidebar { width: 468px; height: 1076px; padding: 0; background-color: transparent; border-right-color: transparent; }
 .mods-sidebar .brand { width: 468px; height: 118px; display: flex; align-items: center; justify-content: center; margin-left: 0; padding: 0; }
 .mods-sidebar .brand-copy { width: 468px; margin-left: 0; }
 .mods-sidebar .brand-name { position: relative; top: 59px; width: 468px; display: flex; justify-content: center; color: #999b9b; font-size: 32px; letter-spacing: 1px; text-align: center; }
 .mods-sidebar .brand-name span { display: block; }
-.mods-sidebar-copy { position: relative; top: 32px; width: 468px; margin: 8px 0 0; color: #a7a9a9; font-size: 36px; line-height: 1.08; text-align: center; }
-.mods-sidebar-line { width: 468px; display: flex; justify-content: center; text-align: center; }
-.mods-sidebar-line span { display: block; }
-.mods-sidebar-gap { display: block; width: 468px; height: 24px; }
-.mods-sidebar-copy strong { color: #eeeeee; font-weight: bold; }
-.mods-shell { position: relative; width: 1448px; height: 1076px; background-color: rgba(12, 13, 13, 118); }
-.mods-header { width: 1448px; height: 145px; padding: 0 72px 0 96px; background-color: rgba(17, 18, 18, 105); border-bottom-color: transparent; }
-.mods-header .breadcrumb { position: relative; top: 28px; color: #eeeeee; font-size: 72px; line-height: 1.0; }
+.ini-sidebar-tools { position: absolute; left: 44px; top: 71px; width: 404px; height: 58px; display: none; }
+.ini-search { position: relative; width: 404px; height: 58px; display: flex; align-items: center; justify-content: center; padding: 0 50px 0 18px; overflow: hidden; color: #bfc1c1; font-size: 30px; text-align: center; background-color: rgba(0, 0, 0, 126); border: 1px #555858; border-radius: 4px; }
+.ini-search:hover, .ini-search.active { color: #ffffff; background-color: rgba(35, 35, 35, 168); border-color: #858888; }
+.ini-search span { display: block; pointer-events: none; }
+#mods-ini-search-text { width: 326px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; }
+.ini-search-clear { position: absolute; right: 0; top: 0; width: 48px; height: 58px; display: none; align-items: center; justify-content: center; padding: 0; color: #a8aaaa; font-size: 26px; text-align: center; background-color: transparent; border: 0px transparent; }
+.ini-search-clear:hover { color: #ffffff; background-color: rgba(75, 75, 75, 145); }
+.ini-search-clear span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.ini-hidden-button { position: absolute; left: 44px; bottom: 63px; width: 404px; height: 52px; display: none; align-items: center; justify-content: center; padding: 0; color: #bfc1c1; font-size: 28px; text-align: center; background-color: rgba(0, 0, 0, 112); border: 1px #454848; border-radius: 4px; }
+.ini-hidden-button span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.ini-hidden-button:hover { color: #ffffff; background-color: rgba(42, 42, 42, 162); border-color: #747777; }
+.ini-hidden-button.active { color: #e5dcde; background-color: rgba(34, 10, 14, 210); border-color: #452027; }
+.mods-shell { position: relative; width: 1448px; height: 1076px; background-color: transparent; }
+.mods-header { position: relative; width: 1448px; height: 145px; display: flex; align-items: center; padding: 0 69px; background-color: transparent; border-bottom-color: transparent; }
+.mods-header .breadcrumb { position: relative; top: 0; color: #eeeeee; font-size: 72px; line-height: 1.0; }
 .mods-header .breadcrumb-muted { color: #898b8b; }
 .mods-header .close-button { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; padding: 0; color: #dedede; font-size: 40px; line-height: 1.0; text-align: center; border-color: #565858; }
-.mods-main { width: 1448px; height: 781px; padding: 42px 42px 30px 96px; background-color: rgba(10, 11, 11, 96); }
+.mods-tabs { position: absolute; left: 741px; top: 36px; display: flex; }
+.mods-tab { width: 310px; height: 88px; display: flex; align-items: center; justify-content: center; margin-right: 18px; padding: 0; color: #bfc1c1; font-size: 42px; text-align: center; background-color: rgba(0, 0, 0, 108); border: 0px transparent; border-radius: 3px; }
+.mods-tab span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.mods-tab:hover { color: #ffffff; background-color: rgba(48, 48, 48, 158); border-color: transparent; }
+.mods-tab.active { color: #e5dcde; background-color: rgba(34, 10, 14, 226); border-color: transparent; }
+.mods-main { width: 1448px; height: 781px; overflow: hidden; padding: 42px 69px 30px; background-color: transparent; }
+#mods-actions-view { display: block; }
+#mods-ini-view { display: none; width: 1310px; height: 710px; }
 .mods-grid { position: relative; z-index: 2; width: 1310px; display: flex; flex-wrap: wrap; }
 .mod-card { position: relative; z-index: 3; width: 410px; height: 142px; display: flex; align-items: center; justify-content: center; margin: 0 20px 24px 0; padding: 22px 22px; color: #dddddd; font-size: 48px; line-height: 1.15; text-align: center; background-color: rgba(24, 25, 25, 225); border: 1px #606260; border-radius: 3px; tab-index: auto; }
 .mod-card:hover { color: #ffffff; background-color: rgba(43, 44, 44, 238); border-color: #969895; }
 .mod-card-mark { display: block; width: 42px; margin-right: 14px; color: #8b3131; font-size: 28px; text-align: center; pointer-events: none; }
 .mod-card-label { display: block; width: 304px; color: #eeeeee; font-size: 48px; line-height: 1.15; text-align: center; pointer-events: none; }
 .mods-empty { width: 1310px; padding: 90px 0; color: #929494; font-size: 44px; text-align: center; }
-.mods-footer { width: 1448px; height: 150px; display: flex; align-items: center; padding: 0 150px 0 96px; background-color: rgba(15, 16, 16, 105); border-top: 0px transparent; }
+.mods-footer { width: 1448px; height: 150px; display: flex; align-items: center; padding: 0 69px; background-color: transparent; border-top: 0px transparent; }
 .mods-control-hints { position: relative; top: -26px; display: flex; align-items: center; color: #d0d1d1; font-size: 40px; line-height: 1.1; }
 .mods-control-hints span { display: block; }
 .mods-hint-divider { width: 1px; height: 30px; margin: 0 28px; background-color: #656766; }
-.mods-add-button { position: relative; top: -26px; z-index: 3; width: 200px; height: 58px; display: flex; align-items: center; justify-content: center; color: #fff0f0; font-size: 32px; line-height: 1.1; text-align: center; background-color: #771e1e; border: 1px #a83d3d; border-radius: 5px; tab-index: auto; }
-.mods-add-button:hover { color: #ffffff; background-color: #902828; border-color: #c45555; }
+.mods-add-button { position: relative; top: -26px; z-index: 3; width: 200px; height: 58px; display: flex; align-items: center; justify-content: center; color: #e5dcde; font-size: 32px; line-height: 1.1; text-align: center; background-color: #2c0d12; border: 1px #452027; border-radius: 5px; tab-index: auto; }
+.mods-add-button:hover { color: #ffffff; background-color: #3b1218; border-color: #5d343c; }
 .mods-add-mark { display: block; width: 28px; color: #f2d7d7; font-size: 27px; text-align: center; pointer-events: none; }
 .mods-add-label { display: block; width: 170px; color: #fff0f0; font-size: 34px; line-height: 1.1; text-align: center; pointer-events: none; }
+.ini-toolbar { width: 1310px; height: 94px; display: flex; align-items: center; margin-bottom: 18px; padding: 0 22px; background-color: transparent; border: 1px #555757; border-radius: 4px; }
+.ini-status { width: 980px; color: #d5d6d6; font-size: 34px; line-height: 1.05; }
+.ini-refresh { width: 260px; height: 66px; display: flex; align-items: center; justify-content: center; padding: 0; color: #e5dcde; font-size: 36px; text-align: center; background-color: #2c0d12; border: 1px #452027; border-radius: 5px; }
+.ini-refresh span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.ini-refresh:hover { color: #ffffff; background-color: #3b1218; border-color: #5d343c; }
+.ini-refresh.disabled { color: #777979; background-color: #303232; border-color: #484a4a; }
+.ini-mod-list { position: relative; top: 22px; width: 468px; height: 754px; overflow-x: hidden; overflow-y: auto; display: none; margin-left: 0; padding: 0 2px 20px 44px; }
+.ini-mod-list scrollbarvertical { position: relative; left: -426px; width: 42px; background-color: transparent; border: 0px transparent; border-radius: 5px; }
+.ini-mod-list scrollbarvertical sliderarrowdec,
+.ini-mod-list scrollbarvertical sliderarrowinc { width: 0px; height: 0px; }
+.ini-mod-list scrollbarvertical slidertrack { width: 26px; margin-left: 8px; background-color: rgba(50, 54, 58, 82); border: 1px rgba(106, 112, 118, 72); border-radius: 5px; }
+.ini-mod-list scrollbarvertical sliderbar { width: 22px; min-height: 116px; margin-left: 10px; background-color: rgba(128, 142, 151, 138); border: 1px rgba(166, 178, 185, 118); border-radius: 5px; }
+.ini-mod-row { position: relative; width: 404px; height: auto; min-height: 82px; display: block; margin: 0 0 12px 0; }
+.ini-mod-card { position: relative; width: 404px; height: auto; min-height: 82px; overflow: hidden; display: block; margin: 0; padding: 18px 68px 18px 16px; color: #f0f0f0; background-color: transparent; border: 0px transparent; border-radius: 3px; tab-index: auto; }
+.sidebar-fade { position: absolute; top: 0; height: 400px; display: block; pointer-events: none; }
+.sidebar-fade-whisper { left: 85%; width: 15%; background-color: rgba(0, 0, 0, 16); }
+.sidebar-fade-soft { left: 70%; width: 15%; background-color: rgba(0, 0, 0, 34); }
+.sidebar-fade-mid { left: 54%; width: 16%; background-color: rgba(0, 0, 0, 56); }
+.sidebar-fade-strong { left: 36%; width: 18%; background-color: rgba(0, 0, 0, 82); }
+.sidebar-fade-solid { left: 0; width: 36%; background-color: rgba(0, 0, 0, 112); }
+.ini-mod-card:hover { background-color: rgba(39, 39, 39, 118); }
+.ini-mod-card.active { background-color: rgba(36, 13, 17, 200); }
+.ini-mod-card.hidden-entry { opacity: 0.68; }
+.ini-mod-name { position: relative; z-index: 2; display: block; width: 320px; min-height: 46px; font-size: 38px; line-height: 1.02; white-space: normal; pointer-events: none; }
+.ini-row-visibility { position: absolute; z-index: 5; right: 10px; top: 14px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; padding: 0; color: #9fa1a1; font-size: 28px; line-height: 1.0; text-align: center; background-color: rgba(0, 0, 0, 84); border: 1px #454747; border-radius: 4px; }
+.ini-row-visibility span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.ini-row-visibility:hover { color: #ffffff; background-color: rgba(47, 18, 22, 210); border-color: #684049; }
+.ini-row-visibility.restore { color: #a8b8aa; background-color: rgba(20, 45, 27, 150); border-color: #3d6545; }
+.mods-sidebar .mods-empty { width: 404px; padding: 120px 12px; color: #aeb0b0; font-size: 36px; line-height: 1.1; text-align: center; }
+.ini-editor-head { width: 1302px; height: 132px; display: none; align-items: flex-start; margin-left: 8px; padding: 18px 8px 8px 0; border-bottom: 1px #4e5050; }
+.ini-detail-title { width: 0; height: 0; display: none; overflow: hidden; }
+.ini-file-tabs { width: 1286px; height: 112px; display: flex; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding: 8px 0 0 0; }
+.ini-file-tabs scrollbarhorizontal { height: 38px; background-color: transparent; border: 0px transparent; border-radius: 5px; }
+.ini-file-tabs scrollbarhorizontal sliderarrowdec,
+.ini-file-tabs scrollbarhorizontal sliderarrowinc { width: 0px; height: 0px; }
+.ini-file-tabs scrollbarhorizontal slidertrack { height: 22px; margin-top: 8px; background-color: rgba(50, 54, 58, 82); border: 1px rgba(106, 112, 118, 72); border-radius: 5px; }
+.ini-file-tabs scrollbarhorizontal sliderbar { min-width: 128px; height: 18px; margin-top: 10px; background-color: rgba(128, 142, 151, 138); border: 1px rgba(166, 178, 185, 118); border-radius: 5px; }
+.ini-file-tab { min-width: 230px; height: 62px; display: flex; align-items: center; justify-content: center; margin-right: 12px; padding: 0 16px; overflow: hidden; color: #c7c9c9; font-size: 30px; line-height: 1.0; text-align: center; white-space: nowrap; text-overflow: ellipsis; background-color: #242626; border: 2px #606262; border-radius: 4px; }
+.ini-file-tab span { display: block; width: 100%; overflow: hidden; text-align: center; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
+.ini-file-tab:hover { color: #ffffff; background-color: #343636; border-color: #8e9090; }
+.ini-file-tab.active { color: #e5dcde; background-color: #281015; border-color: #4b2229; }
+.ini-file-tab.conflict { border-color: #a66c2c; }
+.ini-detail { width: 1310px; height: 462px; overflow-y: auto; display: block; padding: 14px 50px 30px 8px; }
+.ini-detail scrollbarvertical { position: relative; left: 8px; width: 42px; background-color: transparent; border: 0px transparent; border-radius: 5px; }
+.ini-detail scrollbarvertical sliderarrowdec,
+.ini-detail scrollbarvertical sliderarrowinc { width: 0px; height: 0px; }
+.ini-detail scrollbarvertical slidertrack { width: 26px; margin-left: 8px; background-color: rgba(50, 54, 58, 82); border: 1px rgba(106, 112, 118, 72); border-radius: 5px; }
+.ini-detail scrollbarvertical sliderbar { width: 22px; min-height: 116px; margin-left: 10px; background-color: rgba(128, 142, 151, 138); border: 1px rgba(166, 178, 185, 118); border-radius: 5px; }
+.ini-detail-empty { width: 1280px; padding-top: 180px; color: #aeb0b0; font-size: 48px; text-align: center; }
+.ini-file { width: 1270px; display: block; margin-bottom: 28px; padding: 24px; background-color: transparent; border: 2px #626464; border-radius: 5px; }
+.ini-file.conflict { border-color: #a66c2c; }
+.ini-file-name { display: none; }
+.ini-file-path { display: none; }
+.ini-section-name { width: 1218px; display: block; color: #a8757c; font-size: 38px; margin: 20px 0 10px; }
+.ini-setting-row { width: 1218px; min-height: 88px; display: flex; align-items: center; padding: 10px 0; border-bottom: 1px #454747; }
+.ini-setting-key { display: block; width: 470px; color: #f0f0f0; font-size: 38px; line-height: 1.0; pointer-events: none; }
+.ini-setting-value-column { width: 690px; display: block; }
+.ini-setting-description { width: 690px; display: block; margin: 0 0 8px 0; color: #e0a05b; font-size: 30px; line-height: 1.05; }
+.ini-setting-value { width: 690px; min-height: 66px; display: flex; align-items: center; justify-content: center; padding: 10px 16px; color: #ffffff; font-size: 38px; line-height: 1.0; text-align: center; background-color: #292b2b; border: 2px #6a6c6c; border-radius: 4px; }
+.ini-setting-value span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.ini-setting-value:hover { background-color: #3a3c3c; border-color: #929494; }
+.ini-setting-value.boolean { text-align: center; background-color: #211013; border-color: #44272f; }
+.ini-setting-value.boolean.enabled { background-color: #31543a; border-color: #5d9569; }
+.ini-setting-value.dirty { border-color: #c88a3d; }
+.ini-footer-copy { position: relative; top: -26px; display: none; color: #e0e1e1; font-size: 38px; }
+.mods-save-button { position: relative; top: -26px; display: none; width: 270px; height: 66px; align-items: center; justify-content: center; padding: 0; color: #e5dcde; font-size: 36px; text-align: center; background-color: #2c0d12; border: 1px #452027; border-radius: 5px; }
+.mods-save-button span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.mods-save-button.disabled { color: #777979; background-color: #303232; border-color: #484a4a; }
+.mods-discard-button { position: relative; top: -26px; display: none; width: 190px; height: 66px; align-items: center; justify-content: center; margin-right: 16px; padding: 0; color: #dddddd; font-size: 34px; text-align: center; background-color: #343636; border: 1px #626464; border-radius: 5px; }
+.mods-discard-button span { display: block; width: 100%; text-align: center; pointer-events: none; }
+.mods-discard-button.disabled { color: #777979; border-color: #484a4a; }

@@ -1,0 +1,189 @@
+body {
+    width: 1920px;
+    height: 1080px;
+    margin: 0;
+    overflow: hidden;
+}
+
+#keyboard-app {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    opacity: 0.80;
+    color: #f2f2f2;
+    background-color: #0b0c0c;
+    decorator: image("assets/keyboard.jpg" fill);
+}
+
+.keyboard-frame {
+    position: absolute;
+    left: 98px;
+    top: 58px;
+    width: 1724px;
+    height: 964px;
+    padding: 42px 62px 38px;
+    background-color: rgba(8, 9, 9, 154);
+    border: 2px #686a69;
+    border-radius: 7px;
+}
+
+.keyboard-header {
+    width: 1596px;
+    height: 94px;
+    display: flex;
+    align-items: center;
+}
+
+.keyboard-brand {
+    width: 540px;
+    color: #a9abaa;
+    font-size: 34px;
+    letter-spacing: 1px;
+}
+
+.keyboard-prompt {
+    width: 1056px;
+    color: #ffffff;
+    font-size: 52px;
+    line-height: 1.0;
+    text-align: right;
+}
+
+.keyboard-display-shell {
+    width: 1596px;
+    height: 116px;
+    display: flex;
+    align-items: center;
+    margin: 8px 0 34px;
+    padding: 0 26px;
+    background-color: rgba(16, 18, 18, 238);
+    border: 3px #a83d3d;
+    border-radius: 6px;
+}
+
+.keyboard-display {
+    width: 1390px;
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 52px;
+    line-height: 1.0;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.keyboard-display.empty {
+    color: #707272;
+}
+
+.keyboard-count {
+    width: 150px;
+    color: #c2c4c3;
+    font-size: 28px;
+    text-align: right;
+}
+
+.keyboard-keys {
+    width: 1596px;
+}
+
+.keyboard-row {
+    width: 1596px;
+    height: 126px;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+
+.key {
+    width: 100px;
+    height: 112px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 6px;
+    padding: 0;
+    color: #f4f4f4;
+    font-size: 43px;
+    line-height: 1.0;
+    text-align: center;
+    background-color: rgba(35, 37, 37, 242);
+    border: 2px #6c6e6d;
+    border-radius: 7px;
+}
+
+.key span {
+    display: block;
+    width: 100%;
+    text-align: center;
+    pointer-events: none;
+}
+
+.key:hover {
+    color: #ffffff;
+    background-color: #2c0d12;
+    border-color: #d05a5a;
+}
+
+.key-wide {
+    width: 190px;
+    font-size: 31px;
+}
+
+.key-shift {
+    width: 178px;
+    font-size: 34px;
+}
+
+.key-shift.active {
+    color: #ffffff;
+    background-color: #3b1218;
+    border-color: #dc6767;
+}
+
+.key-action {
+    color: #e5c4c4;
+    background-color: rgba(74, 32, 32, 242);
+}
+
+.a-row {
+    padding-left: 58px;
+    padding-right: 58px;
+}
+
+.z-row {
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+.action-row {
+    height: 116px;
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+.key-command {
+    width: 210px;
+    height: 104px;
+    color: #dddddd;
+    font-size: 34px;
+}
+
+.key-space {
+    width: 690px;
+    height: 104px;
+    font-size: 34px;
+}
+
+.key-confirm {
+    width: 260px;
+    height: 104px;
+    color: #ffffff;
+    font-size: 38px;
+    background-color: #2c0d12;
+    border-color: #b54a4a;
+}
+
+#vr-cursor {
+    position: absolute;
+    z-index: 100;
+}

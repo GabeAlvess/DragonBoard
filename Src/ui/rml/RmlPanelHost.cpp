@@ -3,6 +3,7 @@
 #include "ui/rml/DragonBoardRmlRenderer.h"
 #include "ui/rml/RmlPresentBridge.h"
 #include "ui/rml/StatusWidget.h"
+#include "ui/mods/IniFileWriter.h"
 
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUIPanel.h"
@@ -20,8 +21,10 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <chrono>
 #include <cmath>
+#include <fstream>
 #include <format>
 #include <Windows.h>
 
@@ -61,6 +64,45 @@ namespace dragonboard::ui::rml
         constexpr std::uint64_t kDeveloperKeyboardUserValue =
             0x4456425244455643ULL;
         constexpr std::size_t kDeveloperCommandMaximumLength = 256;
+        constexpr const char* kIniKeyboardOverlayKey =
+            "dragonboardvr.mods.ini.keyboard";
+        constexpr const char* kIniKeyboardOverlayName =
+            "DragonBoardVR INI Value";
+        constexpr std::uint64_t kIniKeyboardUserValue =
+            0x44564252494E4945ULL;
+        constexpr std::size_t kIniValueMaximumLength = 1024;
+        constexpr std::string_view kIniScannerDataPath =
+            "SKSE/Plugins/DragonBoardVR/tools/DragonBoardIniScanner.exe";
+        constexpr std::string_view kIniCatalogDataPath =
+            "SKSE/Plugins/DragonBoardVR/IniCatalog.json";
+        constexpr std::string_view kIniVisibilityDataPath =
+            "SKSE/Plugins/DragonBoardVR/IniHiddenMods.txt";
+        constexpr std::size_t kIniSearchMaximumLength = 96;
+        std::filesystem::path RuntimeDataPath(std::string_view relativePath)
+        {
+            std::array<wchar_t, 32768> executablePath{};
+            const DWORD length = GetModuleFileNameW(
+                nullptr,
+                executablePath.data(),
+                static_cast<DWORD>(executablePath.size()));
+            if (length > 0 && length < executablePath.size()) {
+                return std::filesystem::path(
+                           std::wstring(executablePath.data(), length))
+                           .parent_path() /
+                    "Data" / std::filesystem::path(relativePath);
+            }
+
+            std::error_code error;
+            const auto current = std::filesystem::current_path(error);
+            if (!error) {
+                if (current.filename() == "Data" || current.filename() == "data") {
+                    return current / std::filesystem::path(relativePath);
+                }
+                return current / "Data" / std::filesystem::path(relativePath);
+            }
+            return std::filesystem::path("Data") /
+                std::filesystem::path(relativePath);
+        }
 
         vr::IVROverlay* GetSteamVrOverlay()
         {
@@ -164,6 +206,14 @@ namespace dragonboard::ui::rml
             }
         }
 
+        constexpr std::size_t QuestMarkerSlotForType(RE::QUEST_DATA::Type type)
+        {
+            using Type = RE::QUEST_DATA::Type;
+            if (type == Type::kMainQuest) return 0;
+            if (type == Type::kMiscellaneous) return 2;
+            return 1;
+        }
+
         const char* ObjectiveStateLabel(RE::QUEST_OBJECTIVE_STATE state)
         {
             using State = RE::QUEST_OBJECTIVE_STATE;
@@ -191,6 +241,14 @@ namespace dragonboard::ui::rml
         {
             return state == RE::QUEST_OBJECTIVE_STATE::kFailed ||
                    state == RE::QUEST_OBJECTIVE_STATE::kFailedDisplayed;
+        }
+
+        bool ObjectivePublishedInJournal(RE::QUEST_OBJECTIVE_STATE state)
+        {
+            using State = RE::QUEST_OBJECTIVE_STATE;
+            return state == State::kDisplayed ||
+                   state == State::kCompletedDisplayed ||
+                   state == State::kFailedDisplayed;
         }
 
         std::string ResolveJournalText(RE::TESQuest* quest, std::uint32_t instanceID)
@@ -362,6 +420,21 @@ namespace dragonboard::ui::rml
             RE::NiPoint3 end{};
         };
         static_assert(sizeof(QuestTargetTeleportPathView) == 0x48);
+
+        RE::ObjectRefHandle& GetQuestTargetTrackingRef(
+            RE::TESQuestTarget* target,
+            RE::ObjectRefHandle& result,
+            const RE::TESQuest* quest)
+        {
+            using Function = RE::ObjectRefHandle& (*)(
+                RE::TESQuestTarget*,
+                RE::ObjectRefHandle&,
+                const RE::TESQuest*);
+            static REL::Relocation<Function> function{
+                RELOCATION_ID(24816, 25285)
+            };
+            return function(target, result, quest);
+        }
 #endif
 
         template <class QuestContainer>
@@ -407,6 +480,9 @@ namespace dragonboard::ui::rml
         _sceneSurfaces.emplace(
             kStatusSurfaceHandle,
             SurfaceState{ "DragonBoardVR.Status" });
+        _sceneSurfaces.emplace(
+            kKeyboardSurfaceHandle,
+            SurfaceState{ "DragonBoardVR.Keyboard" });
     }
 
     RmlPanelHost::SurfaceState& RmlPanelHost::MainSceneSurface()
@@ -422,6 +498,11 @@ namespace dragonboard::ui::rml
     RmlPanelHost::SurfaceState& RmlPanelHost::StatusSceneSurface()
     {
         return _sceneSurfaces.at(kStatusSurfaceHandle);
+    }
+
+    RmlPanelHost::SurfaceState& RmlPanelHost::KeyboardSceneSurface()
+    {
+        return _sceneSurfaces.at(kKeyboardSurfaceHandle);
     }
 
     bool RmlPanelHost::HasSurfaceFlag(
@@ -822,6 +903,10 @@ namespace dragonboard::ui::rml
             (_rendererReady.load() &&
              (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsModsReady())))) return false;
         const auto actions = vrui::ModActionManager::get().getActions();
+        if (!_iniVisibilityLoaded) LoadIniVisibility();
+        if (std::filesystem::is_regular_file(RuntimeDataPath(kIniCatalogDataPath))) {
+            LoadIniCatalogFromDisk();
+        }
         {
             std::scoped_lock lock(_modsMutex);
             _mods.clear();
@@ -1000,7 +1085,11 @@ namespace dragonboard::ui::rml
     void RmlPanelHost::RequestQuestMarkerRestore()
     {
         const auto& settings = vrui::VRUISettings::get();
-        if (settings.questMarkerLastFormID == 0) return;
+        if (std::ranges::none_of(
+                settings.questMarkerLastFormIDs,
+                [](const auto formID) { return formID != 0; })) {
+            return;
+        }
         _questMarkerRestoreDelay = 2.0f;
         _questMarkerRestoreAttempts = 8;
     }
@@ -1087,6 +1176,9 @@ namespace dragonboard::ui::rml
 
     void RmlPanelHost::Close()
     {
+        if (_positionAdjustmentActive.load(std::memory_order_acquire)) {
+            _positionAdjustmentCancelPending.store(true, std::memory_order_release);
+        }
         // Menu recreation destroys the native inventory/magic panels. Clear
         // their non-owning backends while holding the same locks used by the
         // per-frame preview lookup, so the pointer cannot outlive its panel.
@@ -1100,6 +1192,7 @@ namespace dragonboard::ui::rml
         ResetPanelInput();
         _inputBridge.SetPreviewInteractionZoneHovered(false);
         _developerKeyboardCloseRequested.store(true, std::memory_order_release);
+        _iniKeyboardCloseRequested.store(true, std::memory_order_release);
         _inventoryKeyboardCloseRequested.store(true, std::memory_order_release);
         _magicKeyboardCloseRequested.store(true, std::memory_order_release);
         _modsHoveredIndex.store(static_cast<std::size_t>(-1), std::memory_order_release);
@@ -1128,9 +1221,11 @@ namespace dragonboard::ui::rml
 
     bool RmlPanelHost::SampleFingerTouchSurface(
         const RE::NiPoint3& worldPoint,
+        const RE::NiPoint3& frontReferencePoint,
         float& pointerU,
         float& pointerV,
-        float& signedDistance) const
+        float& signedDistance,
+        float& frontSign) const
     {
         const auto& surface = MainSceneSurface();
         if (!_scenePanelVisible || !surface.node || surface.node->GetAppCulled()) {
@@ -1170,6 +1265,16 @@ namespace dragonboard::ui::rml
         pointerV = 0.5f - localY;
         signedDistance =
             delta.x * normal.x + delta.y * normal.y + delta.z * normal.z;
+        const RE::NiPoint3 frontDelta =
+            frontReferencePoint - transform.translate;
+        const float frontDistance =
+            frontDelta.x * normal.x +
+            frontDelta.y * normal.y +
+            frontDelta.z * normal.z;
+        // The usable RML touch face is opposite the HMD-side sign in the
+        // composed tablet transform. This matches the actual fingertip contact
+        // side in-game, independently of the source quad's winding.
+        frontSign = frontDistance < 0.0f ? 1.0f : -1.0f;
         return pointerU >= 0.0f && pointerU <= 1.0f &&
             pointerV >= 0.0f && pointerV <= 1.0f;
     }
@@ -1327,7 +1432,48 @@ namespace dragonboard::ui::rml
     {
         auto& manager = vrui::VRMenuManager::get();
 
+        if (_positionAdjustmentCancelPending.exchange(
+                false, std::memory_order_acq_rel)) {
+            CancelPositionAdjustmentGameThread();
+        }
+        if (_positionAdjustmentTogglePending.exchange(
+                false, std::memory_order_acq_rel)) {
+            if (_positionAdjustmentActive.load(std::memory_order_acquire)) {
+                CancelPositionAdjustmentGameThread();
+            } else {
+                BeginPositionAdjustmentGameThread();
+            }
+        }
+        PollIniScanGameThread();
+        if (_iniScanPending.exchange(false, std::memory_order_acq_rel)) {
+            StartIniScanGameThread();
+        }
+        if (_iniSavePending.exchange(false, std::memory_order_acq_rel)) {
+            dragonboard::ui::mods::IniCatalog catalog;
+            std::unordered_map<std::string, std::string> drafts;
+            {
+                std::scoped_lock lock(_iniCatalogMutex);
+                catalog = _iniCatalog;
+                drafts = _iniDraftValues;
+            }
+            const auto saveResult = dragonboard::ui::mods::SaveIniDrafts(
+                catalog,
+                drafts);
+            {
+                std::scoped_lock lock(_iniCatalogMutex);
+                _iniCatalogStatus = saveResult.message;
+                if (saveResult.success) _iniDraftValues.clear();
+            }
+            if (saveResult.success) {
+                logger::info("DragonBoardVR: {}", saveResult.message);
+                _iniScanPending.store(true, std::memory_order_release);
+            } else {
+                logger::error("DragonBoardVR: INI save failed: {}.", saveResult.message);
+            }
+            _rmlModsSyncPending.store(true, std::memory_order_release);
+        }
         UpdateSurfaceGameThread();
+        UpdatePositionAdjustmentGameThread(deltaTime);
         UpdateSurfaceGrabsGameThread(deltaTime);
         CaptureStatusSurfaceGameThread(deltaTime);
         DispatchExternalEventsGameThread();
@@ -1365,7 +1511,11 @@ namespace dragonboard::ui::rml
         }
         const auto hapticCue = static_cast<dragonboard::ui::rml::DragonBoardRmlUi::HapticCue>(
             _inputBridge.ConsumeHaptic());
-        if (hapticCue != dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kNone) {
+        const bool suppressFingerTouchHover =
+            _fingerTouchInputActive &&
+            hapticCue == dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kHover;
+        if (hapticCue != dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kNone &&
+            !suppressFingerTouchHover) {
             const auto& settings = vrui::VRUISettings::get();
             float intensity = settings.hapticIntensity;
             float duration = settings.hapticDuration;
@@ -1424,6 +1574,17 @@ namespace dragonboard::ui::rml
                     }
                     previousSignature = _inventoryPresenter.StateSignature();
                     if (backend) {
+                        const auto vitals = backend->buildRmlPlayerVitals();
+                        if (_inventoryPresenter.UpdateVitals(
+                                vitals.currentHealth,
+                                vitals.maximumHealth,
+                                vitals.currentStamina,
+                                vitals.maximumStamina,
+                                vitals.currentMagicka,
+                                vitals.maximumMagicka)) {
+                            _rmlInventorySyncPending.store(
+                                true, std::memory_order_release);
+                        }
                         const auto currentSignature =
                             backend->buildRmlInventorySignature();
                         if (currentSignature != previousSignature) {
@@ -1470,8 +1631,10 @@ namespace dragonboard::ui::rml
         }
 
         if (_savePending.exchange(false)) {
+            FinishPositionAdjustmentGameThread();
             ApplyDraftGameThread();
             vrui::VRMenuManager::get().saveSettingsNow();
+            vrui::VRMenuManager::get().refreshActivePanels();
         }
 
         if (_itemEditApplyPending.exchange(false)) {
@@ -1497,19 +1660,41 @@ namespace dragonboard::ui::rml
         if (_magicPreviewRefreshPending.exchange(false, std::memory_order_acq_rel)) {
             UpdateMagicPreviewGameThread();
         }
-        if (_questTargetResolveDelay >= 0.0f) {
-            _questTargetResolveDelay -= std::clamp(deltaTime, 0.0f, 0.5f);
-            if (_questTargetResolveDelay <= 0.0f) {
-                const bool resolved = CacheQuestObjectiveTargetGameThread(
-                    _questTargetResolveFormID,
-                    _questTargetResolveInstanceID,
-                    _questTargetResolveObjectiveID);
-                if (resolved || _questTargetResolveAttempts <= 1) {
-                    _questTargetResolveDelay = -1.0f;
-                    _questTargetResolveAttempts = 0;
-                } else {
-                    --_questTargetResolveAttempts;
-                    _questTargetResolveDelay = 0.75f;
+        for (std::size_t markerSlot = 0;
+             markerSlot < _questMarkerSlots.size();
+             ++markerSlot) {
+            auto& slot = _questMarkerSlots[markerSlot];
+            if (slot.targetResolveDelay >= 0.0f) {
+                slot.targetResolveDelay -= std::clamp(deltaTime, 0.0f, 0.5f);
+                if (slot.targetResolveDelay <= 0.0f) {
+                    const bool resolved = CacheQuestObjectiveTargetGameThread(
+                        markerSlot,
+                        slot.targetResolveFormID,
+                        slot.targetResolveInstanceID,
+                        slot.targetResolveObjectiveID);
+                    if (resolved) {
+                        slot.targetResolveDelay = -1.0f;
+                        slot.targetResolveAttempts = 0;
+                    } else if (slot.targetResolveAttempts <= 1) {
+                        // Compass/teleport-path data can become available well
+                        // after kPostLoadGame. Keep a low-frequency retry alive
+                        // while this exact objective remains selected instead of
+                        // requiring an untrack/track cycle from the player.
+                        if (slot.watchFormID == slot.targetResolveFormID &&
+                            slot.watchObjectiveInstanceID ==
+                                slot.targetResolveInstanceID &&
+                            slot.watchObjectiveID ==
+                                slot.targetResolveObjectiveID) {
+                            slot.targetResolveAttempts = 4;
+                            slot.targetResolveDelay = 2.0f;
+                        } else {
+                            slot.targetResolveDelay = -1.0f;
+                            slot.targetResolveAttempts = 0;
+                        }
+                    } else {
+                        --slot.targetResolveAttempts;
+                        slot.targetResolveDelay = 0.75f;
+                    }
                 }
             }
         }
@@ -1525,18 +1710,25 @@ namespace dragonboard::ui::rml
                 }
             }
         }
-        if (_questMarkerWatchFormID != 0) {
-            _questMarkerPollAccumulator += std::clamp(deltaTime, 0.0f, 0.5f);
-            if (_questMarkerPollAccumulator >= 0.5f) {
-                _questMarkerPollAccumulator = 0.0f;
-                RefreshTrackedQuestObjectiveGameThread();
+        RefreshQuestMarkersForPlayerCellGameThread();
+        for (std::size_t markerSlot = 0;
+             markerSlot < _questMarkerSlots.size();
+             ++markerSlot) {
+            auto& slot = _questMarkerSlots[markerSlot];
+            if (slot.watchFormID != 0) {
+                slot.pollAccumulator += std::clamp(deltaTime, 0.0f, 0.5f);
+                if (slot.pollAccumulator >= 0.5f) {
+                    slot.pollAccumulator = 0.0f;
+                    RefreshTrackedQuestObjectiveGameThread(markerSlot);
+                }
             }
-        }
-        if (_questMovingTargetHandle) {
-            _questMovingTargetPollAccumulator += std::clamp(deltaTime, 0.0f, 0.5f);
-            if (_questMovingTargetPollAccumulator >= 1.0f) {
-                _questMovingTargetPollAccumulator = 0.0f;
-                RefreshMovingQuestTargetGameThread();
+            if (slot.movingTargetHandle) {
+                slot.movingTargetPollAccumulator +=
+                    std::clamp(deltaTime, 0.0f, 0.5f);
+                if (slot.movingTargetPollAccumulator >= 1.0f) {
+                    slot.movingTargetPollAccumulator = 0.0f;
+                    RefreshMovingQuestTargetGameThread(markerSlot);
+                }
             }
         }
         if (const auto action = _itemEditActionPending.exchange(ItemEditAction::kNone);
@@ -1747,7 +1939,9 @@ namespace dragonboard::ui::rml
         auto& manager = vrui::VRMenuManager::get();
         auto& surface = MainSceneSurface();
         auto& statusSurface = StatusSceneSurface();
+        auto& keyboardSurface = KeyboardSceneSurface();
         SetSurfacePointer(statusSurface, 0.5f, 0.5f, false);
+        SetSurfacePointer(keyboardSurface, 0.5f, 0.5f, false);
         const bool menuActive = manager.isMenuOpen();
         const bool mainPanelActive = menuActive && _visible.load();
         const bool homeActive = menuActive && !_visible.load();
@@ -1757,7 +1951,9 @@ namespace dragonboard::ui::rml
                 surface.node->SetAppCulled(true);
             }
             if (statusSurface.node) statusSurface.node->SetAppCulled(true);
+            if (keyboardSurface.node) keyboardSurface.node->SetAppCulled(true);
             statusSurface.sceneVisible = false;
+            keyboardSurface.sceneVisible = false;
             _scenePanelVisible = false;
             _inputBridge.SetFingerTouchTrigger(_fingerTouchLeftHand, false);
             _inputBridge.SetFingerTouchScroll(false);
@@ -1791,6 +1987,8 @@ namespace dragonboard::ui::rml
         }
         if (!mainPanelActive) {
             if (surface.node) surface.node->SetAppCulled(true);
+            if (keyboardSurface.node) keyboardSurface.node->SetAppCulled(true);
+            keyboardSurface.sceneVisible = false;
             _scenePanelVisible = false;
             _inputBridge.SetFingerTouchTrigger(_fingerTouchLeftHand, false);
             _inputBridge.SetFingerTouchScroll(false);
@@ -1808,6 +2006,21 @@ namespace dragonboard::ui::rml
         if (!_scenePanelVisible || !surface.node) {
             _inputBridge.SetPointerOffPanel();
             return;
+        }
+
+        if (_keyboardSurfaceVisible.load(std::memory_order_acquire)) {
+            _inputBridge.SetFingerTouchTrigger(_fingerTouchLeftHand, false);
+            _inputBridge.SetFingerTouchScroll(false);
+            if (UpdateKeyboardSceneSurfaceGameThread(backgroundNode)) {
+                UpdateKeyboardSurfaceHoverGameThread();
+            } else {
+                _inputBridge.SetPointerOffPanel();
+            }
+            return;
+        }
+        if (keyboardSurface.node) {
+            keyboardSurface.node->SetAppCulled(true);
+            keyboardSurface.sceneVisible = false;
         }
 
         const auto& screenTransform = surface.node->world;
@@ -2345,6 +2558,230 @@ namespace dragonboard::ui::rml
         return true;
     }
 
+    bool RmlPanelHost::UpdateKeyboardSceneSurfaceGameThread(RE::NiNode* backgroundNode)
+    {
+        auto& surface = KeyboardSceneSurface();
+        if (!backgroundNode ||
+            !_keyboardSurfaceVisible.load(std::memory_order_acquire) ||
+            !surface.shaderResource) {
+            if (surface.node) surface.node->SetAppCulled(true);
+            surface.sceneVisible = false;
+            return false;
+        }
+
+        if (!surface.node) {
+            RE::BSGeometry* boardGeometry = nullptr;
+            RE::BSVisit::TraverseScenegraphGeometries(
+                backgroundNode,
+                [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                    if (geometry && geometry->name == "DragonBoard") {
+                        boardGeometry = geometry;
+                        return RE::BSVisit::BSVisitControl::kStop;
+                    }
+                    return RE::BSVisit::BSVisitControl::kContinue;
+                });
+
+            RE::NiTransform boardRelative{};
+            bool hasBoardRelativeTransform = false;
+            if (boardGeometry) {
+                boardRelative = boardGeometry->local;
+                auto* ancestor = boardGeometry->parent;
+                while (ancestor && ancestor != backgroundNode) {
+                    boardRelative.translate = ancestor->local.translate +
+                        (ancestor->local.rotate * boardRelative.translate) *
+                            ancestor->local.scale;
+                    boardRelative.rotate = ancestor->local.rotate * boardRelative.rotate;
+                    boardRelative.scale *= ancestor->local.scale;
+                    ancestor = ancestor->parent;
+                }
+                hasBoardRelativeTransform = ancestor == backgroundNode;
+            }
+
+            surface.node = RE::NiPointer<RE::NiNode>(RE::NiNode::Create(1));
+            surface.visualNode = vrui::VRUIWidget::loadModelFromNif(
+                "DragonBoardVR\\KeyboardScreen.nif", false);
+            if (!surface.node || !surface.visualNode) {
+                logger::error("DragonBoardVR: keyboard surface NIF could not be loaded.");
+                surface.node = nullptr;
+                surface.visualNode = nullptr;
+                return false;
+            }
+            surface.node->name = "DragonBoardVR_KeyboardSurfaceRoot";
+            surface.visualNode->name = "DragonBoardVR_KeyboardSurfaceVisual";
+
+            constexpr float width = 15.0f;
+            constexpr float height = width * 9.0f / 16.0f;
+            RE::NiMatrix3 fit{};
+            fit.entry[0][0] = width / kScenePlaneExtent;
+            fit.entry[1][1] = height / kScenePlaneExtent;
+            surface.visualNode->local.rotate = fit;
+            surface.visualNode->local.translate = {};
+            surface.visualNode->local.scale = 1.0f;
+
+            bool isolated = false;
+            RE::BSVisit::TraverseScenegraphGeometries(
+                surface.visualNode.get(),
+                [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                    if (geometry) {
+                        surface.geometryRendererData =
+                            geometry->GetGeometryRuntimeData().rendererData;
+                    }
+                    auto* property = geometry ? geometry->lightingShaderProp_cast() : nullptr;
+                    if (geometry && property) {
+                        surface.shaderProperty =
+                            RE::NiPointer<RE::BSLightingShaderProperty>(property);
+                    }
+                    auto* material = property ? static_cast<RE::BSLightingShaderMaterialBase*>(
+                        property->GetBaseMaterial()) : nullptr;
+                    if (!material || !material->diffuseTexture) {
+                        return RE::BSVisit::BSVisitControl::kContinue;
+                    }
+                    const auto& mainSurface = MainSceneSurface();
+                    const auto& statusSurface = StatusSceneSurface();
+                    if ((mainSurface.sourceTexture &&
+                         material->diffuseTexture == mainSurface.sourceTexture) ||
+                        (statusSurface.sourceTexture &&
+                         material->diffuseTexture == statusSurface.sourceTexture)) {
+                        logger::error(
+                            "DragonBoardVR: keyboard surface rejected a shared "
+                            "NiSourceTexture.");
+                        return RE::BSVisit::BSVisitControl::kStop;
+                    }
+                    surface.sourceTexture = material->diffuseTexture;
+                    surface.originalRendererTexture =
+                        surface.sourceTexture->rendererTexture;
+                    isolated = true;
+                    return RE::BSVisit::BSVisitControl::kStop;
+                });
+            if (!isolated || !surface.sourceTexture) {
+                logger::error(
+                    "DragonBoardVR: failed to isolate the keyboard surface material.");
+                surface.node = nullptr;
+                surface.visualNode = nullptr;
+                return false;
+            }
+
+            surface.textureBridge = std::make_unique<RE::BSGraphics::Texture>();
+            surface.textureBridge->texture = surface.renderTexture;
+            surface.textureBridge->unk08 = 0;
+            surface.textureBridge->resourceView = surface.shaderResource;
+            surface.sourceTexture->rendererTexture = surface.textureBridge.get();
+            if (surface.shaderProperty) {
+                surface.shaderProperty->InvalidateTextures(0);
+                surface.shaderProperty->DoClearRenderPasses();
+            }
+            surface.node->AttachChild(surface.visualNode.get());
+
+            const RE::NiPoint3 offset{ 0.0f, -12.0f, 1.2f };
+            if (hasBoardRelativeTransform) {
+                surface.node->local.translate = boardRelative.translate +
+                    (boardRelative.rotate * offset) * boardRelative.scale;
+                surface.node->local.rotate = boardRelative.rotate;
+                surface.node->local.scale = boardRelative.scale;
+            } else {
+                surface.node->local.translate = offset;
+                surface.node->local.rotate = RE::NiMatrix3{};
+                surface.node->local.scale = 1.0f;
+            }
+            RegisterAndApplySurfaceTransform(surface);
+            backgroundNode->AttachChild(surface.node.get());
+            logger::info(
+                "DragonBoardVR: independent keyboard surface attached.");
+        } else if (surface.node->parent != backgroundNode &&
+                   !surface.grabController.IsGrabbed()) {
+            if (surface.node->parent) surface.node->parent->DetachChild(surface.node.get());
+            backgroundNode->AttachChild(surface.node.get());
+        }
+
+        if (!surface.sceneVisible) {
+            if (surface.shaderProperty) {
+                surface.shaderProperty->InvalidateTextures(0);
+                surface.shaderProperty->DoClearRenderPasses();
+            }
+            surface.sceneVisible = true;
+        }
+        surface.node->SetAppCulled(false);
+        RE::NiUpdateData updateData;
+        surface.node->Update(updateData);
+        surface.node->UpdateWorldBound();
+        return true;
+    }
+
+    void RmlPanelHost::UpdateKeyboardSurfaceHoverGameThread()
+    {
+        auto& surface = KeyboardSceneSurface();
+        SetSurfacePointer(surface, 0.5f, 0.5f, false);
+        if (!HasSurfaceFlag(surface, DragonBoardVR_API::SurfaceFlags::Interactive) ||
+            !surface.visualNode || surface.visualNode->GetAppCulled()) {
+            _inputBridge.SetPointerOffPanel();
+            return;
+        }
+
+        const auto& transform = surface.visualNode->world;
+        RE::NiPoint3 right(
+            transform.rotate.entry[0][0],
+            transform.rotate.entry[1][0],
+            transform.rotate.entry[2][0]);
+        RE::NiPoint3 up(
+            transform.rotate.entry[0][1],
+            transform.rotate.entry[1][1],
+            transform.rotate.entry[2][1]);
+        const float rightLength = right.Length();
+        const float upLength = up.Length();
+        const float worldScale = std::abs(transform.scale);
+        if (rightLength <= 1.0e-5f || upLength <= 1.0e-5f ||
+            worldScale <= 1.0e-5f) {
+            _inputBridge.SetPointerOffPanel();
+            return;
+        }
+        right = right / rightLength;
+        up = up / upLength;
+        const RE::NiPoint3 normal(
+            right.y * up.z - right.z * up.y,
+            right.z * up.x - right.x * up.z,
+            right.x * up.y - right.y * up.x);
+
+        auto& manager = vrui::VRMenuManager::get();
+        const RE::NiPoint3 rayOrigin = manager.getLaserOrigin();
+        const RE::NiPoint3 rayDirection = manager.getLaserDirection();
+        const float denominator =
+            rayDirection.x * normal.x + rayDirection.y * normal.y +
+            rayDirection.z * normal.z;
+        if (std::abs(denominator) <= 1.0e-5f) {
+            _inputBridge.SetPointerOffPanel();
+            return;
+        }
+
+        const RE::NiPoint3 toSurface = transform.translate - rayOrigin;
+        const float distance =
+            (toSurface.x * normal.x + toSurface.y * normal.y +
+             toSurface.z * normal.z) /
+            denominator;
+        if (distance <= 0.0f || !std::isfinite(distance)) {
+            _inputBridge.SetPointerOffPanel();
+            return;
+        }
+        const RE::NiPoint3 hit =
+            rayOrigin + rayDirection * distance - transform.translate;
+        const float width = kScenePlaneExtent * rightLength * worldScale;
+        const float height = kScenePlaneExtent * upLength * worldScale;
+        const float localX =
+            (hit.x * right.x + hit.y * right.y + hit.z * right.z) / width;
+        const float localY =
+            (hit.x * up.x + hit.y * up.y + hit.z * up.z) / height;
+        const bool hovered =
+            std::abs(localX) <= 0.5f && std::abs(localY) <= 0.5f;
+        if (!hovered) {
+            _inputBridge.SetPointerOffPanel();
+            return;
+        }
+
+        const float u = localX + 0.5f;
+        const float v = 0.5f - localY;
+        SetSurfacePointer(surface, u, v, true);
+        _inputBridge.SetPointer(u, v, true);
+    }
+
     bool RmlPanelHost::EnsurePresentHookInstalled()
     {
         return RmlPresentBridge::Install([](float deltaTime) {
@@ -2354,9 +2791,7 @@ namespace dragonboard::ui::rml
 
     void RmlPanelHost::RenderPresentThread(float deltaTime)
     {
-        UpdateDeveloperCommandKeyboardPresentThread();
-        UpdateInventorySearchKeyboardPresentThread();
-        UpdateMagicSearchKeyboardPresentThread();
+        UpdateSharedKeyboardPresentThread();
         bool initializedThisFrame = false;
         if (_rmlWarmupRequested.exchange(false, std::memory_order_acq_rel) &&
             !_rendererReady.load(std::memory_order_acquire)) {
@@ -2399,6 +2834,7 @@ namespace dragonboard::ui::rml
                 _entranceAnimation.Start();
                 _entranceInputSuppressedPresentThread = _entranceAnimation.IsActive();
             } else {
+                if (_rmlUi) _rmlUi->CancelKeyboard();
                 _entranceAnimation.Stop();
                 _entranceInputSuppressedPresentThread = false;
             }
@@ -2459,6 +2895,48 @@ namespace dragonboard::ui::rml
             _statusWidget.reset();
             return false;
         }
+        return true;
+    }
+
+    bool RmlPanelHost::EnsureKeyboardRenderTargetPresentThread()
+    {
+        auto& surface = KeyboardSceneSurface();
+        if (surface.renderTexture && surface.renderTarget && surface.shaderResource) {
+            return true;
+        }
+        if (!_device || !_rmlUi || !_rmlUi->GetRenderer()) return false;
+
+        const std::uint32_t width = std::max<std::uint32_t>(_panelWidth, 1);
+        const std::uint32_t height = std::max<std::uint32_t>(_panelHeight, 1);
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = width;
+        desc.Height = height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        if (FAILED(_device->CreateTexture2D(&desc, nullptr, &surface.renderTexture)) ||
+            FAILED(_device->CreateRenderTargetView(
+                surface.renderTexture, nullptr, &surface.renderTarget)) ||
+            FAILED(_device->CreateShaderResourceView(
+                surface.renderTexture, nullptr, &surface.shaderResource))) {
+            if (surface.shaderResource) surface.shaderResource->Release();
+            if (surface.renderTarget) surface.renderTarget->Release();
+            if (surface.renderTexture) surface.renderTexture->Release();
+            surface.shaderResource = nullptr;
+            surface.renderTarget = nullptr;
+            surface.renderTexture = nullptr;
+            logger::error("DragonBoardVR: failed to create the keyboard render target.");
+            return false;
+        }
+        surface.textureWidth = width;
+        surface.textureHeight = height;
+        logger::info(
+            "DragonBoardVR: created independent keyboard render target {}x{}.",
+            width,
+            height);
         return true;
     }
 
@@ -2841,9 +3319,12 @@ namespace dragonboard::ui::rml
                 input.state.pointerU,
                 input.state.pointerV,
                 input.state.triggerDown && !_entranceInputSuppressedPresentThread,
-                input.state.gripDown && !_entranceInputSuppressedPresentThread,
-                input.state.stickX,
-                input.state.stickY,
+                input.state.gripDown && !_entranceInputSuppressedPresentThread &&
+                    !_positionAdjustmentActive.load(std::memory_order_acquire),
+                _positionAdjustmentActive.load(std::memory_order_acquire) ?
+                    0.0f : input.state.stickX,
+                _positionAdjustmentActive.load(std::memory_order_acquire) ?
+                    0.0f : input.state.stickY,
                 kPanelLogicalWidth,
                 kPanelLogicalHeight,
                 deltaTime);
@@ -2871,18 +3352,22 @@ namespace dragonboard::ui::rml
                 if (auto change = _rmlUi->ConsumeSliderChange()) {
                     ApplyRmlSliderChange(change->id, change->value);
                 }
-                if (_rmlUi->ConsumeEditModeToggleRequested()) {
-                    bool enabled = false;
+                if (_rmlUi->ConsumeLockPinsToggleRequested()) {
+                    bool locked = false;
                     {
                         std::scoped_lock lock(_draftMutex);
-                        _draft.editModeEnabled = !_draft.editModeEnabled;
-                        enabled = _draft.editModeEnabled;
+                        _draft.lockPins = !_draft.lockPins;
+                        locked = _draft.lockPins;
                     }
-                    _rmlUi->SetEditModeEnabled(enabled);
+                    _rmlUi->SetPinsLocked(locked);
                     _applyPending.store(true);
                     logger::info(
-                        "DragonBoardVR: item edit mode {} from RmlUi settings.",
-                        enabled ? "enabled" : "disabled");
+                        "DragonBoardVR: pinned item lock {} from RmlUi settings.",
+                        locked ? "enabled" : "disabled");
+                }
+                if (_rmlUi->ConsumePositionAdjustmentRequested()) {
+                    _positionAdjustmentTogglePending.store(
+                        true, std::memory_order_release);
                 }
                 if (_rmlUi->ConsumeDeveloperPanelToggleRequested()) {
                     bool enabled = false;
@@ -2895,7 +3380,15 @@ namespace dragonboard::ui::rml
                     _applyPending.store(true);
                 }
                 if (_rmlUi->ConsumeWorldPinToggleRequested()) {
-                    _worldPinTogglePending.store(true);
+                    if (_positionAdjustmentActive.load(std::memory_order_acquire)) {
+                        _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                            dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+                        logger::info(
+                            "DragonBoardVR: ignored world-pin toggle during "
+                            "hand-relative Position adjustment.");
+                    } else {
+                        _worldPinTogglePending.store(true);
+                    }
                 }
                 if (_rmlUi->ConsumeRestartRequested()) {
                     _restartPending.store(true, std::memory_order_release);
@@ -2921,7 +3414,7 @@ namespace dragonboard::ui::rml
                     _mapCalibrationResetPending.store(true, std::memory_order_release);
                 }
                 if (_rmlUi->ConsumeDeveloperAddCommandRequested()) {
-                    if (!BeginDeveloperCommandKeyboardPresentThread()) {
+                    if (!BeginSharedDeveloperKeyboardPresentThread()) {
                         _inputBridge.SetHaptic(static_cast<std::uint8_t>(
                             dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
                     }
@@ -2957,6 +3450,34 @@ namespace dragonboard::ui::rml
                 if (action == ModsAction::kAdd) _modsAddPending.store(true);
                 else if (action == ModsAction::kClose) _modsClosePending.store(true);
                 else if (action == ModsAction::kActivate) _modsActivatePending.store(index);
+                else if (action == ModsAction::kRefreshIni) _iniScanPending.store(true);
+                else if (action == ModsAction::kSelectIniMod) {
+                    SelectIniModPresentThread(index);
+                } else if (action == ModsAction::kSelectIniFile) {
+                    SelectIniFilePresentThread(index);
+                } else if (action == ModsAction::kToggleIniValue) {
+                    ToggleIniValuePresentThread(index);
+                } else if (action == ModsAction::kEditIniValue) {
+                    if (!BeginSharedIniKeyboardPresentThread(index)) {
+                        _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                            dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+                    }
+                } else if (action == ModsAction::kSearchIni) {
+                    if (!BeginSharedIniSearchKeyboardPresentThread()) {
+                        _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                            dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+                    }
+                } else if (action == ModsAction::kClearIniSearch) {
+                    ApplyIniSearchQueryPresentThread({});
+                } else if (action == ModsAction::kToggleHiddenIniView) {
+                    ToggleIniHiddenViewPresentThread();
+                } else if (action == ModsAction::kToggleIniModVisibility) {
+                    ToggleIniModVisibilityPresentThread(index);
+                } else if (action == ModsAction::kDiscardIni) {
+                    DiscardIniChangesPresentThread();
+                } else if (action == ModsAction::kSaveIni) {
+                    _iniSavePending.store(true, std::memory_order_release);
+                }
             } else if (inventoryRmlActive) {
                 const auto [action, index] = _rmlUi->ConsumeInventoryAction();
                 using RmlInventoryAction =
@@ -2992,7 +3513,7 @@ namespace dragonboard::ui::rml
                     _inventoryActionPending.store(InventoryAction::kClose);
                     break;
                 case RmlInventoryAction::kSearch:
-                    if (!BeginInventorySearchKeyboardPresentThread()) {
+                    if (!BeginSharedInventoryKeyboardPresentThread()) {
                         _inputBridge.SetHaptic(static_cast<std::uint8_t>(
                             dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
                     }
@@ -3065,7 +3586,7 @@ namespace dragonboard::ui::rml
                     _magicActionPending.store(MagicAction::kClose);
                     break;
                 case RmlMagicAction::kSearch:
-                    if (!BeginMagicSearchKeyboardPresentThread()) {
+                    if (!BeginSharedMagicKeyboardPresentThread()) {
                         _inputBridge.SetHaptic(static_cast<std::uint8_t>(
                             dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
                     }
@@ -3149,15 +3670,31 @@ namespace dragonboard::ui::rml
                 return;
             }
 
+            auto* renderTarget = _panelRenderTarget;
+            std::uint32_t renderWidth = _panelWidth;
+            std::uint32_t renderHeight = _panelHeight;
+            if (_rmlUi->IsKeyboardOpen()) {
+                if (!EnsureKeyboardRenderTargetPresentThread()) {
+                    logger::error(
+                        "DragonBoardVR: keyboard surface target is unavailable.");
+                    Close();
+                    return;
+                }
+                auto& keyboardSurface = KeyboardSceneSurface();
+                renderTarget = keyboardSurface.renderTarget;
+                renderWidth = keyboardSurface.textureWidth;
+                renderHeight = keyboardSurface.textureHeight;
+            }
+
             auto* renderer = _rmlUi->GetRenderer();
             renderer->SetEntranceEffect(
                 _entranceAnimation.GetProgress(),
                 _entranceAnimation.GetFeather(),
                 _entranceAnimation.GetStyle());
             const bool rendered = _rmlUi->Render(
-                _panelRenderTarget,
-                static_cast<int>(_panelWidth),
-                static_cast<int>(_panelHeight),
+                renderTarget,
+                static_cast<int>(renderWidth),
+                static_cast<int>(renderHeight),
                 kPanelLogicalWidth,
                 kPanelLogicalHeight);
             renderer->SetEntranceEffect(
@@ -3234,9 +3771,11 @@ namespace dragonboard::ui::rml
         _rmlUi->SetSliderValue("labelXOffset", _draft.labelXOffset);
         _rmlUi->SetSliderValue("labelYOffset", _draft.labelYOffset);
         _rmlUi->SetSliderValue("labelZOffset", _draft.labelZOffset);
-        _rmlUi->SetEditModeEnabled(_draft.editModeEnabled);
+        _rmlUi->SetPinsLocked(_draft.lockPins);
         _rmlUi->SetDeveloperButtonEnabled(_draft.showDevButton);
         _rmlUi->SetWorldPinned(_draft.worldPinned);
+        _rmlUi->SetPositionAdjustmentActive(
+            _positionAdjustmentActive.load(std::memory_order_acquire));
     }
 
     void RmlPanelHost::ApplyRmlSliderChange(std::string_view id, float value)
@@ -3417,6 +3956,490 @@ namespace dragonboard::ui::rml
             for (const auto& mod : _mods) labels.push_back(mod.label);
         }
         _rmlUi->SetMods(labels);
+
+        std::vector<dragonboard::ui::rml::DragonBoardRmlUi::IniModInfo> iniMods;
+        std::optional<dragonboard::ui::rml::DragonBoardRmlUi::IniEditorInfo> editorInfo;
+        std::string status;
+        auto selectedVisibleIndex = static_cast<std::size_t>(-1);
+        std::string searchQuery;
+        bool showHidden = false;
+        std::size_t hiddenCount = 0;
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniVisibleModIndices.clear();
+            _iniVisibleSettingRefs.clear();
+            const auto& catalogMods = _iniCatalog.Mods();
+            searchQuery = _iniSearchQuery;
+            showHidden = _iniShowHidden;
+            hiddenCount = 0;
+            _iniSelectedVisibleModIndex.reset();
+            std::string loweredQuery = searchQuery;
+            std::transform(
+                loweredQuery.begin(), loweredQuery.end(), loweredQuery.begin(),
+                [](unsigned char value) {
+                    return static_cast<char>(std::tolower(value));
+                });
+            iniMods.reserve(catalogMods.size());
+            for (std::size_t catalogIndex = 0; catalogIndex < catalogMods.size();
+                 ++catalogIndex) {
+                const auto& mod = catalogMods[catalogIndex];
+                if (mod.files.empty()) continue;
+                const auto persistenceId = mod.id.empty() ? mod.name : mod.id;
+                const bool hidden = _iniHiddenModIds.contains(persistenceId);
+                if (hidden) ++hiddenCount;
+                if (hidden != showHidden) continue;
+                if (!loweredQuery.empty()) {
+                    std::string searchable = mod.name;
+                    for (const auto& file : mod.files) {
+                        searchable += '\n';
+                        searchable += file.name;
+                    }
+                    std::transform(
+                        searchable.begin(), searchable.end(), searchable.begin(),
+                        [](unsigned char value) {
+                            return static_cast<char>(std::tolower(value));
+                        });
+                    if (searchable.find(loweredQuery) == std::string::npos) {
+                        continue;
+                    }
+                }
+                _iniVisibleModIndices.push_back(catalogIndex);
+            }
+            std::stable_sort(
+                _iniVisibleModIndices.begin(),
+                _iniVisibleModIndices.end(),
+                [&](std::size_t left, std::size_t right) {
+                    std::string leftName = catalogMods[left].name;
+                    std::string rightName = catalogMods[right].name;
+                    std::transform(
+                        leftName.begin(), leftName.end(), leftName.begin(),
+                        [](unsigned char value) {
+                            return static_cast<char>(std::tolower(value));
+                        });
+                    std::transform(
+                        rightName.begin(), rightName.end(), rightName.begin(),
+                        [](unsigned char value) {
+                            return static_cast<char>(std::tolower(value));
+                        });
+                    return leftName < rightName;
+                });
+            for (const auto catalogIndex : _iniVisibleModIndices) {
+                const auto& mod = catalogMods[catalogIndex];
+                dragonboard::ui::rml::DragonBoardRmlUi::IniModInfo info;
+                info.name = mod.name;
+                info.fileCount = mod.files.size();
+                const auto persistenceId = mod.id.empty() ? mod.name : mod.id;
+                info.hidden = _iniHiddenModIds.contains(persistenceId);
+                for (const auto& file : mod.files) {
+                    if (file.hasConflict) ++info.conflictCount;
+                }
+                iniMods.push_back(std::move(info));
+            }
+            if (_iniSelectedCatalogModIndex &&
+                *_iniSelectedCatalogModIndex < catalogMods.size()) {
+                const auto selected = std::find(
+                    _iniVisibleModIndices.begin(),
+                    _iniVisibleModIndices.end(),
+                    *_iniSelectedCatalogModIndex);
+                if (selected != _iniVisibleModIndices.end()) {
+                    selectedVisibleIndex = static_cast<std::size_t>(
+                        std::distance(_iniVisibleModIndices.begin(), selected));
+                    _iniSelectedVisibleModIndex = selectedVisibleIndex;
+                    const auto& mod = catalogMods[*_iniSelectedCatalogModIndex];
+                    dragonboard::ui::rml::DragonBoardRmlUi::IniEditorInfo details;
+                    details.modName = mod.name;
+                    details.dirtyCount = _iniDraftValues.size();
+                    if (mod.files.empty()) {
+                        _iniSelectedFileIndex = 0;
+                    } else if (_iniSelectedFileIndex >= mod.files.size()) {
+                        _iniSelectedFileIndex = mod.files.size() - 1;
+                    }
+                    details.selectedFileIndex = _iniSelectedFileIndex;
+                    for (std::size_t fileIndex = 0; fileIndex < mod.files.size();
+                         ++fileIndex) {
+                        const auto& file = mod.files[fileIndex];
+                        dragonboard::ui::rml::DragonBoardRmlUi::IniFileInfo fileInfo;
+                        fileInfo.name = file.name;
+                        fileInfo.relativePath = file.relativePath;
+                        fileInfo.hasConflict = file.hasConflict;
+                        if (!file.effectiveProvider) {
+                            fileInfo.relativePath += " (overridden by " +
+                                file.effectiveProviderName + ")";
+                            details.files.push_back(std::move(fileInfo));
+                            continue;
+                        }
+                        if (fileIndex != _iniSelectedFileIndex) {
+                            details.files.push_back(std::move(fileInfo));
+                            continue;
+                        }
+                        for (std::size_t settingIndex = 0;
+                             settingIndex < file.settings.size();
+                             ++settingIndex) {
+                            const auto& setting = file.settings[settingIndex];
+                            const auto draftKey = std::format(
+                                "{}:{}:{}",
+                                *_iniSelectedCatalogModIndex,
+                                fileIndex,
+                                settingIndex);
+                            const auto draft = _iniDraftValues.find(draftKey);
+                            const auto& value = draft == _iniDraftValues.end() ?
+                                setting.value :
+                                draft->second;
+                            dragonboard::ui::rml::DragonBoardRmlUi::IniSettingInfo settingInfo;
+                            settingInfo.section = setting.section;
+                            settingInfo.key = setting.key;
+                            settingInfo.value = value;
+                            settingInfo.description = setting.description;
+                            settingInfo.isBoolean =
+                                !setting.sensitive &&
+                                setting.type == dragonboard::ui::mods::IniValueType::kBoolean;
+                            settingInfo.booleanValue =
+                                settingInfo.isBoolean && (value == "true" || value == "TRUE" ||
+                                    value == "True");
+                            settingInfo.sensitive = setting.sensitive;
+                            settingInfo.dirty = draft != _iniDraftValues.end();
+                            fileInfo.settings.push_back(std::move(settingInfo));
+                            _iniVisibleSettingRefs.push_back(IniSettingRef{
+                                *_iniSelectedCatalogModIndex,
+                                fileIndex,
+                                settingIndex,
+                                draftKey });
+                        }
+                        details.files.push_back(std::move(fileInfo));
+                    }
+                    editorInfo = std::move(details);
+                }
+            }
+            status = _iniCatalogStatus;
+        }
+        _rmlUi->SetIniMods(
+            iniMods,
+            status,
+            _iniScanner.GetState() ==
+                dragonboard::ui::mods::IniScannerProcess::State::kRunning,
+            selectedVisibleIndex,
+            searchQuery,
+            showHidden,
+            hiddenCount);
+        _rmlUi->SetIniEditor(editorInfo);
+    }
+
+    void RmlPanelHost::StartIniScanGameThread()
+    {
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            if (!_iniDraftValues.empty()) {
+                _iniCatalogStatus =
+                    "Save or discard the current changes before refreshing the catalog.";
+                _rmlModsSyncPending.store(true, std::memory_order_release);
+                return;
+            }
+        }
+        const auto scannerPath = RuntimeDataPath(kIniScannerDataPath);
+        const auto catalogPath = RuntimeDataPath(kIniCatalogDataPath);
+
+        std::string error;
+        if (!_iniScanner.Start(scannerPath, catalogPath, error)) {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniCatalogStatus = std::move(error);
+            _rmlModsSyncPending.store(true, std::memory_order_release);
+            logger::error("DragonBoardVR: {}.", _iniCatalogStatus);
+            return;
+        }
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniCatalogStatus = "Scanning the active MO2 profile...";
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+        logger::info(
+            "DragonBoardVR: started the MO2 INI scanner executable='{}' catalog='{}'.",
+            scannerPath.string(),
+            catalogPath.string());
+    }
+
+    void RmlPanelHost::PollIniScanGameThread()
+    {
+        auto completion = _iniScanner.ConsumeCompletion();
+        if (!completion) return;
+        if (completion->state ==
+            dragonboard::ui::mods::IniScannerProcess::State::kSucceeded) {
+            if (LoadIniCatalogFromDisk(completion->message)) {
+                logger::info("DragonBoardVR: {}.", completion->message);
+            }
+        } else {
+            {
+                std::scoped_lock lock(_iniCatalogMutex);
+                _iniCatalogStatus = completion->message.empty() ?
+                    "The INI scanner failed." :
+                    completion->message;
+            }
+            logger::error("DragonBoardVR: INI scanner failed: {}.", completion->message);
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+    }
+
+    bool RmlPanelHost::LoadIniCatalogFromDisk(std::string_view completionMessage)
+    {
+        dragonboard::ui::mods::IniCatalog loaded;
+        std::string error;
+        const auto catalogPath = RuntimeDataPath(kIniCatalogDataPath);
+        if (!loaded.Load(catalogPath, error)) {
+            const auto failureMessage = error;
+            {
+                std::scoped_lock lock(_iniCatalogMutex);
+                _iniCatalogStatus = failureMessage;
+            }
+            logger::error(
+                "DragonBoardVR: failed to load INI catalog from '{}': {}.",
+                catalogPath.string(),
+                failureMessage);
+            _rmlModsSyncPending.store(true, std::memory_order_release);
+            return false;
+        }
+
+        const auto profile = loaded.Profile();
+        const auto activeMods = loaded.ActiveModCount();
+        const auto iniFiles = loaded.IniFileCount();
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            std::string selectedModId;
+            std::string selectedFileId;
+            if (_iniSelectedCatalogModIndex &&
+                *_iniSelectedCatalogModIndex < _iniCatalog.Mods().size()) {
+                const auto& selectedMod =
+                    _iniCatalog.Mods()[*_iniSelectedCatalogModIndex];
+                selectedModId = selectedMod.id;
+                if (_iniSelectedFileIndex < selectedMod.files.size()) {
+                    selectedFileId = selectedMod.files[_iniSelectedFileIndex].id;
+                }
+            }
+            _iniCatalog = std::move(loaded);
+            _iniSelectedCatalogModIndex.reset();
+            _iniSelectedVisibleModIndex.reset();
+            _iniSelectedFileIndex = 0;
+            if (!selectedModId.empty()) {
+                const auto& mods = _iniCatalog.Mods();
+                const auto mod = std::find_if(
+                    mods.begin(), mods.end(), [&](const auto& candidate) {
+                        return candidate.id == selectedModId;
+                    });
+                if (mod != mods.end()) {
+                    _iniSelectedCatalogModIndex =
+                        static_cast<std::size_t>(std::distance(mods.begin(), mod));
+                    if (!selectedFileId.empty()) {
+                        const auto file = std::find_if(
+                            mod->files.begin(), mod->files.end(),
+                            [&](const auto& candidate) {
+                                return candidate.id == selectedFileId;
+                            });
+                        if (file != mod->files.end()) {
+                            _iniSelectedFileIndex = static_cast<std::size_t>(
+                                std::distance(mod->files.begin(), file));
+                        }
+                    }
+                }
+            }
+            _iniVisibleSettingRefs.clear();
+            _iniCatalogStatus = std::format(
+                "Profile: {} | Mods: {} | INIs: {}",
+                profile,
+                activeMods,
+                iniFiles);
+        }
+        logger::info(
+            "DragonBoardVR: loaded INI catalog from '{}'.",
+            catalogPath.string());
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+        return true;
+    }
+
+    void RmlPanelHost::LoadIniVisibility()
+    {
+        std::unordered_set<std::string> hidden;
+        const auto path = RuntimeDataPath(kIniVisibilityDataPath);
+        std::ifstream input(path, std::ios::binary);
+        std::string line;
+        while (std::getline(input, line)) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (!line.empty()) hidden.insert(std::move(line));
+        }
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniHiddenModIds = std::move(hidden);
+            _iniVisibilityLoaded = true;
+        }
+        logger::info(
+            "DragonBoardVR: loaded {} hidden INI mod entries from '{}'.",
+            _iniHiddenModIds.size(),
+            path.string());
+    }
+
+    bool RmlPanelHost::SaveIniVisibility()
+    {
+        std::vector<std::string> hidden;
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            hidden.assign(_iniHiddenModIds.begin(), _iniHiddenModIds.end());
+        }
+        std::ranges::sort(hidden);
+
+        const auto path = RuntimeDataPath(kIniVisibilityDataPath);
+        const auto temporary = path.wstring() + L".tmp";
+        std::error_code error;
+        std::filesystem::create_directories(path.parent_path(), error);
+        {
+            std::ofstream output(
+                std::filesystem::path(temporary),
+                std::ios::binary | std::ios::trunc);
+            if (!output) {
+                logger::error(
+                    "DragonBoardVR: could not write INI visibility file '{}'.",
+                    path.string());
+                return false;
+            }
+            for (const auto& id : hidden) output << id << '\n';
+            output.flush();
+            if (!output) return false;
+        }
+        if (!MoveFileExW(
+                temporary.c_str(),
+                path.c_str(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+            std::filesystem::remove(std::filesystem::path(temporary), error);
+            logger::error(
+                "DragonBoardVR: could not replace INI visibility file '{}'.",
+                path.string());
+            return false;
+        }
+        return true;
+    }
+
+    void RmlPanelHost::SelectIniModPresentThread(std::size_t visibleModIndex)
+    {
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            if (visibleModIndex >= _iniVisibleModIndices.size()) return;
+            _iniSelectedVisibleModIndex = visibleModIndex;
+            _iniSelectedCatalogModIndex = _iniVisibleModIndices[visibleModIndex];
+            _iniSelectedFileIndex = 0;
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::SelectIniFilePresentThread(std::size_t fileIndex)
+    {
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            if (!_iniSelectedCatalogModIndex ||
+                *_iniSelectedCatalogModIndex >= _iniCatalog.Mods().size()) {
+                return;
+            }
+            const auto& files =
+                _iniCatalog.Mods()[*_iniSelectedCatalogModIndex].files;
+            if (fileIndex >= files.size()) return;
+            _iniSelectedFileIndex = fileIndex;
+            _iniVisibleSettingRefs.clear();
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::ApplyIniSearchQueryPresentThread(std::string query)
+    {
+        const auto first = std::find_if_not(
+            query.begin(), query.end(),
+            [](unsigned char character) { return std::isspace(character) != 0; });
+        const auto last = std::find_if_not(
+            query.rbegin(), query.rend(),
+            [](unsigned char character) { return std::isspace(character) != 0; }).base();
+        query = first < last ? std::string(first, last) : std::string{};
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniSearchQuery = std::move(query);
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::ToggleIniHiddenViewPresentThread()
+    {
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniShowHidden = !_iniShowHidden;
+            _iniSelectedCatalogModIndex.reset();
+            _iniSelectedVisibleModIndex.reset();
+            _iniSelectedFileIndex = 0;
+            _iniVisibleSettingRefs.clear();
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::ToggleIniModVisibilityPresentThread(
+        std::size_t visibleModIndex)
+    {
+        bool changed = false;
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            if (visibleModIndex >= _iniVisibleModIndices.size()) {
+                return;
+            }
+            const auto catalogModIndex = _iniVisibleModIndices[visibleModIndex];
+            if (catalogModIndex >= _iniCatalog.Mods().size()) return;
+            const auto& mod = _iniCatalog.Mods()[catalogModIndex];
+            const auto id = mod.id.empty() ? mod.name : mod.id;
+            if (_iniHiddenModIds.contains(id)) {
+                _iniHiddenModIds.erase(id);
+            } else {
+                _iniHiddenModIds.insert(id);
+            }
+            _iniSelectedCatalogModIndex.reset();
+            _iniSelectedVisibleModIndex.reset();
+            _iniSelectedFileIndex = 0;
+            _iniVisibleSettingRefs.clear();
+            changed = true;
+        }
+        if (changed && !SaveIniVisibility()) {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniCatalogStatus = "Could not save the hidden INI list.";
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::ToggleIniValuePresentThread(std::size_t visibleSettingIndex)
+    {
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            if (visibleSettingIndex >= _iniVisibleSettingRefs.size()) return;
+            const auto& reference = _iniVisibleSettingRefs[visibleSettingIndex];
+            const auto& setting = _iniCatalog.Mods()[reference.modIndex]
+                                      .files[reference.fileIndex]
+                                      .settings[reference.settingIndex];
+            if (setting.type != dragonboard::ui::mods::IniValueType::kBoolean) return;
+            const auto draft = _iniDraftValues.find(reference.draftKey);
+            const auto& current =
+                draft == _iniDraftValues.end() ? setting.value : draft->second;
+            std::string lowered = current;
+            std::transform(
+                lowered.begin(), lowered.end(), lowered.begin(),
+                [](unsigned char character) {
+                    return static_cast<char>(std::tolower(character));
+                });
+            const std::string replacement = lowered == "true" ? "false" : "true";
+            if (replacement == setting.value) {
+                _iniDraftValues.erase(reference.draftKey);
+            } else {
+                _iniDraftValues[reference.draftKey] = replacement;
+            }
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::DiscardIniChangesPresentThread()
+    {
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            _iniDraftValues.clear();
+            _iniCatalogStatus = "Unsaved INI changes discarded.";
+        }
+        _rmlModsSyncPending.store(true, std::memory_order_release);
     }
 
     void RmlPanelHost::SyncRmlInventory()
@@ -3468,9 +4491,6 @@ namespace dragonboard::ui::rml
                 quest,
                 instanceID,
                 quest->GetName());
-            if (entry.title.empty()) {
-                entry.title = std::format("Quest {:08X}", entry.formID);
-            }
             entry.summary = ResolveQuestObjectiveText(
                 quest,
                 instanceID,
@@ -3500,7 +4520,8 @@ namespace dragonboard::ui::rml
         std::unordered_map<std::uint32_t, std::uint32_t> observedInstances;
         observedInstances.reserve(objectives.size());
         for (const auto& instanced : objectives) {
-            if (instanced.Objective && instanced.Objective->ownerQuest) {
+            if (instanced.Objective && instanced.Objective->ownerQuest &&
+                ObjectivePublishedInJournal(instanced.InstanceState)) {
                 observedInstances.insert_or_assign(
                     instanced.Objective->ownerQuest->GetFormID(),
                     instanced.instanceID);
@@ -3542,11 +4563,10 @@ namespace dragonboard::ui::rml
             auto* objective = instanced.Objective;
             if (!objective || !objective->ownerQuest ||
                 !isCurrentJournalQuest(objective->ownerQuest) ||
-                instanced.InstanceState == RE::QUEST_OBJECTIVE_STATE::kDormant) {
+                !ObjectivePublishedInJournal(instanced.InstanceState)) {
                 continue;
             }
 
-            auto& quest = ensureQuest(objective->ownerQuest, instanced.instanceID);
             JournalObjectiveEntry entry;
             entry.objectiveID = objective->index;
             entry.instanceID = instanced.instanceID;
@@ -3555,14 +4575,49 @@ namespace dragonboard::ui::rml
                 instanced.instanceID,
                 objective->displayText.c_str());
             if (entry.text.empty()) {
-                entry.text = std::format("Objective {}", objective->index);
+                continue;
             }
             entry.state = ObjectiveStateLabel(instanced.InstanceState);
             entry.completed = ObjectiveCompleted(instanced.InstanceState);
             entry.failed = ObjectiveFailed(instanced.InstanceState);
             entry.hasTargets = objective->numTargets > 0;
+            auto& quest = ensureQuest(objective->ownerQuest, instanced.instanceID);
             quest.objectives.push_back(std::move(entry));
         }
+
+        // Miscellaneous/radiant quests often intentionally have no quest name.
+        // The native Journal presents their published objective text instead of
+        // exposing an internal FormID. Use the current objective as the stable,
+        // player-facing title and discard records with no displayable text.
+        for (auto& quest : quests) {
+            if (!quest.title.empty()) continue;
+
+            const auto preferred = std::find_if(
+                quest.objectives.begin(),
+                quest.objectives.end(),
+                [](const JournalObjectiveEntry& objective) {
+                    return !objective.completed && !objective.failed &&
+                           !objective.text.empty();
+                });
+            const auto fallback = preferred != quest.objectives.end() ?
+                                      preferred :
+                                      std::find_if(
+                                          quest.objectives.begin(),
+                                          quest.objectives.end(),
+                                          [](const JournalObjectiveEntry& objective) {
+                                              return !objective.text.empty();
+                                          });
+            if (fallback != quest.objectives.end()) {
+                quest.title = fallback->text;
+                if (quest.summary.empty()) {
+                    quest.summary =
+                        "A miscellaneous objective currently shown in your journal.";
+                }
+            }
+        }
+        std::erase_if(
+            quests,
+            [](const JournalQuestEntry& quest) { return quest.title.empty(); });
 
         // Several radiant/template quests can publish separate objective
         // records with the same user-facing Journal title. The native Journal
@@ -3757,16 +4812,19 @@ namespace dragonboard::ui::rml
     }
 
     bool RmlPanelHost::CacheQuestObjectiveTargetGameThread(
+        std::size_t markerSlot,
         std::uint32_t formID,
         std::uint32_t instanceID,
         std::uint16_t objectiveID)
     {
-        _questMovingTargetHandle.reset();
-        _questMovingTargetPollAccumulator = 0.0f;
+        if (markerSlot >= _questMarkerSlots.size()) return false;
+        auto& slot = _questMarkerSlots[markerSlot];
+        slot.movingTargetHandle.reset();
+        slot.movingTargetPollAccumulator = 0.0f;
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(formID);
         if (!player || !quest) {
-            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            vrui::VRUIMapMarker::ClearQuestObjectivePosition(markerSlot);
             return false;
         }
 
@@ -3793,17 +4851,61 @@ namespace dragonboard::ui::rml
                 formID,
                 instanceID,
                 objectiveID);
-            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+            vrui::VRUIMapMarker::ClearQuestObjectivePosition(markerSlot);
             return false;
         }
 
-        // This action runs on Skyrim's game thread after a short delay. Read
-        // the teleport path already stored in the target by the game's compass
-        // update, then copy only an exterior door position into the render cache.
-        // No relocation and no PlayerCharacter::questTargets lock are used.
+        // This action runs on Skyrim's game thread after a short delay. Prefer
+        // the objective itself and the entrance linked directly to its cell.
+        // When only the game's compass teleport path is available, traverse it
+        // from the destination backwards so an exit from the player's current
+        // city cannot replace the actual destination.
         std::uint32_t unresolvedTargets = 0;
         std::uint32_t interiorTargets = 0;
         std::uint32_t teleportPathLinks = 0;
+        const bool emitUnresolvedDiagnostic =
+            !slot.unresolvedDiagnosticLogged;
+        const auto logReferenceState = [&](std::string_view role,
+                                           RE::TESObjectREFR* reference) {
+            if (!emitUnresolvedDiagnostic) return;
+            auto* referenceCell = reference ? reference->parentCell : nullptr;
+            const auto position =
+                reference ? reference->GetPosition() : RE::NiPoint3{};
+            logger::info(
+                "DragonBoardVR: unresolved marker diagnostic role={} ref={:08X} parentCell={:08X} interior={} pos=({:.1f}, {:.1f}, {:.1f}).",
+                role,
+                reference ? reference->GetFormID() : 0,
+                referenceCell ? referenceCell->GetFormID() : 0,
+                referenceCell &&
+                    referenceCell->cellFlags.any(
+                        RE::TESObjectCELL::Flag::kIsInteriorCell),
+                position.x,
+                position.y,
+                position.z);
+        };
+        const auto isCurrentChildWorldBoundaryDoor =
+            [&](RE::TESObjectREFR* reference) {
+                auto* playerCell = player->GetParentCell();
+                auto* currentWorld = playerCell ?
+                    playerCell->GetRuntimeData().worldSpace :
+                    nullptr;
+                if (!reference || !reference->parentCell || !currentWorld ||
+                    !currentWorld->parentWorld) {
+                    return false;
+                }
+                auto* referenceWorld =
+                    reference->parentCell->GetRuntimeData().worldSpace;
+                const auto linkedDoor =
+                    reference->extraList.GetTeleportLinkedDoor().get();
+                auto* linkedCell = linkedDoor ? linkedDoor->parentCell : nullptr;
+                auto* linkedWorld =
+                    linkedCell ? linkedCell->GetRuntimeData().worldSpace : nullptr;
+                return
+                    (referenceWorld == currentWorld &&
+                     linkedWorld == currentWorld->parentWorld) ||
+                    (referenceWorld == currentWorld->parentWorld &&
+                     linkedWorld == currentWorld);
+            };
         for (std::uint32_t targetIndex = 0;
              targetIndex < selectedObjective->numTargets;
              ++targetIndex) {
@@ -3818,8 +4920,18 @@ namespace dragonboard::ui::rml
                         RE::TESObjectCELL::Flag::kIsInteriorCell)) {
                     return false;
                 }
+                if (isCurrentChildWorldBoundaryDoor(reference)) {
+                    if (emitUnresolvedDiagnostic) {
+                        logger::info(
+                            "DragonBoardVR: ignored current city boundary door {:08X} while resolving external quest {:08X}; preserving its last destination.",
+                            reference->GetFormID(),
+                            formID);
+                    }
+                    return false;
+                }
                 const auto position = reference->GetPosition();
                 vrui::VRUIMapMarker::SetQuestObjectivePosition(
+                    markerSlot,
                     formID,
                     reference->GetFormID(),
                     position);
@@ -3836,6 +4948,87 @@ namespace dragonboard::ui::rml
                     position.z);
                 return true;
             };
+            const auto cacheVerifiedUnloadedPathReference =
+                [&](RE::TESObjectREFR* reference, std::string_view source) {
+                    if (!reference || reference->parentCell) return false;
+                    const auto position = reference->GetPosition();
+                    if (!std::isfinite(position.x) ||
+                        !std::isfinite(position.y) ||
+                        !std::isfinite(position.z)) {
+                        return false;
+                    }
+                    vrui::VRUIMapMarker::SetQuestObjectivePosition(
+                        markerSlot,
+                        formID,
+                        reference->GetFormID(),
+                        position);
+                    logger::info(
+                        "DragonBoardVR: cached verified unloaded objective {} quest={:08X} instance={} objective={} alias={} target={:08X} world=({:.1f}, {:.1f}, {:.1f}).",
+                        source,
+                        formID,
+                        instanceID,
+                        objectiveID,
+                        aliasID,
+                        reference->GetFormID(),
+                        position.x,
+                        position.y,
+                        position.z);
+                    return true;
+                };
+
+#ifdef ENABLE_SKYRIM_VR
+            RE::ObjectRefHandle trackingHandle{};
+            GetQuestTargetTrackingRef(target, trackingHandle, quest);
+            const auto trackingReference = trackingHandle.get();
+            logReferenceState("game-tracking", trackingReference.get());
+            if (cacheExteriorReference(
+                    trackingReference.get(), "game tracking reference")) {
+                return true;
+            }
+            if (trackingReference) {
+                const auto trackingLinkedDoor =
+                    trackingReference->extraList.GetTeleportLinkedDoor().get();
+                logReferenceState(
+                    "game-tracking-linked-door",
+                    trackingLinkedDoor.get());
+                if (cacheExteriorReference(
+                        trackingLinkedDoor.get(),
+                        "game tracking linked entrance")) {
+                    return true;
+                }
+            }
+#endif
+
+            RE::ObjectRefHandle targetHandle{};
+            quest->CreateRefHandleByAliasID(targetHandle, aliasID);
+            const auto targetReference = targetHandle.get();
+            logReferenceState("alias-target", targetReference.get());
+            if (!targetReference || !targetReference->parentCell) {
+                ++unresolvedTargets;
+            } else {
+                if (targetReference->As<RE::Actor>() &&
+                    cacheExteriorReference(targetReference.get(), "moving actor target")) {
+                    slot.movingTargetHandle = targetHandle;
+                    slot.movingTargetPollAccumulator = 0.0f;
+                    logger::info(
+                        "DragonBoardVR: enabled 1-second moving quest target updates for marker slot {} actor {:08X}.",
+                        markerSlot + 1,
+                        targetReference->GetFormID());
+                    return true;
+                }
+                if (cacheExteriorReference(targetReference.get(), "exterior target")) {
+                    return true;
+                }
+
+                ++interiorTargets;
+                const auto linkedDoor =
+                    targetReference->extraList.GetTeleportLinkedDoor().get();
+                logReferenceState("alias-target-linked-door", linkedDoor.get());
+                if (cacheExteriorReference(
+                        linkedDoor.get(), "destination linked entrance")) {
+                    return true;
+                }
+            }
 
 #ifdef ENABLE_SKYRIM_VR
             const auto* teleportPath =
@@ -3844,52 +5037,69 @@ namespace dragonboard::ui::rml
             const auto linkCount = teleportPath->teleportLinks.size();
             if (linkCount <= 64) {
                 teleportPathLinks += static_cast<std::uint32_t>(linkCount);
-                for (const auto& link : teleportPath->teleportLinks) {
-                    if (cacheExteriorReference(link.reference, "teleport-path entrance")) {
+                RE::TESObjectREFR* unloadedPathCandidate = nullptr;
+                for (std::size_t linkIndex = linkCount;
+                     linkIndex > 0;
+                     --linkIndex) {
+                    const auto& link = teleportPath->teleportLinks[
+                        static_cast<std::uint32_t>(linkIndex - 1)];
+                    logReferenceState(
+                        "teleport-path-reference",
+                        link.reference);
+                    if (cacheExteriorReference(
+                            link.reference, "destination teleport-path entrance")) {
                         return true;
+                    }
+                    if (link.reference && !link.reference->parentCell) {
+                        const auto position = link.reference->GetPosition();
+                        if (std::isfinite(position.x) &&
+                            std::isfinite(position.y) &&
+                            std::isfinite(position.z)) {
+                            // The path is traversed from the player toward the
+                            // objective. Keep replacing intermediate unloaded
+                            // entrances so the final candidate is the actual
+                            // external destination, even when the game's
+                            // tracking reference is the current city gate.
+                            unloadedPathCandidate = link.reference;
+                        }
                     }
                     if (link.reference) {
                         const auto linkedDoor =
                             link.reference->extraList.GetTeleportLinkedDoor().get();
+                        logReferenceState(
+                            "teleport-path-linked-door",
+                            linkedDoor.get());
                         if (cacheExteriorReference(
-                                linkedDoor.get(), "teleport-path linked entrance")) {
+                                linkedDoor.get(),
+                                "destination teleport-path linked entrance")) {
                             return true;
                         }
                     }
                 }
+                if (cacheVerifiedUnloadedPathReference(
+                        unloadedPathCandidate,
+                        "destination teleport-path unloaded entrance")) {
+                    return true;
+                }
             }
 #endif
-
-            RE::ObjectRefHandle targetHandle{};
-            quest->CreateRefHandleByAliasID(targetHandle, aliasID);
-            const auto targetReference = targetHandle.get();
-            if (!targetReference || !targetReference->parentCell) {
-                ++unresolvedTargets;
-                continue;
-            }
-            if (targetReference->As<RE::Actor>() &&
-                cacheExteriorReference(targetReference.get(), "moving actor target")) {
-                _questMovingTargetHandle = targetHandle;
-                _questMovingTargetPollAccumulator = 0.0f;
-                logger::info(
-                    "DragonBoardVR: enabled 1-second moving quest target updates for actor {:08X}.",
-                    targetReference->GetFormID());
-                return true;
-            }
-            if (cacheExteriorReference(targetReference.get(), "exterior target")) {
-                return true;
-            }
-
-            ++interiorTargets;
-            const auto linkedDoor =
-                targetReference->extraList.GetTeleportLinkedDoor().get();
-            if (cacheExteriorReference(linkedDoor.get(), "target linked entrance")) {
-                return true;
-            }
         }
 
+        if (emitUnresolvedDiagnostic) {
+            auto* playerCell = player->GetParentCell();
+            logger::info(
+                "DragonBoardVR: unresolved marker diagnostic summary quest={:08X} instance={} objective={} playerCell={:08X} playerInterior={}.",
+                formID,
+                instanceID,
+                objectiveID,
+                playerCell ? playerCell->GetFormID() : 0,
+                playerCell &&
+                    playerCell->cellFlags.any(
+                        RE::TESObjectCELL::Flag::kIsInteriorCell));
+            slot.unresolvedDiagnosticLogged = true;
+        }
         logger::warn(
-            "DragonBoardVR: objective target cache found no exterior reference for quest={:08X} instance={} objective={} targets={} unresolved={} interior={} pathLinks={}.",
+            "DragonBoardVR: objective target cache found no exterior reference for quest={:08X} instance={} objective={} targets={} unresolved={} interior={} pathLinks={}; preserving the last valid marker position.",
             formID,
             instanceID,
             objectiveID,
@@ -3897,39 +5107,42 @@ namespace dragonboard::ui::rml
             unresolvedTargets,
             interiorTargets,
             teleportPathLinks);
-        vrui::VRUIMapMarker::ClearQuestObjectivePosition();
         return false;
     }
 
-    void RmlPanelHost::RefreshMovingQuestTargetGameThread()
+    void RmlPanelHost::RefreshMovingQuestTargetGameThread(std::size_t markerSlot)
     {
-        if (!_questMovingTargetHandle || _questMarkerWatchFormID == 0) {
-            _questMovingTargetHandle.reset();
+        if (markerSlot >= _questMarkerSlots.size()) return;
+        auto& slot = _questMarkerSlots[markerSlot];
+        if (!slot.movingTargetHandle || slot.watchFormID == 0) {
+            slot.movingTargetHandle.reset();
             return;
         }
 
-        const auto reference = _questMovingTargetHandle.get();
+        const auto reference = slot.movingTargetHandle.get();
         auto* actor = reference ? reference->As<RE::Actor>() : nullptr;
         const bool interior = reference && reference->parentCell &&
             reference->parentCell->cellFlags.any(
                 RE::TESObjectCELL::Flag::kIsInteriorCell);
         if (!actor || !reference->parentCell || interior) {
             const auto targetFormID = reference ? reference->GetFormID() : 0;
-            _questMovingTargetHandle.reset();
-            _questMovingTargetPollAccumulator = 0.0f;
-            _questTargetResolveFormID = _questMarkerWatchFormID;
-            _questTargetResolveInstanceID = _questMarkerWatchObjectiveInstanceID;
-            _questTargetResolveObjectiveID = _questMarkerWatchObjectiveID;
-            _questTargetResolveAttempts = 4;
-            _questTargetResolveDelay = 0.25f;
+            slot.movingTargetHandle.reset();
+            slot.movingTargetPollAccumulator = 0.0f;
+            slot.targetResolveFormID = slot.watchFormID;
+            slot.targetResolveInstanceID = slot.watchObjectiveInstanceID;
+            slot.targetResolveObjectiveID = slot.watchObjectiveID;
+            slot.targetResolveAttempts = 4;
+            slot.targetResolveDelay = 0.25f;
             logger::info(
-                "DragonBoardVR: moving quest target {:08X} became unavailable or interior; scheduled entrance resolution.",
+                "DragonBoardVR: marker slot {} moving quest target {:08X} became unavailable or interior; scheduled entrance resolution.",
+                markerSlot + 1,
                 targetFormID);
             return;
         }
 
         vrui::VRUIMapMarker::SetQuestObjectivePosition(
-            _questMarkerWatchFormID,
+            markerSlot,
+            slot.watchFormID,
             reference->GetFormID(),
             reference->GetPosition());
     }
@@ -3937,21 +5150,102 @@ namespace dragonboard::ui::rml
     void RmlPanelHost::PersistQuestMarkerSelectionGameThread()
     {
         auto& settings = vrui::VRUISettings::get();
-        settings.questMarkerLastFormID = _questMarkerWatchFormID;
-        settings.questMarkerLastQuestInstanceID = _questMarkerWatchQuestInstanceID;
-        settings.questMarkerLastObjectiveInstanceID =
-            _questMarkerWatchObjectiveInstanceID;
-        settings.questMarkerLastObjectiveID = _questMarkerWatchObjectiveID;
+        for (std::size_t markerSlot = 0;
+             markerSlot < _questMarkerSlots.size();
+             ++markerSlot) {
+            const auto& slot = _questMarkerSlots[markerSlot];
+            settings.questMarkerLastFormIDs[markerSlot] = slot.watchFormID;
+            settings.questMarkerLastQuestInstanceIDs[markerSlot] =
+                slot.watchQuestInstanceID;
+            settings.questMarkerLastObjectiveInstanceIDs[markerSlot] =
+                slot.watchObjectiveInstanceID;
+            settings.questMarkerLastObjectiveIDs[markerSlot] =
+                slot.watchObjectiveID;
+        }
         settings.save(vrui::VRUISettings::getDefaultIniPath());
     }
 
-    bool RmlPanelHost::RestoreQuestMarkerGameThread()
+    std::optional<std::size_t> RmlPanelHost::FindQuestMarkerSlot(
+        std::uint32_t formID,
+        std::uint32_t questInstanceID) const
     {
+        for (std::size_t markerSlot = 0;
+             markerSlot < _questMarkerSlots.size();
+             ++markerSlot) {
+            const auto& slot = _questMarkerSlots[markerSlot];
+            if (slot.watchFormID == formID &&
+                slot.watchQuestInstanceID == questInstanceID) {
+                return markerSlot;
+            }
+        }
+        return std::nullopt;
+    }
+
+    void RmlPanelHost::ClearQuestMarkerSlotGameThread(
+        std::size_t markerSlot,
+        bool persist)
+    {
+        if (markerSlot >= _questMarkerSlots.size()) return;
+        _questMarkerSlots[markerSlot] = {};
+        vrui::VRUIMapMarker::ClearQuestObjectivePosition(markerSlot);
+        if (persist) PersistQuestMarkerSelectionGameThread();
+    }
+
+    std::size_t RmlPanelHost::AllocateQuestMarkerSlotGameThread(
+        std::uint32_t formID,
+        std::uint32_t questInstanceID)
+    {
+        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(formID);
+        const auto markerSlot = quest
+            ? QuestMarkerSlotForType(quest->GetType())
+            : std::size_t{ 1 };
+
+        if (const auto existing = FindQuestMarkerSlot(formID, questInstanceID);
+            existing && *existing == markerSlot) {
+            return markerSlot;
+        }
+
+        for (std::size_t slotIndex = 0;
+             slotIndex < _questMarkerSlots.size();
+             ++slotIndex) {
+            if (slotIndex != markerSlot &&
+                _questMarkerSlots[slotIndex].watchFormID == formID &&
+                _questMarkerSlots[slotIndex].watchQuestInstanceID ==
+                    questInstanceID) {
+                ClearQuestMarkerSlotGameThread(slotIndex, false);
+            }
+        }
+
+        const auto replacedFormID = _questMarkerSlots[markerSlot].watchFormID;
+        const auto replacedInstanceID =
+            _questMarkerSlots[markerSlot].watchQuestInstanceID;
+        if (replacedFormID != 0 &&
+            (replacedFormID != formID ||
+             replacedInstanceID != questInstanceID)) {
+            (void)SetQuestTrackedGameThread(replacedFormID, false);
+            _journalPresenter.SetTracked(
+                replacedFormID,
+                replacedInstanceID,
+                false);
+            logger::info(
+                "DragonBoardVR: category marker slot {} replaced tracked quest {:08X} with {:08X}.",
+                markerSlot + 1,
+                replacedFormID,
+                formID);
+        }
+        ClearQuestMarkerSlotGameThread(markerSlot, false);
+        return markerSlot;
+    }
+
+    bool RmlPanelHost::ArmLatestQuestObjectiveGameThread(
+        std::size_t markerSlot,
+        std::uint32_t formID,
+        std::uint32_t questInstanceID)
+    {
+        if (markerSlot >= _questMarkerSlots.size()) return false;
         auto* player = RE::PlayerCharacter::GetSingleton();
-        const auto& settings = vrui::VRUISettings::get();
-        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(
-            settings.questMarkerLastFormID);
-        if (!player || !quest || !quest->IsActive()) return false;
+        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(formID);
+        if (!player || !quest) return false;
 
 #ifdef ENABLE_SKYRIM_VR
         auto& objectives = GetVrQuestObjectives(player);
@@ -3960,70 +5254,171 @@ namespace dragonboard::ui::rml
 #endif
         if (objectives.size() > 4096) return false;
 
-        const RE::BGSInstancedQuestObjective* exact = nullptr;
         const RE::BGSInstancedQuestObjective* newest = nullptr;
         for (const auto& instanced : objectives) {
             auto* objective = instanced.Objective;
-            if (!objective || objective->ownerQuest != quest || objective->numTargets == 0 ||
+            if (!objective || objective->ownerQuest != quest ||
+                objective->numTargets == 0 ||
                 instanced.InstanceState == RE::QUEST_OBJECTIVE_STATE::kDormant ||
                 ObjectiveCompleted(instanced.InstanceState) ||
                 ObjectiveFailed(instanced.InstanceState)) {
                 continue;
-            }
-            if (objective->index == settings.questMarkerLastObjectiveID &&
-                instanced.instanceID == settings.questMarkerLastObjectiveInstanceID) {
-                exact = std::addressof(instanced);
             }
             if (!newest || objective->index > newest->Objective->index) {
                 newest = std::addressof(instanced);
             }
         }
 
-        const auto* restored = exact ? exact : newest;
-        if (!restored) return false;
+        auto& slot = _questMarkerSlots[markerSlot];
+        slot.watchFormID = formID;
+        slot.watchQuestInstanceID = questInstanceID;
+        slot.assignmentSequence = ++_questMarkerAssignmentSequence;
+        slot.pollAccumulator = 0.0f;
+        slot.movingTargetHandle.reset();
+        slot.movingTargetPollAccumulator = 0.0f;
+        slot.unresolvedDiagnosticLogged = false;
+        vrui::VRUIMapMarker::ClearQuestObjectivePosition(markerSlot);
 
-        _questMarkerWatchFormID = settings.questMarkerLastFormID;
-        _questMarkerWatchQuestInstanceID = settings.questMarkerLastQuestInstanceID;
-        _questMarkerWatchObjectiveInstanceID = restored->instanceID;
-        _questMarkerWatchObjectiveID = restored->Objective->index;
-        _questMarkerPollAccumulator = 0.0f;
-        _questMovingTargetHandle.reset();
-        _questMovingTargetPollAccumulator = 0.0f;
-        _questTargetResolveFormID = _questMarkerWatchFormID;
-        _questTargetResolveInstanceID = restored->instanceID;
-        _questTargetResolveObjectiveID = restored->Objective->index;
-        _questTargetResolveAttempts = 4;
-        _questTargetResolveDelay = 0.25f;
+        if (!newest) {
+            slot.watchObjectiveInstanceID = 0;
+            slot.watchObjectiveID = 0;
+            slot.targetResolveDelay = -1.0f;
+            slot.targetResolveAttempts = 0;
+            PersistQuestMarkerSelectionGameThread();
+            logger::info(
+                "DragonBoardVR: marker slot {} armed for quest {:08X}; waiting for its next open objective.",
+                markerSlot + 1,
+                formID);
+            return false;
+        }
+
+        slot.watchObjectiveInstanceID = newest->instanceID;
+        slot.watchObjectiveID = newest->Objective->index;
+        slot.targetResolveFormID = formID;
+        slot.targetResolveInstanceID = newest->instanceID;
+        slot.targetResolveObjectiveID = newest->Objective->index;
+        slot.targetResolveAttempts = 4;
+        slot.targetResolveDelay = 0.0f;
         PersistQuestMarkerSelectionGameThread();
         logger::info(
-            "DragonBoardVR: restored persisted quest marker quest={:08X} questInstance={} objectiveInstance={} objective={}.",
-            _questMarkerWatchFormID,
-            _questMarkerWatchQuestInstanceID,
-            _questMarkerWatchObjectiveInstanceID,
-            _questMarkerWatchObjectiveID);
+            "DragonBoardVR: marker slot {} armed immediately for latest open objective quest={:08X} questInstance={} objectiveInstance={} objective={}.",
+            markerSlot + 1,
+            formID,
+            questInstanceID,
+            newest->instanceID,
+            newest->Objective->index);
         return true;
     }
 
-    void RmlPanelHost::RefreshTrackedQuestObjectiveGameThread()
+    bool RmlPanelHost::RestoreQuestMarkerGameThread()
     {
-        if (_questMarkerWatchFormID == 0) return;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        const auto& settings = vrui::VRUISettings::get();
+        if (!player) return false;
+
+        std::array<std::uint32_t, vrui::VRUIMapMarker::kQuestMarkerSlotCount>
+            restoredFormIDs{};
+        std::array<std::uint32_t, vrui::VRUIMapMarker::kQuestMarkerSlotCount>
+            restoredInstanceIDs{};
+        std::array<unsigned char, vrui::VRUIMapMarker::kQuestMarkerSlotCount>
+            restoredPriorities{};
+        bool foundPersisted = false;
+        bool restoredAll = true;
+        for (std::size_t persistedSlot = 0;
+             persistedSlot < _questMarkerSlots.size();
+             ++persistedSlot) {
+            const auto formID = settings.questMarkerLastFormIDs[persistedSlot];
+            const auto questInstanceID =
+                settings.questMarkerLastQuestInstanceIDs[persistedSlot];
+            if (formID == 0) continue;
+            foundPersisted = true;
+            auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(formID);
+            if (!quest || !quest->IsActive()) {
+                restoredAll = false;
+                continue;
+            }
+            const auto markerSlot = QuestMarkerSlotForType(quest->GetType());
+            const auto priority =
+                static_cast<unsigned char>(persistedSlot == markerSlot ? 2 : 1);
+            if (priority <= restoredPriorities[markerSlot]) continue;
+            restoredFormIDs[markerSlot] = formID;
+            restoredInstanceIDs[markerSlot] = questInstanceID;
+            restoredPriorities[markerSlot] = priority;
+        }
+
+        for (std::size_t markerSlot = 0;
+             markerSlot < _questMarkerSlots.size();
+             ++markerSlot) {
+            const auto formID = restoredFormIDs[markerSlot];
+            const auto questInstanceID = restoredInstanceIDs[markerSlot];
+            if (formID == 0) continue;
+            if (_questMarkerSlots[markerSlot].watchFormID == formID &&
+                _questMarkerSlots[markerSlot].watchQuestInstanceID ==
+                    questInstanceID) {
+                continue;
+            }
+            (void)ArmLatestQuestObjectiveGameThread(
+                markerSlot,
+                formID,
+                questInstanceID);
+            restoredAll = restoredAll &&
+                _questMarkerSlots[markerSlot].watchFormID == formID &&
+                _questMarkerSlots[markerSlot].watchQuestInstanceID ==
+                    questInstanceID;
+        }
+        return foundPersisted && restoredAll;
+    }
+
+    void RmlPanelHost::RefreshQuestMarkersForPlayerCellGameThread()
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* cell = player ? player->GetParentCell() : nullptr;
+        if (!cell) return;
+
+        const auto currentCellFormID = cell->GetFormID();
+        if (_questMarkerPlayerCellFormID == currentCellFormID) return;
+
+        const auto previousCellFormID = _questMarkerPlayerCellFormID;
+        _questMarkerPlayerCellFormID = currentCellFormID;
+        if (previousCellFormID == 0) return;
+
+        std::size_t scheduled = 0;
+        for (auto& slot : _questMarkerSlots) {
+            if (slot.watchFormID == 0 || slot.watchObjectiveID == 0) continue;
+            slot.movingTargetHandle.reset();
+            slot.movingTargetPollAccumulator = 0.0f;
+            slot.unresolvedDiagnosticLogged = false;
+            slot.targetResolveFormID = slot.watchFormID;
+            slot.targetResolveInstanceID = slot.watchObjectiveInstanceID;
+            slot.targetResolveObjectiveID = slot.watchObjectiveID;
+            slot.targetResolveAttempts = 6;
+            slot.targetResolveDelay = 0.25f;
+            ++scheduled;
+        }
+        if (scheduled > 0) {
+            logger::info(
+                "DragonBoardVR: player cell changed {:08X}->{:08X}; scheduled {} tracked quest marker refresh(es).",
+                previousCellFormID,
+                currentCellFormID,
+                scheduled);
+        }
+    }
+
+    void RmlPanelHost::RefreshTrackedQuestObjectiveGameThread(
+        std::size_t markerSlot)
+    {
+        if (markerSlot >= _questMarkerSlots.size()) return;
+        auto& slot = _questMarkerSlots[markerSlot];
+        if (slot.watchFormID == 0) return;
 
         auto* player = RE::PlayerCharacter::GetSingleton();
-        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(_questMarkerWatchFormID);
+        auto* quest = RE::TESForm::LookupByID<RE::TESQuest>(slot.watchFormID);
         if (!player || !quest || !quest->IsActive()) {
             logger::info(
-                "DragonBoardVR: stopped automatic objective marker updates for quest {:08X}; quest is no longer tracked.",
-                _questMarkerWatchFormID);
-            _questMarkerWatchFormID = 0;
-            _questMarkerWatchQuestInstanceID = 0;
-            _questMarkerWatchObjectiveInstanceID = 0;
-            _questMarkerWatchObjectiveID = 0;
-            _questMovingTargetHandle.reset();
-            _questMovingTargetPollAccumulator = 0.0f;
-            _questTargetResolveDelay = -1.0f;
-            _questTargetResolveAttempts = 0;
-            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
-            PersistQuestMarkerSelectionGameThread();
+                "DragonBoardVR: stopped marker slot {} automatic updates for quest {:08X}; quest is no longer tracked.",
+                markerSlot + 1,
+                slot.watchFormID);
+            ClearQuestMarkerSlotGameThread(markerSlot, true);
             return;
         }
 
@@ -4038,15 +5433,15 @@ namespace dragonboard::ui::rml
         const RE::BGSInstancedQuestObjective* replacement = nullptr;
         for (const auto& instanced : objectives) {
             auto* objective = instanced.Objective;
-            if (!objective || objective->ownerQuest != quest || objective->numTargets == 0 ||
+            if (!objective || objective->ownerQuest != quest ||
+                objective->numTargets == 0 ||
                 instanced.InstanceState == RE::QUEST_OBJECTIVE_STATE::kDormant ||
                 ObjectiveCompleted(instanced.InstanceState) ||
                 ObjectiveFailed(instanced.InstanceState)) {
                 continue;
             }
-
-            if (objective->index == _questMarkerWatchObjectiveID &&
-                instanced.instanceID == _questMarkerWatchObjectiveInstanceID) {
+            if (objective->index == slot.watchObjectiveID &&
+                instanced.instanceID == slot.watchObjectiveInstanceID) {
                 current = std::addressof(instanced);
             }
             if (!replacement || objective->index > replacement->Objective->index) {
@@ -4054,45 +5449,46 @@ namespace dragonboard::ui::rml
             }
         }
 
-        // Skyrim can publish the next stage before retiring the previous one.
-        // Advance when a newer objective exists; otherwise preserve the user's
-        // current choice while it remains active.
         if (current && replacement &&
             replacement->Objective->index <= current->Objective->index) {
             return;
         }
 
         if (!replacement) {
-            if (_questMarkerWatchObjectiveID != 0) {
+            if (slot.watchObjectiveID != 0) {
                 logger::info(
-                    "DragonBoardVR: tracked quest {:08X} currently has no active map objective; marker hidden until the next update.",
-                    _questMarkerWatchFormID);
-                _questMarkerWatchObjectiveID = 0;
-                _questMovingTargetHandle.reset();
-                _questMovingTargetPollAccumulator = 0.0f;
-                _questMarkerWatchObjectiveInstanceID = 0;
-                _questTargetResolveDelay = -1.0f;
-                _questTargetResolveAttempts = 0;
-                vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+                    "DragonBoardVR: marker slot {} quest {:08X} has no open objective; marker hidden until the next objective.",
+                    markerSlot + 1,
+                    slot.watchFormID);
+                slot.watchObjectiveID = 0;
+                slot.watchObjectiveInstanceID = 0;
+                slot.movingTargetHandle.reset();
+                slot.movingTargetPollAccumulator = 0.0f;
+                slot.targetResolveDelay = -1.0f;
+                slot.targetResolveAttempts = 0;
+                vrui::VRUIMapMarker::ClearQuestObjectivePosition(markerSlot);
+                PersistQuestMarkerSelectionGameThread();
             }
             return;
         }
 
-        _questMarkerWatchObjectiveID = replacement->Objective->index;
-        _questMarkerWatchObjectiveInstanceID = replacement->instanceID;
-        _questMovingTargetHandle.reset();
-        _questMovingTargetPollAccumulator = 0.0f;
-        _questTargetResolveFormID = _questMarkerWatchFormID;
-        _questTargetResolveInstanceID = replacement->instanceID;
-        _questTargetResolveObjectiveID = replacement->Objective->index;
-        _questTargetResolveAttempts = 4;
-        _questTargetResolveDelay = 0.25f;
+        slot.watchObjectiveID = replacement->Objective->index;
+        slot.watchObjectiveInstanceID = replacement->instanceID;
+        slot.movingTargetHandle.reset();
+        slot.movingTargetPollAccumulator = 0.0f;
+        slot.unresolvedDiagnosticLogged = false;
+        slot.targetResolveFormID = slot.watchFormID;
+        slot.targetResolveInstanceID = replacement->instanceID;
+        slot.targetResolveObjectiveID = replacement->Objective->index;
+        slot.targetResolveAttempts = 4;
+        slot.targetResolveDelay = 0.0f;
         PersistQuestMarkerSelectionGameThread();
-        vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+        vrui::VRUIMapMarker::ClearQuestObjectivePosition(markerSlot);
         logger::info(
-            "DragonBoardVR: objective update detected; scheduled marker refresh quest={:08X} questInstance={} objectiveInstance={} objective={}.",
-            _questMarkerWatchFormID,
-            _questMarkerWatchQuestInstanceID,
+            "DragonBoardVR: marker slot {} advanced automatically to next objective quest={:08X} questInstance={} objectiveInstance={} objective={}.",
+            markerSlot + 1,
+            slot.watchFormID,
+            slot.watchQuestInstanceID,
             replacement->instanceID,
             replacement->Objective->index);
     }
@@ -4158,47 +5554,462 @@ namespace dragonboard::ui::rml
             action == JournalAction::kToggleTracking ? !tracked : true;
         if (!SetQuestTrackedGameThread(formID, desiredTracking)) return;
 
-        if (action == JournalAction::kTrackObjective) {
-            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
-            _questMarkerWatchFormID = formID;
-            _questMarkerWatchQuestInstanceID = instanceID;
-            _questMarkerWatchObjectiveInstanceID = objectiveInstanceID;
-            _questMarkerWatchObjectiveID = objectiveID;
-            _questMarkerPollAccumulator = 0.0f;
-            _questMovingTargetHandle.reset();
-            _questMovingTargetPollAccumulator = 0.0f;
-            PersistQuestMarkerSelectionGameThread();
-            _questTargetResolveFormID = formID;
-            _questTargetResolveInstanceID = objectiveInstanceID;
-            _questTargetResolveObjectiveID = objectiveID;
-            _questTargetResolveAttempts = 4;
-            _questTargetResolveDelay = 0.75f;
-            logger::info(
-                "DragonBoardVR: scheduled bounded objective entrance resolution quest={:08X} instance={} objective={}.",
-                formID,
-                objectiveInstanceID,
-                objectiveID);
-        } else if (!desiredTracking) {
-            if (_questMarkerWatchFormID == formID) {
-                _questMarkerWatchFormID = 0;
-                _questMarkerWatchQuestInstanceID = 0;
-                _questMarkerWatchObjectiveInstanceID = 0;
-                _questMarkerWatchObjectiveID = 0;
-                _questMovingTargetHandle.reset();
-                _questMovingTargetPollAccumulator = 0.0f;
+        if (desiredTracking) {
+            const auto markerSlot =
+                AllocateQuestMarkerSlotGameThread(formID, instanceID);
+            auto& slot = _questMarkerSlots[markerSlot];
+            if (action == JournalAction::kTrackObjective) {
+                slot.watchFormID = formID;
+                slot.watchQuestInstanceID = instanceID;
+                slot.watchObjectiveInstanceID = objectiveInstanceID;
+                slot.watchObjectiveID = objectiveID;
+                slot.pollAccumulator = 0.0f;
+                slot.movingTargetHandle.reset();
+                slot.movingTargetPollAccumulator = 0.0f;
+                slot.assignmentSequence = ++_questMarkerAssignmentSequence;
+                slot.targetResolveFormID = formID;
+                slot.targetResolveInstanceID = objectiveInstanceID;
+                slot.targetResolveObjectiveID = objectiveID;
+                slot.targetResolveAttempts = 4;
+                slot.targetResolveDelay = 0.0f;
+                vrui::VRUIMapMarker::ClearQuestObjectivePosition(markerSlot);
                 PersistQuestMarkerSelectionGameThread();
+                logger::info(
+                    "DragonBoardVR: marker slot {} scheduled immediately for selected objective quest={:08X} instance={} objective={}.",
+                    markerSlot + 1,
+                    formID,
+                    objectiveInstanceID,
+                    objectiveID);
+            } else {
+                (void)ArmLatestQuestObjectiveGameThread(
+                    markerSlot,
+                    formID,
+                    instanceID);
             }
-            _questTargetResolveDelay = -1.0f;
-            _questTargetResolveAttempts = 0;
-            vrui::VRUIMapMarker::ClearQuestObjectivePosition();
+        } else if (const auto markerSlot =
+                       FindQuestMarkerSlot(formID, instanceID)) {
+            ClearQuestMarkerSlotGameThread(*markerSlot, true);
             logger::info(
-                "DragonBoardVR: objective map marker cache cleared with quest {:08X} tracking.",
+                "DragonBoardVR: marker slot {} cleared with quest {:08X} tracking.",
+                *markerSlot + 1,
                 formID);
         }
 
         _journalPresenter.SetTracked(formID, instanceID, desiredTracking);
         _rmlJournalSyncPending.store(true);
         _journalPollAccumulator = 0.5f;
+    }
+
+    bool RmlPanelHost::BeginSharedDeveloperKeyboardPresentThread()
+    {
+        if (!_rmlUi || _sharedKeyboardPurpose != SharedKeyboardPurpose::kNone) {
+            return false;
+        }
+        if (!_rmlUi->OpenKeyboard(
+                "Add console command", "", kDeveloperCommandMaximumLength)) {
+            return false;
+        }
+        _sharedKeyboardPurpose = SharedKeyboardPurpose::kDeveloperCommand;
+        _keyboardSurfaceVisible.store(true, std::memory_order_release);
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+        return true;
+    }
+
+    bool RmlPanelHost::BeginSharedIniKeyboardPresentThread(
+        std::size_t visibleSettingIndex)
+    {
+        if (!_rmlUi || _sharedKeyboardPurpose != SharedKeyboardPurpose::kNone) {
+            return false;
+        }
+
+        _iniKeyboardExistingValue.clear();
+        _iniKeyboardPrompt = "Edit INI value";
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            if (visibleSettingIndex >= _iniVisibleSettingRefs.size()) return false;
+            const auto& reference = _iniVisibleSettingRefs[visibleSettingIndex];
+            const auto& setting = _iniCatalog.Mods()[reference.modIndex]
+                                      .files[reference.fileIndex]
+                                      .settings[reference.settingIndex];
+            if (!setting.sensitive &&
+                setting.type == dragonboard::ui::mods::IniValueType::kBoolean) {
+                return false;
+            }
+            _iniKeyboardDraftKey = reference.draftKey;
+            _iniKeyboardOriginalValue = setting.value;
+            _iniKeyboardValueType = setting.type;
+            if (const auto draft = _iniDraftValues.find(reference.draftKey);
+                draft != _iniDraftValues.end()) {
+                _iniKeyboardExistingValue = draft->second;
+            } else {
+                _iniKeyboardExistingValue = setting.value;
+            }
+            _iniKeyboardPrompt = "Edit " + setting.key;
+        }
+
+        if (!_rmlUi->OpenKeyboard(
+                _iniKeyboardPrompt,
+                _iniKeyboardExistingValue,
+                kIniValueMaximumLength)) {
+            return false;
+        }
+        _sharedKeyboardPurpose = SharedKeyboardPurpose::kIniValue;
+        _keyboardSurfaceVisible.store(true, std::memory_order_release);
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+        return true;
+    }
+
+    bool RmlPanelHost::BeginSharedIniSearchKeyboardPresentThread()
+    {
+        if (!_rmlUi || _sharedKeyboardPurpose != SharedKeyboardPurpose::kNone) {
+            return false;
+        }
+        std::string query;
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            query = _iniSearchQuery;
+        }
+        if (!_rmlUi->OpenKeyboard(
+                "Search editable INIs", query, kIniSearchMaximumLength)) {
+            return false;
+        }
+        _sharedKeyboardPurpose = SharedKeyboardPurpose::kIniSearch;
+        _keyboardSurfaceVisible.store(true, std::memory_order_release);
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+        return true;
+    }
+
+    bool RmlPanelHost::BeginSharedInventoryKeyboardPresentThread()
+    {
+        if (!_rmlUi || _sharedKeyboardPurpose != SharedKeyboardPurpose::kNone) {
+            return false;
+        }
+        if (!_rmlUi->OpenKeyboard(
+                "Search inventory",
+                _inventoryPresenter.SearchQuery(),
+                kInventorySearchMaximumLength)) {
+            return false;
+        }
+        _sharedKeyboardPurpose = SharedKeyboardPurpose::kInventorySearch;
+        _keyboardSurfaceVisible.store(true, std::memory_order_release);
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+        return true;
+    }
+
+    bool RmlPanelHost::BeginSharedMagicKeyboardPresentThread()
+    {
+        if (!_rmlUi || _sharedKeyboardPurpose != SharedKeyboardPurpose::kNone) {
+            return false;
+        }
+        if (!_rmlUi->OpenKeyboard(
+                "Search magic",
+                _magicPresenter.SearchQuery(),
+                kMagicSearchMaximumLength)) {
+            return false;
+        }
+        _sharedKeyboardPurpose = SharedKeyboardPurpose::kMagicSearch;
+        _keyboardSurfaceVisible.store(true, std::memory_order_release);
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+        return true;
+    }
+
+    void RmlPanelHost::UpdateSharedKeyboardPresentThread()
+    {
+        if (!_rmlUi) return;
+        const auto result = _rmlUi->ConsumeKeyboardResult();
+        if (!result) return;
+
+        const auto purpose = _sharedKeyboardPurpose;
+        if (!result->accepted) {
+            _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
+            _keyboardSurfaceVisible.store(false, std::memory_order_release);
+            _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+            return;
+        }
+
+        if (purpose == SharedKeyboardPurpose::kDeveloperCommand) {
+            QueueDeveloperCommandAdditionPresentThread(result->text);
+        } else if (purpose == SharedKeyboardPurpose::kInventorySearch) {
+            ApplyInventorySearchQueryPresentThread(result->text);
+        } else if (purpose == SharedKeyboardPurpose::kMagicSearch) {
+            ApplyMagicSearchQueryPresentThread(result->text);
+        } else if (purpose == SharedKeyboardPurpose::kIniSearch) {
+            ApplyIniSearchQueryPresentThread(result->text);
+        } else if (purpose == SharedKeyboardPurpose::kIniValue) {
+            const auto& value = result->text;
+            bool valid = true;
+            if (_iniKeyboardValueType ==
+                dragonboard::ui::mods::IniValueType::kInteger) {
+                std::int64_t parsed = 0;
+                const auto* begin = value.data();
+                if (!value.empty() && value.front() == '+') ++begin;
+                const auto [end, error] = std::from_chars(
+                    begin, value.data() + value.size(), parsed);
+                valid = begin != value.data() + value.size() &&
+                    error == std::errc{} && end == value.data() + value.size();
+            } else if (_iniKeyboardValueType ==
+                       dragonboard::ui::mods::IniValueType::kFloat) {
+                double parsed = 0.0;
+                const auto* begin = value.data();
+                if (!value.empty() && value.front() == '+') ++begin;
+                const auto [end, error] = std::from_chars(
+                    begin, value.data() + value.size(), parsed);
+                valid = begin != value.data() + value.size() &&
+                    error == std::errc{} && end == value.data() + value.size();
+            }
+            if (!valid) {
+                {
+                    std::scoped_lock lock(_iniCatalogMutex);
+                    _iniCatalogStatus =
+                        "The entered value is not valid for this numeric setting.";
+                }
+                _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                    dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+                _rmlModsSyncPending.store(true, std::memory_order_release);
+                if (_rmlUi->OpenKeyboard(
+                        "Invalid number - " + _iniKeyboardPrompt,
+                        value,
+                        kIniValueMaximumLength)) {
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+                    return;
+                }
+            } else {
+                std::scoped_lock lock(_iniCatalogMutex);
+                if (value == _iniKeyboardOriginalValue) {
+                    _iniDraftValues.erase(_iniKeyboardDraftKey);
+                } else {
+                    _iniDraftValues[_iniKeyboardDraftKey] = value;
+                }
+                _rmlModsSyncPending.store(true, std::memory_order_release);
+            }
+        }
+
+        _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
+        _keyboardSurfaceVisible.store(false, std::memory_order_release);
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+    }
+
+    bool RmlPanelHost::BeginIniValueKeyboardPresentThread(
+        std::size_t visibleSettingIndex)
+    {
+#ifdef ENABLE_SKYRIM_VR
+        if (_iniKeyboardOpen || _iniKeyboardOpenPending) return true;
+
+        _iniKeyboardExistingValue.clear();
+        _iniKeyboardPrompt = "Edit INI value";
+        {
+            std::scoped_lock lock(_iniCatalogMutex);
+            if (visibleSettingIndex >= _iniVisibleSettingRefs.size()) return false;
+            const auto& reference = _iniVisibleSettingRefs[visibleSettingIndex];
+            const auto& setting = _iniCatalog.Mods()[reference.modIndex]
+                                      .files[reference.fileIndex]
+                                      .settings[reference.settingIndex];
+            if (!setting.sensitive &&
+                setting.type == dragonboard::ui::mods::IniValueType::kBoolean) {
+                return false;
+            }
+            _iniKeyboardDraftKey = reference.draftKey;
+            _iniKeyboardOriginalValue = setting.value;
+            _iniKeyboardValueType = setting.type;
+            if (const auto draft = _iniDraftValues.find(reference.draftKey);
+                draft != _iniDraftValues.end()) {
+                _iniKeyboardExistingValue = draft->second;
+            } else {
+                _iniKeyboardExistingValue = setting.value;
+            }
+            _iniKeyboardPrompt = "Edit " + setting.key;
+        }
+
+        // Opening in the same Present frame as the controller click lets some
+        // SteamVR runtimes interpret the tail of that click as an immediate
+        // keyboard dismissal. Defer the OpenVR call until the input frame has
+        // fully completed.
+        _iniKeyboardOpenPending = true;
+        _iniKeyboardNextOpenAttempt =
+            std::chrono::steady_clock::now() + std::chrono::milliseconds(120);
+        _iniKeyboardCloseRequested.store(false, std::memory_order_release);
+        logger::info("DragonBoardVR: queued SteamVR INI value keyboard.");
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    bool RmlPanelHost::ShowIniValueKeyboardPresentThread()
+    {
+#ifdef ENABLE_SKYRIM_VR
+        auto* overlay = GetSteamVrOverlay();
+        if (!overlay) {
+            logger::error("DragonBoardVR: SteamVR overlay interface is unavailable.");
+            return false;
+        }
+        auto handle = static_cast<vr::VROverlayHandle_t>(_iniKeyboardOverlayHandle);
+        if (handle == vr::k_ulOverlayHandleInvalid) {
+            auto error = overlay->FindOverlay(kIniKeyboardOverlayKey, &handle);
+            if (error != vr::VROverlayError_None) {
+                error = overlay->CreateOverlay(
+                    kIniKeyboardOverlayKey, kIniKeyboardOverlayName, &handle);
+            }
+            if (error != vr::VROverlayError_None) {
+                logger::error(
+                    "DragonBoardVR: could not create the SteamVR INI keyboard overlay: {}.",
+                    overlay->GetOverlayErrorNameFromEnum(error));
+                return false;
+            }
+            _iniKeyboardOverlayHandle = handle;
+        }
+
+        vr::VREvent_t staleEvent{};
+        while (overlay->PollNextOverlayEvent(handle, &staleEvent, sizeof(staleEvent))) {
+        }
+        ++_iniKeyboardSessionSequence;
+        _iniKeyboardSessionValue =
+            kIniKeyboardUserValue + _iniKeyboardSessionSequence;
+        const auto error = overlay->ShowKeyboardForOverlay(
+            handle,
+            vr::k_EGamepadTextInputModeNormal,
+            vr::k_EGamepadTextInputLineModeSingleLine,
+            _iniKeyboardPrompt.c_str(),
+            static_cast<std::uint32_t>(kIniValueMaximumLength),
+            _iniKeyboardExistingValue.c_str(),
+            false,
+            _iniKeyboardSessionValue);
+        if (error != vr::VROverlayError_None) {
+            logger::error(
+                "DragonBoardVR: SteamVR INI value keyboard failed to open: {}.",
+                overlay->GetOverlayErrorNameFromEnum(error));
+            return false;
+        }
+
+        _iniKeyboardCloseRequested.store(false, std::memory_order_release);
+        _iniKeyboardOpen = true;
+        _iniKeyboardOpenedAt = std::chrono::steady_clock::now();
+        logger::info("DragonBoardVR: SteamVR INI value keyboard opened.");
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    void RmlPanelHost::UpdateIniValueKeyboardPresentThread()
+    {
+#ifdef ENABLE_SKYRIM_VR
+        const bool closeRequested =
+            _iniKeyboardCloseRequested.exchange(false, std::memory_order_acq_rel);
+        if (closeRequested) _iniKeyboardOpenPending = false;
+        const auto now = std::chrono::steady_clock::now();
+        if (_iniKeyboardOpenPending && now >= _iniKeyboardNextOpenAttempt) {
+            _iniKeyboardOpenPending = false;
+            if (!ShowIniValueKeyboardPresentThread()) {
+                _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                    dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+            }
+        }
+        const auto handle =
+            static_cast<vr::VROverlayHandle_t>(_iniKeyboardOverlayHandle);
+        if (handle == vr::k_ulOverlayHandleInvalid && !_iniKeyboardOpen &&
+            !_iniKeyboardOpenPending) {
+            return;
+        }
+
+        auto* overlay = GetSteamVrOverlay();
+        if (!overlay) {
+            _iniKeyboardOpen = false;
+            return;
+        }
+        if (closeRequested) {
+            if (_iniKeyboardOpen) overlay->HideKeyboard();
+            _iniKeyboardOpen = false;
+            if (handle != vr::k_ulOverlayHandleInvalid) {
+                overlay->DestroyOverlay(handle);
+                _iniKeyboardOverlayHandle = vr::k_ulOverlayHandleInvalid;
+            }
+            return;
+        }
+        if (handle == vr::k_ulOverlayHandleInvalid) return;
+
+        vr::VREvent_t event{};
+        while (overlay->PollNextOverlayEvent(handle, &event, sizeof(event))) {
+            if ((event.eventType == vr::VREvent_KeyboardDone ||
+                 event.eventType == vr::VREvent_KeyboardClosed) &&
+                event.data.keyboard.uUserValue != _iniKeyboardSessionValue) {
+                logger::info(
+                    "DragonBoardVR: ignored stale SteamVR keyboard event {} "
+                    "(session={}, active={}).",
+                    event.eventType,
+                    event.data.keyboard.uUserValue,
+                    _iniKeyboardSessionValue);
+                continue;
+            }
+            if (event.eventType == vr::VREvent_KeyboardDone) {
+                std::array<char, kIniValueMaximumLength + 1> text{};
+                overlay->GetKeyboardText(
+                    text.data(), static_cast<std::uint32_t>(text.size()));
+                const std::string value(text.data());
+                bool valid = true;
+                if (_iniKeyboardValueType ==
+                    dragonboard::ui::mods::IniValueType::kInteger) {
+                    std::int64_t parsed = 0;
+                    const auto* begin = value.data();
+                    if (!value.empty() && value.front() == '+') ++begin;
+                    const auto [end, error] = std::from_chars(
+                        begin, value.data() + value.size(), parsed);
+                    valid = begin != value.data() + value.size() &&
+                        error == std::errc{} && end == value.data() + value.size();
+                } else if (_iniKeyboardValueType ==
+                           dragonboard::ui::mods::IniValueType::kFloat) {
+                    double parsed = 0.0;
+                    const auto* begin = value.data();
+                    if (!value.empty() && value.front() == '+') ++begin;
+                    const auto [end, error] = std::from_chars(
+                        begin, value.data() + value.size(), parsed);
+                    valid = begin != value.data() + value.size() &&
+                        error == std::errc{} && end == value.data() + value.size();
+                }
+                if (!valid) {
+                    {
+                        std::scoped_lock lock(_iniCatalogMutex);
+                        _iniCatalogStatus =
+                            "The entered value is not valid for this numeric setting.";
+                    }
+                    _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                        dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+                    _rmlModsSyncPending.store(true, std::memory_order_release);
+                    _iniKeyboardOpen = false;
+                    overlay->DestroyOverlay(handle);
+                    _iniKeyboardOverlayHandle = vr::k_ulOverlayHandleInvalid;
+                    break;
+                }
+                {
+                    std::scoped_lock lock(_iniCatalogMutex);
+                    if (value == _iniKeyboardOriginalValue) {
+                        _iniDraftValues.erase(_iniKeyboardDraftKey);
+                    } else {
+                        _iniDraftValues[_iniKeyboardDraftKey] = value;
+                    }
+                }
+                _rmlModsSyncPending.store(true, std::memory_order_release);
+                _iniKeyboardOpen = false;
+                logger::info("DragonBoardVR: accepted an INI draft value.");
+                overlay->DestroyOverlay(handle);
+                _iniKeyboardOverlayHandle = vr::k_ulOverlayHandleInvalid;
+                break;
+            } else if (event.eventType == vr::VREvent_KeyboardClosed) {
+                _iniKeyboardOpen = false;
+                const auto eventNow = std::chrono::steady_clock::now();
+                const auto lifetime =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        eventNow - _iniKeyboardOpenedAt);
+                logger::info(
+                    "DragonBoardVR: SteamVR INI value keyboard closed after {} ms; "
+                    "discarding its overlay before the next session.",
+                    lifetime.count());
+                overlay->DestroyOverlay(handle);
+                _iniKeyboardOverlayHandle = vr::k_ulOverlayHandleInvalid;
+                break;
+            }
+        }
+#endif
     }
 
     bool RmlPanelHost::BeginDeveloperCommandKeyboardPresentThread()
@@ -4648,6 +6459,12 @@ namespace dragonboard::ui::rml
         playerInfo.gold = snapshot.gold;
         playerInfo.currentWeight = snapshot.currentWeight;
         playerInfo.carryWeight = snapshot.carryWeight;
+        playerInfo.currentHealth = snapshot.currentHealth;
+        playerInfo.maximumHealth = snapshot.maximumHealth;
+        playerInfo.currentStamina = snapshot.currentStamina;
+        playerInfo.maximumStamina = snapshot.maximumStamina;
+        playerInfo.currentMagicka = snapshot.currentMagicka;
+        playerInfo.maximumMagicka = snapshot.maximumMagicka;
         _inventoryPresenter.ReplaceSnapshot(
             std::move(entries),
             selectedIndex,

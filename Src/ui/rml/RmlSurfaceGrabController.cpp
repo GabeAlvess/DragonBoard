@@ -9,7 +9,6 @@ namespace dragonboard::ui::rml
 {
     namespace
     {
-        constexpr float kGrabHoldSeconds = 1.0f;
         constexpr float kGrabSmoothSpeed = 14.0f;
 
         RE::NiPoint3 RotateVector(const RE::NiMatrix3& rotation, const RE::NiPoint3& value)
@@ -89,9 +88,11 @@ namespace dragonboard::ui::rml
         }
 
         if (!_grabbed) {
-            if (input.hovered && input.dominantGripDown && input.dominantHand) {
+            const bool hoverAccepted = !input.requireHover || input.hovered;
+            if (hoverAccepted && input.dominantGripDown && input.dominantHand) {
                 _holdSeconds += std::max(deltaTime, 0.0f);
-                if (_holdSeconds >= kGrabHoldSeconds && BeginGrab(surfaceNode, input.dominantHand)) {
+                if (_holdSeconds >= std::max(input.grabHoldSeconds, 0.0f) &&
+                    BeginGrab(surfaceNode, input.dominantHand)) {
                     result.grabStarted = true;
                 }
             } else {
@@ -146,16 +147,18 @@ namespace dragonboard::ui::rml
                 const float ratio = distance / _twoHandInitialDistance;
                 surfaceNode->local.scale = std::clamp(
                     _twoHandInitialScale * ratio,
-                    _twoHandInitialScale * 0.1f,
-                    _twoHandInitialScale * 10.0f);
+                    std::max(input.minimumScale, 1.0e-4f),
+                    std::max(input.maximumScale, input.minimumScale));
             }
         } else {
             _twoHandScaling = false;
         }
 
-        RE::NiUpdateData updateData;
-        updateData.flags = RE::NiUpdateData::Flag::kDirty;
-        surfaceNode->Update(updateData);
+        if (input.updateSceneGraph) {
+            RE::NiUpdateData updateData;
+            updateData.flags = RE::NiUpdateData::Flag::kDirty;
+            surfaceNode->Update(updateData);
+        }
         result.transformChanged = true;
         return result;
     }

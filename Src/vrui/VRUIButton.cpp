@@ -1135,7 +1135,40 @@ namespace vrui
         updateAmbientWiggle(deltaTime);
 
         auto& settings = VRUISettings::get();
-        if (settings.bEnableButtonEditMode && _node) {
+        const bool boardPositionAdjustment =
+            VRMenuManager::get().isPositionAdjustmentActive();
+        const bool pinMutationLocked = _isDashboardPinned && settings.lockPins;
+        if ((pinMutationLocked || boardPositionAdjustment) && _isGrabbed) {
+            if (_node) {
+                _node->local.translate = _grabInitialLocalButtonPos;
+                _node->local.rotate = _grabInitialLocalButtonRot;
+                _node->local.scale = _grabInitialLocalButtonScale;
+            }
+            if (_persistItemRotationOnGrab && _primaryVisualNode) {
+                _primaryVisualNode->local.translate = _grabInitialEditableLocalPos;
+                _primaryVisualNode->local.rotate = _grabInitialEditableLocalRot;
+                _primaryVisualNode->local.scale = _grabInitialEditableLocalScale;
+            }
+            if (_node) {
+                RE::NiUpdateData updateData;
+                updateData.flags = RE::NiUpdateData::Flag::kDirty;
+                _node->Update(updateData);
+                _node->UpdateWorldBound();
+            }
+            _isGrabbed = false;
+            _isTwoHandScaling = false;
+            _grabTimer = 0.0f;
+            updateLabelVisibility();
+            VRMenuManager::get().clearGrabbedWidget(this);
+            logger::trace(
+                "DragonBoardVR: active widget grab cancelled for '{}' (pinLocked={}, "
+                "boardPositionAdjustment={}).",
+                _label,
+                pinMutationLocked,
+                boardPositionAdjustment);
+        }
+        if (settings.bEnableButtonEditMode && !pinMutationLocked &&
+            !boardPositionAdjustment && _node) {
             if (_isGrabbed) {
                 if (!VRMenuManager::get().isDominantGripButtonDown()) {
                     releaseGrab();
@@ -1289,7 +1322,8 @@ namespace vrui
         }
 
         // --- HIGGS Dashboard Proximity Equip ---
-        if (_isDashboardPinned && _onPressHandler && _node && isVisible()) {
+        if (!boardPositionAdjustment && _isDashboardPinned &&
+            _onPressHandler && _node && isVisible()) {
             bool isDomGripDown = VRMenuManager::get().isDominantGripButtonDown();
             bool isOffGripDown = VRMenuManager::get().isOffhandGripButtonDown();
 
@@ -1375,7 +1409,8 @@ namespace vrui
 
 
         // --- Drag-to-Drop Generic Processing ---
-        if (_onGripDragHandler && _node && VRMenuManager::get().isMenuOpen()) {
+        if (!boardPositionAdjustment && _onGripDragHandler && _node &&
+            VRMenuManager::get().isMenuOpen()) {
             bool isGripDown = VRMenuManager::get().isDominantGripButtonDown();
             auto* hand = VRMenuManager::get().getDominantHandNode();
             auto* headNode = VRMenuManager::get().getHeadNode();
@@ -1455,6 +1490,10 @@ namespace vrui
 
     void VRUIButton::onSecondaryPress()
     {
+        if (_isDashboardPinned && VRUISettings::get().lockPins) {
+            logger::trace("DragonBoardVR: ignored secondary press on locked pin '{}'.", _label);
+            return;
+        }
         if (_onSecondaryPressHandler) {
             _onSecondaryPressHandler(this, EquipHand::kRight);
         }
@@ -1463,6 +1502,10 @@ namespace vrui
 
     void VRUIButton::onSecondaryLongPress()
     {
+        if (_isDashboardPinned && VRUISettings::get().lockPins) {
+            logger::trace("DragonBoardVR: ignored secondary long press on locked pin '{}'.", _label);
+            return;
+        }
         if (_onSecondaryLongPressHandler) {
             _onSecondaryLongPressHandler(this, EquipHand::kRight);
         }
@@ -1528,6 +1571,11 @@ namespace vrui
 
     void VRUIButton::startGrab()
     {
+        if (_isDashboardPinned && VRUISettings::get().lockPins) {
+            _grabTimer = 0.0f;
+            logger::trace("DragonBoardVR: ignored grab request for locked pin '{}'.", _label);
+            return;
+        }
         if (VRMenuManager::get().hasGrabbedWidget()) {
             auto grabbed = VRMenuManager::get().getGrabbedWidget();
             if (grabbed && grabbed.get() != this) {

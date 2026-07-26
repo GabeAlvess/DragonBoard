@@ -23,3 +23,12 @@
 *.ilk
 *.tlog
 *.log
+
+/Tools/IniScanner/.build/
+/Tools/IniScanner/__pycache__/
+/Tools/IniScanner/tests/__pycache__/
+
+# Local investigation artifacts, third-party source snapshots, and visual QA.
+/Backups/
+/External/
+/design-preview/

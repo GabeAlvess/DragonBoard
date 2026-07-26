@@ -37,6 +37,20 @@ namespace vrui
         constexpr std::size_t kInventoryBuildsPerFrame = 3;
         constexpr RE::FormID kGoldFormID = 0x0000000F;
 
+        float resolveMaximumActorValue(
+            RE::PlayerCharacter* player,
+            RE::ActorValue actorValue)
+        {
+            if (!player) return 0.0f;
+            const float current = player->GetActorValue(actorValue);
+            const float maximum =
+                player->GetPermanentActorValue(actorValue) +
+                player->GetActorValueModifier(
+                    RE::ACTOR_VALUE_MODIFIER::kTemporary,
+                    actorValue);
+            return std::max(current, maximum);
+        }
+
         bool isSupportedInventoryItem(const RE::TESBoundObject& item)
         {
             switch (item.GetFormType()) {
@@ -614,6 +628,13 @@ namespace vrui
         snapshot.playerName =
             playerName && *playerName ? playerName : "Dragonborn";
         snapshot.playerLevel = player->GetLevel();
+        const auto vitals = buildRmlPlayerVitals();
+        snapshot.currentHealth = vitals.currentHealth;
+        snapshot.maximumHealth = vitals.maximumHealth;
+        snapshot.currentStamina = vitals.currentStamina;
+        snapshot.maximumStamina = vitals.maximumStamina;
+        snapshot.currentMagicka = vitals.currentMagicka;
+        snapshot.maximumMagicka = vitals.maximumMagicka;
 
         if (auto* changes = player->GetInventoryChanges()) {
             snapshot.currentWeight = changes->GetInventoryWeight();
@@ -691,6 +712,28 @@ namespace vrui
                 return left < right;
             });
         return snapshot;
+    }
+
+    VRUIInventoryContainer::RmlPlayerVitals
+    VRUIInventoryContainer::buildRmlPlayerVitals() const
+    {
+        RmlPlayerVitals vitals;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return vitals;
+
+        vitals.currentHealth =
+            player->GetActorValue(RE::ActorValue::kHealth);
+        vitals.maximumHealth =
+            resolveMaximumActorValue(player, RE::ActorValue::kHealth);
+        vitals.currentStamina =
+            player->GetActorValue(RE::ActorValue::kStamina);
+        vitals.maximumStamina =
+            resolveMaximumActorValue(player, RE::ActorValue::kStamina);
+        vitals.currentMagicka =
+            player->GetActorValue(RE::ActorValue::kMagicka);
+        vitals.maximumMagicka =
+            resolveMaximumActorValue(player, RE::ActorValue::kMagicka);
+        return vitals;
     }
 
     std::uint64_t VRUIInventoryContainer::buildRmlInventorySignature() const

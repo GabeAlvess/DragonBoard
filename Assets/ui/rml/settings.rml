@@ -13,15 +13,14 @@
             </div>
 
             <div class="section-label">SETTINGS</div>
-            <button id="tab-general" class="nav-item"><span>General</span></button>
-            <button id="tab-visuals" class="nav-item"><span>Visuals</span></button>
-            <button id="tab-items" class="nav-item"><span>Item scale</span></button>
+            <button id="tab-general" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>General</span></button>
+            <button id="tab-visuals" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>Visuals</span></button>
+            <button id="tab-items" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>Item scale</span></button>
         </aside>
 
         <div class="content-shell">
             <header>
                 <div class="breadcrumb"><span class="breadcrumb-muted">Configuration</span><span class="breadcrumb-slash">/</span><span>DragonBoard</span></div>
-                <button id="close" class="close-button"><span>Close</span></button>
             </header>
 
             <main id="page-scroll">
@@ -30,11 +29,11 @@
                     <p class="lead">Adjust the overall size and spacing of your board.</p>
                     <div class="settings-card">
                         <div class="setting-row toggle-setting">
-                            <div class="setting-copy"><span class="setting-label">Item edit mode</span><span class="setting-help">Allow secondary-button editing in inventory, magic and other containers</span></div>
+                            <div class="setting-copy"><span class="setting-label">Lock Pins</span><span class="setting-help">Prevent pinned items from being edited, grabbed or removed</span></div>
                             <div class="toggle-space"></div>
-                            <button id="toggle-edit-mode" class="toggle-button">
+                            <button id="toggle-lock-pins" class="toggle-button">
                                 <span class="toggle-track"><span class="toggle-knob"></span></span>
-                                <span id="toggle-edit-state" class="toggle-state">Enabled</span>
+                                <span id="toggle-lock-pins-state" class="toggle-state">Unlocked</span>
                             </button>
                         </div>
                         <div class="setting-row toggle-setting">
@@ -58,12 +57,11 @@
                             <button id="restart-dragonboard" class="save-button restart-button"><span>Restart now</span></button>
                         </div>
                         <div class="setting-row featured">
-                            <div class="setting-copy"><span class="setting-label">Menu scale</span><span class="setting-help">Overall board size in your field of view</span></div>
-                            <input id="menuScale" type="range" class="range" min="0.25" max="3" step="0.01" value="1" />
-                            <span id="value-menuScale" class="value">1.00</span>
+                            <div class="setting-copy"><span class="setting-label">Position adjustment</span><span id="position-adjustment-help" class="setting-help">Grab with the laser hand; hold both grips and move the controllers apart or together to scale</span></div>
+                            <button id="position-adjustment" class="save-button position-adjustment-button"><span id="position-adjustment-state">Start adjustment</span></button>
                         </div>
                     </div>
-                    <div class="hint"><span class="hint-icon">i</span><span>Changes are previewed instantly. Save when the board feels comfortable at arm's length.</span></div>
+                    <div class="hint"><span class="hint-icon">i</span><span>Position is stored relative to the menu hand. Save when the board feels comfortable.</span></div>
                 </section>
 
                 <section id="page-visuals" class="page">
