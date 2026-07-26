@@ -1,28 +1,3 @@
-# DragonBoardVR
-
-DragonBoardVR is a native Skyrim VR plugin that turns a hand-mounted physical
-board into an interactive interface for inventory, magic, quests, settings,
-and mod actions.
-
-It combines Skyrim scene-graph objects with RmlUi pages rendered through
-Direct3D 11. Interaction supports laser input, front-face finger touch, and
-physical grabbing.
-
-DragonBoardVR is VR-only. Skyrim SE and AE are not supported.
-
-## Features
-
-- Inventory, Magic, Journal, Settings, Developer, and Mods pages
-- Laser and finger-touch interaction
-- Persistent board position, rotation, and two-hand scaling
-- 3D item previews and pinned items, spells, and widgets
-- Physical left/right-hand equipment actions
-- Map and quest markers
-- Mod Organizer 2 INI editor with a virtual keyboard
-- Optional HIGGS, VRIK, and Spell Wheel VR integrations
-- C++ and Papyrus APIs for external RmlUi pages
-- Standalone RmlUi preview tool
-
 ## Requirements
 
 - Windows 10 or 11 x64
