@@ -162,6 +162,7 @@ namespace dragonboard::ui::rml
         {
             using Filter = vrui::InventoryFilterMode;
             switch (filter) {
+            case Filter::Favorites: return "favorites";
             case Filter::WeaponsAll: return "weapons";
             case Filter::ArmorAll: return "armor";
             case Filter::ConsumablesAll: return "consumables";
@@ -176,6 +177,7 @@ namespace dragonboard::ui::rml
         {
             using Filter = vrui::MagicFilterMode;
             switch (filter) {
+            case Filter::Favorites: return "favorites";
             case Filter::Destruction: return "destruction";
             case Filter::Conjuration: return "conjuration";
             case Filter::Restoration: return "restoration";
@@ -967,6 +969,7 @@ namespace dragonboard::ui::rml
             _inventoryBackend = inventory;
             _inventoryPreviewBackend = preview;
         }
+        inventory->setFilter(vrui::InventoryFilterMode::Favorites);
         _inventoryPresenter.ResetForOpen();
         preview->setWorkingTransformChangedHandler({});
         preview->setInventoryPreviewInteractionHandler(
@@ -1023,6 +1026,7 @@ namespace dragonboard::ui::rml
             _magicBackend = magic;
             _magicPreviewBackend = preview;
         }
+        magic->setFilter(vrui::MagicFilterMode::Favorites);
         _magicPresenter.ResetForOpen();
         preview->setWorkingTransformChangedHandler({});
         preview->setInventoryPreviewInteractionHandler(
@@ -4082,6 +4086,9 @@ namespace dragonboard::ui::rml
                 case RmlInventoryAction::kClearSearch:
                     ApplyInventorySearchQueryPresentThread({});
                     break;
+                case RmlInventoryAction::kFilterFavorites:
+                    _inventoryActionPending.store(InventoryAction::kFilterFavorites);
+                    break;
                 case RmlInventoryAction::kFilterWeapons:
                     _inventoryActionPending.store(InventoryAction::kFilterWeapons);
                     break;
@@ -4160,6 +4167,9 @@ namespace dragonboard::ui::rml
                     break;
                 case RmlMagicAction::kClearSearch:
                     ApplyMagicSearchQueryPresentThread({});
+                    break;
+                case RmlMagicAction::kFilterFavorites:
+                    _magicActionPending.store(MagicAction::kFilterFavorites);
                     break;
                 case RmlMagicAction::kFilterDestruction:
                     _magicActionPending.store(MagicAction::kFilterDestruction);
@@ -7194,6 +7204,7 @@ namespace dragonboard::ui::rml
             Close();
             vrui::VRMenuManager::get().switchToPanel("MainPanel");
             return;
+        case InventoryAction::kFilterFavorites:
         case InventoryAction::kFilterWeapons:
         case InventoryAction::kFilterArmor:
         case InventoryAction::kFilterConsumables:
@@ -7204,6 +7215,7 @@ namespace dragonboard::ui::rml
                 using Filter = vrui::InventoryFilterMode;
                 Filter requested = Filter::All;
                 switch (action) {
+                case InventoryAction::kFilterFavorites: requested = Filter::Favorites; break;
                 case InventoryAction::kFilterWeapons: requested = Filter::WeaponsAll; break;
                 case InventoryAction::kFilterArmor: requested = Filter::ArmorAll; break;
                 case InventoryAction::kFilterConsumables: requested = Filter::ConsumablesAll; break;
@@ -7456,6 +7468,7 @@ namespace dragonboard::ui::rml
             Close();
             vrui::VRMenuManager::get().switchToPanel("MainPanel");
             return;
+        case MagicAction::kFilterFavorites:
         case MagicAction::kFilterDestruction:
         case MagicAction::kFilterConjuration:
         case MagicAction::kFilterRestoration:
@@ -7467,6 +7480,7 @@ namespace dragonboard::ui::rml
                 using Filter = vrui::MagicFilterMode;
                 Filter requested = Filter::All;
                 switch (action) {
+                case MagicAction::kFilterFavorites: requested = Filter::Favorites; break;
                 case MagicAction::kFilterDestruction: requested = Filter::Destruction; break;
                 case MagicAction::kFilterConjuration: requested = Filter::Conjuration; break;
                 case MagicAction::kFilterRestoration: requested = Filter::Restoration; break;

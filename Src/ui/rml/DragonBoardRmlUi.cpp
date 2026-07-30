@@ -677,6 +677,7 @@ namespace dragonboard::ui::rml
                 for (const auto* id : {
                          "inventory-equip", "inventory-drop", "inventory-pin",
                          "inventory-search", "inventory-search-clear",
+                         "inventory-filter-favorites",
                          "inventory-filter-weapons", "inventory-filter-armor",
                          "inventory-filter-consumables", "inventory-filter-quest",
                          "inventory-filter-books", "inventory-filter-misc" }) {
@@ -694,6 +695,7 @@ namespace dragonboard::ui::rml
                 for (const auto* id : {
                          "magic-equip", "magic-pin",
                          "magic-search", "magic-search-clear",
+                         "magic-filter-favorites",
                          "magic-filter-destruction", "magic-filter-conjuration",
                          "magic-filter-restoration", "magic-filter-illusion",
                          "magic-filter-alteration", "magic-filter-powers",
@@ -2996,7 +2998,8 @@ namespace dragonboard::ui::rml
                 "display", info.searchQuery.empty() ? "none" : "flex");
         }
 
-        constexpr std::array<std::pair<const char*, const char*>, 6> kInventoryFilters{ {
+        constexpr std::array<std::pair<const char*, const char*>, 7> kInventoryFilters{ {
+            { "inventory-filter-favorites", "favorites" },
             { "inventory-filter-weapons", "weapons" },
             { "inventory-filter-armor", "armor" },
             { "inventory-filter-consumables", "consumables" },
@@ -3319,7 +3322,8 @@ namespace dragonboard::ui::rml
             clear->SetProperty("display", info.searchQuery.empty() ? "none" : "flex");
         }
 
-        constexpr std::array<std::pair<const char*, const char*>, 7> kMagicFilters{ {
+        constexpr std::array<std::pair<const char*, const char*>, 8> kMagicFilters{ {
+            { "magic-filter-favorites", "favorites" },
             { "magic-filter-destruction", "destruction" },
             { "magic-filter-conjuration", "conjuration" },
             { "magic-filter-restoration", "restoration" },
@@ -4252,6 +4256,8 @@ namespace dragonboard::ui::rml
             _inventoryAction = InventoryAction::kSearch;
         } else if (value == "inventory-search-clear") {
             _inventoryAction = InventoryAction::kClearSearch;
+        } else if (value == "inventory-filter-favorites") {
+            _inventoryAction = InventoryAction::kFilterFavorites;
         } else if (value == "inventory-filter-weapons") {
             _inventoryAction = InventoryAction::kFilterWeapons;
         } else if (value == "inventory-filter-armor") {
@@ -4301,6 +4307,8 @@ namespace dragonboard::ui::rml
             _magicAction = MagicAction::kSearch;
         } else if (value == "magic-search-clear") {
             _magicAction = MagicAction::kClearSearch;
+        } else if (value == "magic-filter-favorites") {
+            _magicAction = MagicAction::kFilterFavorites;
         } else if (value == "magic-filter-destruction") {
             _magicAction = MagicAction::kFilterDestruction;
         } else if (value == "magic-filter-conjuration") {

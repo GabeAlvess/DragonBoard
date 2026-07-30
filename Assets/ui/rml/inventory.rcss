@@ -27,16 +27,16 @@ body {
 
 .category-strip {
     position: absolute;
-    left: 76px;
+    left: 68px;
     top: 92px;
-    width: 792px;
+    width: 884px;
     height: 116px;
     display: flex;
     align-items: center;
 }
 
 .inventory-filter {
-    width: 116px;
+    width: 112px;
     height: 116px;
     display: flex;
     align-items: center;
@@ -62,8 +62,8 @@ body {
 }
 
 .inventory-filter img {
-    width: 94px;
-    height: 94px;
+    width: 90px;
+    height: 90px;
     display: block;
     pointer-events: none;
 }
@@ -74,9 +74,9 @@ body {
 
 .mod-title-banner {
     position: absolute;
-    left: 1050px;
+    left: 972px;
     top: 92px;
-    width: 794px;
+    width: 884px;
     height: 116px;
     display: flex;
     align-items: center;
@@ -89,7 +89,7 @@ body {
 }
 
 .mod-title-banner .selected-name {
-    width: 760px;
+    width: 850px;
     height: 58px;
     max-height: 58px;
     margin-left: 0;

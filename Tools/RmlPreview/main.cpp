@@ -1467,7 +1467,7 @@ namespace
                     _document->GetElementById("inventory-scroll-proxy")) {
                 scroll->SetScrollTop(0.0f);
             }
-            if (auto* filter = _document->GetElementById("inventory-filter-weapons")) {
+            if (auto* filter = _document->GetElementById("inventory-filter-favorites")) {
                 filter->SetClass("active", true);
             }
             SetText("inventory-player-name", "Arthas");
@@ -1518,7 +1518,7 @@ namespace
                 scroll->SetScrollTop(0.0f);
             }
             UpdateSyntheticVirtualRows(true);
-            if (auto* filter = _document->GetElementById("magic-filter-conjuration")) {
+            if (auto* filter = _document->GetElementById("magic-filter-favorites")) {
                 filter->SetClass("active", true);
             }
             SetText("magic-player-name", "Arthas");

@@ -377,11 +377,15 @@ namespace vrui
 
 
     // Checks if an item passes the current sub-category filter
-    bool VRUIInventoryContainer::passesFilter(RE::TESBoundObject* item, InventoryFilterMode filter)
+    bool VRUIInventoryContainer::passesFilter(
+        RE::TESBoundObject* item,
+        InventoryFilterMode filter,
+        bool favorited)
     {
         using FM = InventoryFilterMode;
         if (!item) return false;
         if (filter == FM::All)       return true;
+        if (filter == FM::Favorites) return favorited;
         if (filter == FM::QuestItems) return (item->formFlags & 0x400u) != 0;
         if (filter == FM::Ammo)      return item->Is(RE::FormType::Ammo);
         if (filter == FM::Keys)      return item->Is(RE::FormType::KeyMaster);
@@ -489,7 +493,10 @@ namespace vrui
         std::vector<std::pair<RE::TESBoundObject*, std::pair<int32_t, RE::InventoryEntryData*>>> validItems;
         for (auto& [item, data] : inventory) {
             if (!item || data.first <= 0) continue;
-            if (!passesFilter(item, _filter)) continue;
+            if (!passesFilter(
+                    item,
+                    _filter,
+                    data.second && data.second->IsFavorited())) continue;
             validItems.push_back({ item, {data.first, data.second.get()} });
         }
 
@@ -665,7 +672,8 @@ namespace vrui
                 snapshot.gold = data.first;
                 continue;
             }
-            if (!passesFilter(item, _filter)) continue;
+            const bool favorited = data.second && data.second->IsFavorited();
+            if (!passesFilter(item, _filter, favorited)) continue;
 
             RmlItemData entry;
             entry.formID = item->formID;
@@ -685,7 +693,7 @@ namespace vrui
             entry.equippedRight = equipment.equippedRight;
             entry.equipmentMarker = equipment.marker;
             entry.equipmentState = equipment.state;
-            entry.favorited = data.second && data.second->IsFavorited();
+            entry.favorited = favorited;
             entry.canEquip = isEquippableItem(item);
 
             if (auto* weapon = item->As<RE::TESObjectWEAP>()) {

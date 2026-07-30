@@ -12,6 +12,7 @@ namespace vrui
 
     enum class InventoryFilterMode {
         All,
+        Favorites,
         // Weapons
         WeaponsAll, Swords, Daggers, Maces, WarAxes,
         Greatswords, Battleaxes, Warhammers, Bows, Crossbows, Staves, Torches,
@@ -116,13 +117,16 @@ namespace vrui
 
         std::string getModelPath(RE::TESBoundObject* item);
 
-        static bool passesFilter(RE::TESBoundObject* item, InventoryFilterMode filter);
+        static bool passesFilter(
+            RE::TESBoundObject* item,
+            InventoryFilterMode filter,
+            bool favorited = false);
 
         // Maps item FormID → button (populated during refresh, updated in place)
         std::unordered_map<uint32_t, std::weak_ptr<VRUIButton>> _formToButton;
 
         // Sub-category filter
-        InventoryFilterMode _filter = InventoryFilterMode::All;
+        InventoryFilterMode _filter = InventoryFilterMode::Favorites;
         void setFilter(InventoryFilterMode mode) { _filter = mode; _currentPage = 0; _cachedPageItems.clear(); }
         [[nodiscard]] InventoryFilterMode getFilter() const { return _filter; }
 

@@ -27,9 +27,9 @@ body {
 
 .magic-filter-strip {
     position: absolute;
-    left: 76px;
+    left: 68px;
     top: 92px;
-    width: 792px;
+    width: 884px;
     height: 116px;
     display: flex;
     align-items: center;
@@ -74,9 +74,9 @@ body {
 
 .spell-title-banner {
     position: absolute;
-    left: 1050px;
+    left: 972px;
     top: 100px;
-    width: 800px;
+    width: 884px;
     height: 100px;
     display: flex;
     align-items: center;
@@ -90,7 +90,7 @@ body {
 
 .spell-title {
     display: block;
-    width: 760px;
+    width: 850px;
     height: 58px;
     overflow: hidden;
     color: #eeeeee;

@@ -7,6 +7,7 @@
 <body>
     <div id="app" class="magic-app">
         <div class="magic-filter-strip">
+            <button id="magic-filter-favorites" class="magic-filter active" title="Favorites"><img src="assets/favoriteIcon.png" /></button>
             <button id="magic-filter-destruction" class="magic-filter" title="Destruction"><img src="assets/destructionicon.png" /></button>
             <button id="magic-filter-conjuration" class="magic-filter" title="Conjuration"><img src="assets/conjurationicon.png" /></button>
             <button id="magic-filter-restoration" class="magic-filter" title="Restoration"><img src="assets/restorationicon.png" /></button>

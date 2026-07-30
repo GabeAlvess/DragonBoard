@@ -84,10 +84,13 @@ namespace vrui
                  isPassive(spell));
         }
 
+        bool isFavorited(const RE::SpellItem* spell);
+
         bool passesFilter(const RE::SpellItem* spell, MagicFilterMode filter)
         {
             if (!isSupportedSpell(spell)) return false;
             if (filter == MagicFilterMode::All) return true;
+            if (filter == MagicFilterMode::Favorites) return isFavorited(spell);
             if (filter == MagicFilterMode::Powers) return isPower(spell);
             if (filter == MagicFilterMode::Passive) return isPassive(spell);
             if (spell->GetSpellType() != RE::MagicSystem::SpellType::kSpell) return false;

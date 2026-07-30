@@ -7,6 +7,7 @@
 <body>
     <div id="app" class="inventory-app">
         <div class="category-strip">
+            <button id="inventory-filter-favorites" class="inventory-filter active" title="Favorites"><img src="assets/favoriteIcon.png" /></button>
             <button id="inventory-filter-weapons" class="inventory-filter" title="Weapons"><img src="assets/weaponicon.png" /></button>
             <button id="inventory-filter-armor" class="inventory-filter" title="Armor"><img src="assets/armoricon.png" /></button>
             <button id="inventory-filter-consumables" class="inventory-filter" title="Consumables"><img src="assets/consumiblesicon.png" /></button>

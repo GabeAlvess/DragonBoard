@@ -12,6 +12,7 @@ namespace vrui
 
     enum class MagicFilterMode {
         All,
+        Favorites,
         Destruction,
         Conjuration,
         Restoration,
@@ -84,7 +85,7 @@ namespace vrui
         std::unordered_map<uint32_t, std::weak_ptr<VRUIButton>> _formToButton;
         
         bool _rmlBackendOnly = false;
-        MagicFilterMode _currentFilter = MagicFilterMode::All;
+        MagicFilterMode _currentFilter = MagicFilterMode::Favorites;
         void setFilter(MagicFilterMode mode) { _currentFilter = mode; _currentPage = 0; }
         [[nodiscard]] MagicFilterMode getFilter() const { return _currentFilter; }
     };
