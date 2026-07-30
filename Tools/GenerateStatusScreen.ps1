@@ -5,11 +5,11 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Destination,
 
-    [string]$Replacement = 'ImGui1.dds'
+    [string]$Replacement = 'RmlUI1.dds'
 )
 
 $sourceBytes = [System.IO.File]::ReadAllBytes($Source)
-$searchBytes = [System.Text.Encoding]::ASCII.GetBytes('ImGui0.dds')
+$searchBytes = [System.Text.Encoding]::ASCII.GetBytes('RmlUI0.dds')
 $replacementBytes = [System.Text.Encoding]::ASCII.GetBytes($Replacement)
 
 if ($searchBytes.Length -ne $replacementBytes.Length) {
@@ -33,7 +33,7 @@ for ($offset = 0; $offset -le $sourceBytes.Length - $searchBytes.Length; $offset
 }
 
 if ($matchCount -ne 1) {
-    throw "Expected exactly one ImGui0.dds reference in '$Source', found $matchCount."
+    throw "Expected exactly one RmlUI0.dds reference in '$Source', found $matchCount."
 }
 
 [System.Array]::Copy(

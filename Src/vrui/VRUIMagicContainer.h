@@ -71,6 +71,7 @@ namespace vrui
                                   float spacing = 3.6f, 
                                   float scale = 1.0f);
 
+        void setRmlBackendOnly(bool enabled) { _rmlBackendOnly = enabled; }
         void refresh() override;
         void updateEquippedStates() override;
 
@@ -82,6 +83,7 @@ namespace vrui
         // Maps spell FormID → button
         std::unordered_map<uint32_t, std::weak_ptr<VRUIButton>> _formToButton;
         
+        bool _rmlBackendOnly = false;
         MagicFilterMode _currentFilter = MagicFilterMode::All;
         void setFilter(MagicFilterMode mode) { _currentFilter = mode; _currentPage = 0; }
         [[nodiscard]] MagicFilterMode getFilter() const { return _currentFilter; }

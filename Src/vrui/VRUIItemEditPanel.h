@@ -91,6 +91,7 @@ namespace vrui
             RE::NiPoint3& position, RE::NiMatrix3& rotation, float& scale) const;
         void syncRotationFromPreviewGrab(const RE::NiMatrix3& localRotation);
         void updateInventoryPreviewInteraction();
+        void rebuildPreviewWidget();
 
         std::string _targetCategory;
         std::string _targetItemName;
@@ -102,7 +103,7 @@ namespace vrui
         std::shared_ptr<class VRUIButton> _previewWidget;
         float _baseScaleMult = 4.0f;
         float _normalizedScale = 1.0f;
-        bool _rmlPreviewMode = false;
+        bool _rmlPreviewMode = true;
         bool _previewRootTransformConfigured = false;
         RmlPreviewLayout _rmlPreviewLayout = RmlPreviewLayout::ItemEditor;
         InventoryPreviewInteractionHandler _inventoryPreviewInteractionHandler;

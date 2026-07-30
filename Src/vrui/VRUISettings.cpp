@@ -605,7 +605,6 @@ namespace vrui
         questMarkerRotX = (float)ini.GetDoubleValue("QuestMarker", "fRotX", questMarkerRotX);
         questMarkerRotY = (float)ini.GetDoubleValue("QuestMarker", "fRotY", questMarkerRotY);
         questMarkerRotZ = (float)ini.GetDoubleValue("QuestMarker", "fRotZ", questMarkerRotZ);
-        questMarkerNifPath = ini.GetValue("QuestMarker", "sMarkerNifPath", questMarkerNifPath.c_str());
         for (std::size_t slot = 0; slot < kQuestMarkerSlotCount; ++slot) {
             const auto suffix = slot == 0 ? std::string{} : std::to_string(slot + 1);
             questMarkerLastFormIDs[slot] = static_cast<std::uint32_t>(
@@ -970,7 +969,6 @@ namespace vrui
         ini.SetDoubleValue("QuestMarker", "fRotX", questMarkerRotX);
         ini.SetDoubleValue("QuestMarker", "fRotY", questMarkerRotY);
         ini.SetDoubleValue("QuestMarker", "fRotZ", questMarkerRotZ);
-        ini.SetValue("QuestMarker", "sMarkerNifPath", questMarkerNifPath.c_str());
         for (std::size_t slot = 0; slot < kQuestMarkerSlotCount; ++slot) {
             const auto suffix = slot == 0 ? std::string{} : std::to_string(slot + 1);
             ini.SetLongValue(
@@ -1266,7 +1264,7 @@ namespace vrui
         ini.SetValue("FixedButtons", "sMagicLabel",   bMagicLabel.c_str(),   "; Displayed name of the Magic button");
         ini.SetValue("FixedButtons", "sMagicAction",  bMagicAction.c_str(),  "; Action: MagicPanel or menu name");
         ini.SetValue("FixedButtons", "sSysLabel",     bSysLabel.c_str(),     "; Displayed name of the System button");
-        ini.SetValue("FixedButtons", "sSysAction",    bSysAction.c_str(),    "; Action: MCM_Panel or menu name");
+        ini.SetValue("FixedButtons", "sSysAction",    bSysAction.c_str(),    "; Action: Settings or menu name");
         ini.SetValue("FixedButtons", "sSaveLabel",    bSaveLabel.c_str(),    "; Displayed name of the Save button");
         ini.SetValue("FixedButtons", "sSaveAction",   bSaveAction.c_str(),   "; Action: QuickSave");
         ini.SetValue("FixedButtons", "sModsLabel",    bModsLabel.c_str(),    "; Displayed name of the Mods button");

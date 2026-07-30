@@ -273,7 +273,7 @@ namespace vrui
         float bMagicScale = 1.000000f;
 
         std::string bSysLabel  = "Settings";    
-        std::string bSysAction = "MCM_Panel";  
+        std::string bSysAction = "Settings";
         float bSysPosX = -12.000000f;  float bSysPosY = 0.000000f;  float bSysPosZ = -9.000000f;
         float bSysRotX = 0.000000f;  float bSysRotY = 0.000000f; float bSysRotZ = 0.000000f;
         float bSysScale = 0.800000f;   
@@ -381,7 +381,6 @@ namespace vrui
         float questMarkerRotX = 90.0f;
         float questMarkerRotY = 0.0f;
         float questMarkerRotZ = 180.0f;
-        std::string questMarkerNifPath = "meshes\\DragonBoardVR\\QuestMarker.nif";
         static constexpr std::size_t kQuestMarkerSlotCount = 3;
         std::array<std::uint32_t, kQuestMarkerSlotCount> questMarkerLastFormIDs{};
         std::array<std::uint32_t, kQuestMarkerSlotCount>

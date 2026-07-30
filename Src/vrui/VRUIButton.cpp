@@ -750,13 +750,6 @@ namespace vrui
         if (!_label.empty() || !_sublabel.empty()) {
             refreshLabel();
         }
-
-        // Re-apply equipped indicator if it was set before visuals were ready (deferInit = true).
-        // We reset the flag and call setEquipped() again so it loads the NIF now that _node is ready.
-        if (_isEquipped) {
-            _isEquipped = false; // reset so setEquipped() triggers the full load
-            setEquipped(true);
-        }
     }
 
     void VRUIButton::refreshLabel()
@@ -1523,50 +1516,7 @@ namespace vrui
 
     void VRUIButton::setEquipped(bool equipped)
     {
-        if (_isEquipped == equipped) return;
         _isEquipped = equipped;
-
-        // Lazily load-and-attach the indicator the FIRST time it's needed.
-        // After that, only toggle visibility with SetAppCulled — never
-        // AttachChild/DetachChild during gameplay. This prevents the race
-        // condition with hapticskyrimvr's magic-effect hook, which crashed
-        // when the NIF node was detached while it was processing an equip event.
-        if (!_equippedIndicatorNode && _node) {
-            auto indicator = loadModelFromNif("DragonBoardVR\\isEquipped.nif");
-            if (indicator) {
-                indicator->name = "EquippedIndicator";
-
-                // Face the same direction as the button face (90° X, 180° Z)
-                constexpr float kDeg2Rad = 3.14159265f / 180.0f;
-                RE::NiMatrix3 faceRot;
-                faceRot.SetEulerAnglesXYZ(90.0f * kDeg2Rad, 0.0f, 180.0f * kDeg2Rad);
-                indicator->local.rotate = faceRot;
-
-                // Scale to match the button's smallest dimension
-                float btnSize = (_width < _height ? _width : _height);
-                indicator->local.scale = btnSize;
-
-                // Slightly in front of the button face
-                indicator->local.translate = { 0.0f, -0.05f, 0.0f };
-
-                // Start hidden — we'll un-cull it immediately below if equipped
-                indicator->SetAppCulled(true);
-
-                getVisualParentNode()->AttachChild(indicator.get());
-                _equippedIndicatorNode = std::move(indicator);
-
-                RE::NiUpdateData upd;
-                _node->Update(upd);
-                logger::trace("DragonBoardVR: Button '{}' equipped indicator loaded", _label);
-            } else {
-                logger::warn("DragonBoardVR: Button '{}' failed to load isEquipped.nif", _label);
-            }
-        }
-
-        // Toggle visibility only — no further scenegraph structural changes
-        if (_equippedIndicatorNode) {
-            _equippedIndicatorNode->SetAppCulled(!equipped);
-        }
     }
 
     void VRUIButton::startGrab()

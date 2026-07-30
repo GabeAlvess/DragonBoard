@@ -35,7 +35,7 @@ Pronto quando: o branch puder ser reconstruído a partir de commits com escopo c
 - [ ] Comparar hashes do build, staging e mod ativo do MO2.
 - [ ] Documentar o procedimento de deploy com Skyrim completamente encerrado.
 
-Evidência atual: `install_output` contém `symbol.nif`, uma screenshot e `ImGuiStatus.dds` que não existem na árvore atual de `Assets`; o build não limpa a saída.
+Evidência atual: o build não limpa arquivos inesperados acumulados anteriormente em `install_output`; o pacote precisa ser produzido em staging limpa.
 
 Pronto quando: dois builds de um checkout limpo produzirem a mesma lista de arquivos e o mesmo conteúdo, exceto metadados explicitamente não determinísticos.
 
@@ -48,7 +48,7 @@ Pronto quando: dois builds de um checkout limpo produzirem a mesma lista de arqu
 - [ ] Compilar e empacotar `DragonBoardVR_PlayerAlias.pex` se ele fizer parte da instalação final.
 - [ ] Validar todos os caminhos internos de textura dos NIFs e evitar nomes genéricos que substituam assets do Skyrim.
 
-Evidência atual: `Assets/meshes` contém apenas `dragonboard.nif` e `ImGuiScreen.nif`, enquanto o source referencia dezenas de meshes DragonBoardVR. O pipeline só instala `DragonBoardVR.pex`.
+Evidência atual: `Assets/meshes` contém apenas os meshes diretamente mantidos pelo pacote, incluindo `dragonboard.nif` e `RmlUIScreen.nif`, enquanto o source referencia dezenas de meshes DragonBoardVR. O pipeline só instala `DragonBoardVR.pex`.
 
 Pronto quando: uma instalação feita somente a partir do pacote gerado pelo repositório carregue todos os elementos esperados sem depender de restos de uma versão anterior.
 

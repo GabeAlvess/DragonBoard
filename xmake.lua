@@ -95,25 +95,19 @@ target('DragonBoardVR')
     add_installfiles('Assets/integrations/spellwheel/SKSE/Plugins/SpellWheelVR_CustomConsoleCommand_DragonBoardVR.ini', {
         prefixdir = 'SKSE/Plugins'
     })
-    add_installfiles('Assets/meshes/DragonBoardVR/ImGuiScreen.nif', {
+    add_installfiles('Assets/meshes/DragonBoardVR/RmlUIScreen.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
     add_installfiles('Assets/meshes/DragonBoardVR/dragonboard.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
-    add_installfiles('Assets/meshes/DragonBoardVR/QuestMarker.nif', {
-        prefixdir = 'meshes/DragonBoardVR'
-    })
     add_installfiles('Assets/meshes/DragonBoardVR/DBMarker*.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
-    add_installfiles('Assets/textures/ImGui0.dds', {
+    add_installfiles('Assets/textures/RmlUI0.dds', {
         prefixdir = 'textures'
     })
     add_installfiles('Assets/textures/DragonBoardMat_*.dds', {
-        prefixdir = 'textures'
-    })
-    add_installfiles('Assets/textures/DBQuestMark*.dds', {
         prefixdir = 'textures'
     })
     add_installfiles('Assets/textures/DBMarker*.dds', {
@@ -139,18 +133,16 @@ target('DragonBoardVR')
         local targetFile = target:targetfile()
         local installFile = path.join(outputDir, path.filename(targetFile))
         os.cp(targetFile, installFile)
-        local screenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'ImGuiScreen.nif')
+        local screenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif')
         local spellWheelNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard.nif')
-        local questMarkerNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'QuestMarker.nif')
         local categoryMarkerNifs = path.join(
             os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'DBMarker*.nif')
-        local screenTexture = path.join(os.projectdir(), 'Assets', 'textures', 'ImGui0.dds')
+        local screenTexture = path.join(os.projectdir(), 'Assets', 'textures', 'RmlUI0.dds')
         local spellWheelTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DragonBoardMat_*.dds')
-        local questMarkerTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DBQuestMark*.dds')
         local categoryMarkerTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DBMarker*.dds')
         os.mkdir(path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.mkdir(path.join(installRoot, 'textures'))
-        os.cp(screenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'ImGuiScreen.nif'))
+        os.cp(screenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif'))
         os.vrunv('powershell', {
             '-NoProfile',
             '-ExecutionPolicy', 'Bypass',
@@ -165,7 +157,7 @@ target('DragonBoardVR')
             '-Source', screenNif,
             '-Destination', path.join(
                 installRoot, 'meshes', 'DragonBoardVR', 'KeyboardScreen.nif'),
-            '-Replacement', 'ImGui2.dds'
+            '-Replacement', 'RmlUI2.dds'
         })
         os.vrunv('powershell', {
             '-NoProfile',
@@ -174,17 +166,15 @@ target('DragonBoardVR')
             '-Source', screenNif,
             '-Destination', path.join(
                 installRoot, 'meshes', 'DragonBoardVR', 'TutorialScreen.nif'),
-            '-Replacement', 'ImGui3.dds'
+            '-Replacement', 'RmlUI3.dds'
         })
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
-        os.cp(questMarkerNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'QuestMarker.nif'))
         os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
-        os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui0.dds'))
-        os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui1.dds'))
-        os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui2.dds'))
-        os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui3.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI0.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI1.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI2.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI3.dds'))
         os.cp(spellWheelTextures, path.join(installRoot, 'textures'))
-        os.cp(questMarkerTextures, path.join(installRoot, 'textures'))
         os.cp(categoryMarkerTextures, path.join(installRoot, 'textures'))
         local rmlUiDir = path.join(os.projectdir(), 'Assets', 'ui', 'rml')
         local installedRmlUiDir = path.join(outputDir, 'DragonBoardVR', 'ui')

@@ -15,9 +15,6 @@
 /simpleini/
 /xbyak/
 
-/External/ImGuiVRHelper/.xmake/
-/External/ImGuiVRHelper/build/
-
 *.obj
 *.pdb
 *.ilk

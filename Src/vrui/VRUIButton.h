@@ -121,8 +121,7 @@ namespace vrui
         /// Disable the pop-in scale animation (for inventory items where it causes visual noise)
         void setNoPopAnimation(bool val) { _noPopAnimation = val; }
 
-        // --- Equipped indicator ---
-        /// Show or hide the DragonBoardVR/isEquipped.nif indicator overlay
+        // --- Equipped state ---
         void setEquipped(bool equipped);
         bool isEquipped() const { return _isEquipped; }
 
@@ -264,9 +263,7 @@ namespace vrui
         bool _isGripDragging = false;
         RE::NiPoint3 _gripDragStartHandPos;
 
-        // Equipped item indicator (DragonBoardVR/isEquipped.nif overlay)
         bool _isEquipped = false;
-        RE::NiPointer<RE::NiNode> _equippedIndicatorNode;
 
         // Dynamic label offset (for inventory/magic/favorites containers)
         bool _useDynamicLabelOffset = false;

@@ -47,10 +47,10 @@ The integration is split by responsibility:
   internal implementation detail.
 - `Assets/ui/rml/` contains DragonBoardVR's built-in documents.
 
-The old ImGui renderer and ImGui VR Helper client are no longer compiled or
-initialized. `ImGuiScreen.nif` and `ImGui0.dds` retain their historical file
-names only because the NIF is the packaged physical quad used by existing
-installations. The runtime content rendered onto it is exclusively RmlUi.
+The legacy immediate-mode renderer and its external helper are no longer
+compiled or initialized. `RmlUIScreen.nif` is the packaged physical quad, and
+`RmlUI0.dds` is its dedicated diffuse resource. The runtime content rendered
+onto it is exclusively RmlUi.
 
 ## Runtime flow
 
@@ -106,7 +106,7 @@ The documents are:
 
 If a requested document cannot load, the host logs the error and rejects it.
 Settings and Item Editor callers may then use their existing native 3D panel;
-there is no ImGui fallback with independent behavior.
+there is no legacy renderer fallback with independent behavior.
 
 ## Creating a page panel
 
@@ -161,15 +161,15 @@ created when the NIF loads. Cloning a shader property or calling `SetMaterial`
 after load is not sufficient: the widget can display the placeholder on its
 first frame and later sample the last main-panel texture.
 
-The build therefore generates `StatusScreen.nif` from `ImGuiScreen.nif` with
-the internal path changed from `textures\\ImGui0.dds` to
-`textures\\ImGui1.dds`. `Tools/GenerateStatusScreen.ps1` performs a same-length
+The build therefore generates `StatusScreen.nif` from `RmlUIScreen.nif` with
+the internal path changed from `textures\\RmlUI0.dds` to
+`textures\\RmlUI1.dds`. `Tools/GenerateStatusScreen.ps1` performs a same-length
 binary replacement, and `xmake.lua` installs both the generated NIF and
-`ImGui1.dds`. Runtime code then replaces `NiSourceTexture::rendererTexture`
+`RmlUI1.dds`. Runtime code then replaces `NiSourceTexture::rendererTexture`
 directly, which is the same proven binding path used by the main surface.
 
-Do not copy `ImGuiScreen.nif` unchanged for another surface. Allocate the next
-texture name (for example `ImGui2.dds`), generate a NIF that already references
+Do not copy `RmlUIScreen.nif` unchanged for another surface. Allocate the next
+texture name (for example `RmlUI2.dds`), generate a NIF that already references
 that name, and keep the binding direct.
 
 ### Thread and visibility lifecycle

@@ -95,6 +95,8 @@ namespace vrui
                                       float spacing = 3.6f, 
                                       float scale = 1.0f);
 
+        void setRmlBackendOnly(bool enabled) { _rmlBackendOnly = enabled; }
+
         void refresh() override;
         void update(float deltaTime) override;
         int getTotalPages() const override;
@@ -155,6 +157,7 @@ namespace vrui
         std::vector<PendingInventoryItem> _pendingBuildItems;
         std::size_t _pendingBuildIndex = 0;
         bool _pendingLayoutCommit = false;
+        bool _rmlBackendOnly = false;
 
         bool spawnItemInHand(RE::FormID formID, EquipHand hand);
         void appendInventoryButton(const PendingInventoryItem& pending);

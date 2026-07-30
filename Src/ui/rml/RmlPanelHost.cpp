@@ -2561,7 +2561,7 @@ namespace dragonboard::ui::rml
 
         if (!surface.node) {
             surface.node = vrui::VRUIWidget::loadModelFromNif(
-                "DragonBoardVR\\ImGuiScreen.nif", false);
+                "DragonBoardVR\\RmlUIScreen.nif", false);
             if (!surface.node) {
                 return false;
             }
@@ -2605,7 +2605,7 @@ namespace dragonboard::ui::rml
                 });
 
             if (!surface.sourceTexture || !surface.originalRendererTexture) {
-                logger::warn("DragonBoardVR: ImGuiScreen.nif has no usable dedicated diffuse texture.");
+                logger::warn("DragonBoardVR: RmlUIScreen.nif has no usable dedicated diffuse texture.");
                 surface.node = nullptr;
                 surface.sourceTexture = nullptr;
                 return false;

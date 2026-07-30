@@ -542,6 +542,12 @@ namespace vrui
 
     void VRUIMagicContainer::refresh()
     {
+        if (_rmlBackendOnly) {
+            clearElements();
+            _formToButton.clear();
+            return;
+        }
+
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) return;
 
@@ -653,6 +659,8 @@ namespace vrui
 
     void VRUIMagicContainer::updateEquippedStates()
     {
+        if (_rmlBackendOnly) return;
+
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) return;
 

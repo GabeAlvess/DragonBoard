@@ -458,6 +458,16 @@ namespace vrui
 
     void VRUIInventoryContainer::refresh()
     {
+        if (_rmlBackendOnly) {
+            clearElements();
+            _formToButton.clear();
+            _pendingBuildItems.clear();
+            _cachedPageItems.clear();
+            _pendingBuildIndex = 0;
+            _pendingLayoutCommit = false;
+            return;
+        }
+
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) return;
 
@@ -1371,6 +1381,8 @@ namespace vrui
 
     void VRUIInventoryContainer::updateEquippedStates()
     {
+        if (_rmlBackendOnly) return;
+
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) return;
 

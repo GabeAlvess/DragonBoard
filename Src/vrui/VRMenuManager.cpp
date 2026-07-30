@@ -70,8 +70,10 @@ namespace vrui
                     *this, "ItemEditPanel");
                 return;
             }
-            logger::warn(
-                "DragonBoardVR: RmlUi inventory unavailable; using classic InventoryPanel.");
+            logger::error(
+                "DragonBoardVR: RmlUi inventory unavailable; classic fallback was removed.");
+            rmlHost.Close();
+            return;
         }
         if (panelName == "MagicPanel") {
             const auto magicPanel = findPanelByName("MagicPanel");
@@ -87,11 +89,19 @@ namespace vrui
                     *this, "ItemEditPanel");
                 return;
             }
-            logger::warn(
-                "DragonBoardVR: RmlUi magic unavailable; using classic MagicPanel.");
+            logger::error(
+                "DragonBoardVR: RmlUi magic unavailable; classic fallback was removed.");
+            rmlHost.Close();
+            return;
         }
-        if (panelName == "ModsPanel" && rmlHost.OpenMods()) {
-            dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);
+        if (panelName == "ModsPanel") {
+            if (rmlHost.OpenMods()) {
+                dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);
+            } else {
+                logger::error(
+                    "DragonBoardVR: RmlUi Mods unavailable; classic fallback was removed.");
+                rmlHost.Close();
+            }
             return;
         }
         if (panelName == "ItemEditPanel") {
@@ -108,9 +118,11 @@ namespace vrui
                     dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);
                     return;
                 }
-                if (editor) editor->setRmlPreviewMode(false);
             }
-            logger::warn("DragonBoardVR: RmlUi item editor unavailable; using classic ItemEditPanel.");
+            logger::error(
+                "DragonBoardVR: RmlUi item editor unavailable; classic fallback was removed.");
+            rmlHost.Close();
+            return;
         }
         rmlHost.Close();
         dragonboard::ui::panels::PanelManagementController::SwitchTo(*this, panelName);

@@ -3,7 +3,7 @@
 Standalone Windows editor and live preview for any RmlUi document. It renders at the same
 logical resolution used in Skyrim VR (1920x1080) and reuses the production
 D3D11 RmlUi renderer, but it does not load SKSE, CommonLib, Skyrim, the Present
-hook or ImGui.
+hook or any native overlay dependency.
 
 ## Build and run
 
