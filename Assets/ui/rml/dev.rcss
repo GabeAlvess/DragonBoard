@@ -966,3 +966,106 @@
 .command-workspace {
     width: 1381px;
 }
+
+/* Compact typography for longer Russian Developer labels. */
+.lang-ru .dev-sidebar .brand-name {
+    font-size: 40px;
+}
+
+.lang-ru .dev-sidebar .nav-item {
+    font-size: 32px;
+    line-height: 1.05;
+}
+
+.lang-ru .developer-status-line {
+    font-size: 26px;
+}
+
+.lang-ru .subheading {
+    font-size: 24px;
+    letter-spacing: 2px;
+}
+
+.lang-ru .command-title {
+    font-size: 46px;
+}
+
+.lang-ru .command-description {
+    font-size: 31px;
+}
+
+.lang-ru .console-label {
+    font-size: 24px;
+    letter-spacing: 1px;
+}
+
+.lang-ru .warning {
+    font-size: 24px;
+}
+
+.lang-ru .add-command-button,
+.lang-ru .execute-button {
+    font-size: 28px;
+}
+
+.lang-ru .performance-card .subheading,
+.lang-ru .runtime-card .subheading {
+    font-size: 28px;
+}
+
+.lang-ru .runtime-card .info-row {
+    font-size: 30px;
+}
+
+.lang-ru .performance-card .info-row {
+    font-size: 27px;
+}
+
+.lang-ru .performance-card .timing-row {
+    font-size: 25px;
+}
+
+.lang-ru .timing-header {
+    font-size: 22px;
+    letter-spacing: 0px;
+}
+
+.lang-ru .info-note {
+    font-size: 25px;
+}
+
+.lang-ru .dev-footer-hints {
+    font-size: 27px;
+}
+
+.lang-ru .dev-hint-divider {
+    margin: 0 20px;
+}
+
+.lang-ru .calibration-title {
+    display: block;
+    width: 100%;
+    font-size: 29px;
+}
+
+.lang-ru .calibration-instructions {
+    display: block;
+    width: 100%;
+    font-size: 23px;
+}
+
+.lang-ru .calibration-city {
+    font-size: 24px;
+}
+
+.lang-ru .calibration-status {
+    font-size: 17px;
+}
+
+.lang-ru .calibration-reset {
+    font-size: 20px;
+}
+
+.lang-ru .calibration-surface {
+    font-size: 24px;
+}

@@ -13,6 +13,7 @@ set_toolset('msvc', 'ninja')
 add_rules('mode.debug', 'mode.releasedbg', 'mode.release')
 
 add_requires('rmlui 6.2', { configs = { shared = false, lua = false, svg = false, lottie = false } })
+add_requires('nlohmann_json')
 
 -- CommonLibSSE-NG enables SE, AE, and VR by default. Override those dependency
 -- options here so a plain `xmake f` cannot accidentally produce a cross-runtime
@@ -34,7 +35,7 @@ option_end()
 
 target('DragonBoardVR')
     add_deps('commonlibsse-ng')
-    add_packages('rmlui')
+    add_packages('rmlui', 'nlohmann_json')
     add_syslinks('d3d11', 'd3dcompiler', 'windowscodecs', 'ole32', 'bcrypt')
 
     on_config(function ()
@@ -258,7 +259,7 @@ target('DragonBoardRmlPreview')
     set_default(false)
     set_rundir('$(projectdir)')
 
-    add_packages('rmlui')
+    add_packages('rmlui', 'nlohmann_json')
     add_links('rmlui_debugger')
     add_syslinks('d3d11', 'd3dcompiler', 'dxgi', 'user32', 'gdi32', 'shell32', 'comdlg32', 'comctl32', 'windowscodecs', 'ole32')
 
@@ -266,6 +267,7 @@ target('DragonBoardRmlPreview')
         'Tools/RmlPreview/main.cpp',
         'Tools/RmlPreview/RmlSourceEditor.cpp',
         'Tools/RmlPreview/RmlVisualInspector.cpp',
+        'Src/ui/rml/LocalizationManager.cpp',
         'Src/ui/rml/D3D11StateGuard.cpp',
         'Src/ui/rml/DragonBoardRmlRenderer.cpp',
         'Src/ui/rml/RmlPerformanceMetrics.cpp',

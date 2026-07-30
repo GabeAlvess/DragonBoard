@@ -187,3 +187,29 @@ body {
     position: absolute;
     z-index: 100;
 }
+
+#keyboard-app.lang-ru .keyboard-brand {
+    font-size: 30px;
+    letter-spacing: 0px;
+}
+
+#keyboard-app.lang-ru .keyboard-prompt {
+    font-size: 46px;
+}
+
+#keyboard-app.lang-ru .key-shift {
+    font-size: 30px;
+}
+
+#keyboard-app.lang-ru #keyboard-clear {
+    font-size: 27px;
+}
+
+#keyboard-app.lang-ru #keyboard-space,
+#keyboard-app.lang-ru #keyboard-cancel {
+    font-size: 30px;
+}
+
+#keyboard-app.lang-ru #keyboard-confirm {
+    font-size: 28px;
+}

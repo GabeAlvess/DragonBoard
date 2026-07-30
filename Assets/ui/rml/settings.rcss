@@ -1616,6 +1616,95 @@ input.range sliderbar:active {
     border-color: transparent;
 }
 
+/* Russian strings need denser type and flexible rows; English keeps the base layout. */
+.lang-ru .nav-item {
+    height: auto;
+    min-height: 76px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    font-size: 30px;
+}
+
+.lang-ru .nav-item span {
+    line-height: 34px;
+}
+
+.lang-ru .breadcrumb {
+    font-size: 42px;
+}
+
+.lang-ru h1 {
+    font-size: 60px;
+}
+
+.lang-ru .lead {
+    font-size: 34px;
+    line-height: 40px;
+}
+
+.lang-ru .setting-row {
+    height: auto;
+    min-height: 152px;
+    padding-top: 18px;
+    padding-bottom: 18px;
+}
+
+.lang-ru .setting-label {
+    font-size: 40px;
+    line-height: 46px;
+}
+
+.lang-ru .setting-help {
+    font-size: 28px;
+    line-height: 34px;
+}
+
+#page-general .setting-copy {
+    width: 820px;
+}
+
+#page-general .toggle-space {
+    width: auto;
+    flex: 1;
+}
+
+.lang-ru .toggle-space {
+    width: auto;
+    flex: 1;
+}
+
+.lang-ru .toggle-button {
+    width: 420px;
+    min-width: 420px;
+    font-size: 25px;
+}
+
+.lang-ru .toggle-state {
+    width: 310px;
+    min-width: 310px;
+}
+
+.lang-ru .position-adjustment-button {
+    width: auto;
+    min-width: 230px;
+    font-size: 27px;
+}
+
+.lang-ru .language-current {
+    font-size: 26px;
+    line-height: 34px;
+}
+
+.lang-ru .restart-button,
+.lang-ru .save-button {
+    font-size: 27px;
+}
+
+.lang-ru .hint {
+    font-size: 22px;
+    line-height: 34px;
+}
+
 footer {
     height: 150px;
     padding: 0 72px 0 96px;

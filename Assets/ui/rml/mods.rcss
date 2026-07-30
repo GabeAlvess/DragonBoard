@@ -114,3 +114,16 @@
 .mods-discard-button { position: relative; top: -26px; display: none; width: 190px; height: 66px; align-items: center; justify-content: center; margin-right: 16px; padding: 0; color: #dddddd; font-size: 34px; text-align: center; background-color: #343636; border: 1px #626464; border-radius: 5px; }
 .mods-discard-button span { display: block; width: 100%; text-align: center; pointer-events: none; }
 .mods-discard-button.disabled { color: #777979; border-color: #484a4a; }
+
+.lang-ru .mods-tab { font-size: 36px; }
+.lang-ru .mods-empty { font-size: 38px; line-height: 1.1; }
+.lang-ru .mods-control-hints { font-size: 28px; }
+.lang-ru .mods-hint-divider { margin: 0 18px; }
+.lang-ru .mods-add-label { font-size: 28px; }
+.lang-ru .ini-status { font-size: 30px; }
+.lang-ru .ini-refresh { font-size: 28px; }
+.lang-ru .mods-sidebar .mods-empty { font-size: 30px; }
+.lang-ru .ini-detail-empty { font-size: 38px; line-height: 1.1; }
+.lang-ru .ini-footer-copy { font-size: 30px; }
+.lang-ru .mods-save-button { font-size: 24px; }
+.lang-ru .mods-discard-button { font-size: 28px; }

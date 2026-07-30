@@ -799,6 +799,74 @@ body {
     pointer-events: none;
 }
 
+.magic-app.lang-ru .spell-title {
+    font-size: 38px;
+    line-height: 1.08;
+}
+
+.magic-app.lang-ru .list-heading {
+    font-size: 36px;
+    letter-spacing: 2px;
+}
+
+.magic-app.lang-ru .magic-list-item {
+    font-size: 43px;
+}
+
+.magic-app.lang-ru .spell-name {
+    line-height: 1.08;
+}
+
+.magic-app.lang-ru .magic-empty {
+    font-size: 44px;
+}
+
+.magic-app.lang-ru .spell-category {
+    font-size: 24px;
+    letter-spacing: 2px;
+}
+
+.magic-app.lang-ru .description-text {
+    font-size: 29px;
+    line-height: 1.08;
+}
+
+.magic-app.lang-ru .attribute-label {
+    font-size: 24px;
+}
+
+.magic-app.lang-ru .attribute-value.text-value {
+    font-size: 38px;
+}
+
+.magic-app.lang-ru .half-row .attribute-label {
+    font-size: 15px;
+    line-height: 1.02;
+    white-space: normal;
+}
+
+.magic-app.lang-ru .half-row .attribute-value.text-value {
+    font-size: 17px;
+    line-height: 1.05;
+    white-space: normal;
+}
+
+.magic-app.lang-ru .magic-action {
+    font-size: 26px;
+    letter-spacing: 1px;
+}
+
+.magic-app.lang-ru .pin-option {
+    font-size: 17px;
+    line-height: 1.05;
+}
+
+.magic-app.lang-ru .pin-option span {
+    display: block;
+    width: 100%;
+    text-align: center;
+}
+
 .magic-player-vitals {
     position: absolute;
     left: 1320px;

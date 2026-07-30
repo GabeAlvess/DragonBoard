@@ -1,4 +1,5 @@
 #include "ui/rml/DragonBoardRmlRenderer.h"
+#include "ui/rml/LocalizationManager.h"
 #include "ui/rml/RmlPerformanceMetrics.h"
 #include "ui/rml/RmlVirtualList.h"
 #include "RmlSourceEditor.h"
@@ -23,6 +24,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -33,6 +35,7 @@ namespace
 {
     using Microsoft::WRL::ComPtr;
     using dragonboard::ui::rml::DragonBoardRmlRenderer;
+    using dragonboard::ui::rml::LocalizationManager;
     using dragonboard::ui::rml::RmlPerformanceMetrics;
     using dragonboard::ui::rml::RmlVirtualList;
     using dragonboard::tools::RmlSourceEditor;
@@ -138,7 +141,10 @@ namespace
     class PreviewApp
     {
     public:
-        bool Initialize(HINSTANCE instance, const std::optional<std::filesystem::path>& requestedDocument)
+        bool Initialize(
+            HINSTANCE instance,
+            const std::optional<std::filesystem::path>& requestedDocument,
+            std::string_view requestedLanguage)
         {
             _assetsDirectory = FindAssetsDirectory();
             if (!CreatePreviewWindow(instance) || !CreateD3D()) return false;
@@ -152,6 +158,7 @@ namespace
             _context = Rml::CreateContext(
                 kContextName, Rml::Vector2i(kCanvasWidth, kCanvasHeight), &_renderer);
             if (!_context || !LoadFont()) return false;
+            _localization.Load(requestedLanguage);
 
             _listener = std::make_unique<PreviewEventListener>(*this);
             if (!_sourceEditor.Create(
@@ -709,6 +716,7 @@ namespace
                 std::filesystem::path("SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf"),
                 std::filesystem::path("Assets/ui/rml/assets/DragonBoardVR_Font.ttf")
             };
+            bool primaryLoaded = false;
             for (const auto& path : candidates) {
                 std::ifstream stream(path, std::ios::binary | std::ios::ate);
                 if (!stream) continue;
@@ -721,8 +729,39 @@ namespace
                 if (Rml::LoadFontFace(
                         bytes, "DragonBoard", Rml::Style::FontStyle::Normal,
                         Rml::Style::FontWeight::Normal)) {
-                    return true;
+                    primaryLoaded = true;
+                    break;
                 }
+            }
+            if (primaryLoaded) {
+                const std::array<std::filesystem::path, 4> fallbackCandidates{
+                    _assetsDirectory / "assets" / "NotoSansCJKsc-Regular.otf",
+                    std::filesystem::path("Data/SKSE/Plugins/DragonBoardVR/ui/assets/NotoSansCJKsc-Regular.otf"),
+                    std::filesystem::path("SKSE/Plugins/DragonBoardVR/ui/assets/NotoSansCJKsc-Regular.otf"),
+                    std::filesystem::path("Assets/ui/rml/assets/NotoSansCJKsc-Regular.otf")
+                };
+                for (const auto& path : fallbackCandidates) {
+                    std::ifstream stream(path, std::ios::binary | std::ios::ate);
+                    if (!stream) continue;
+                    const auto size = stream.tellg();
+                    if (size <= 0) continue;
+                    _fallbackFontData.resize(static_cast<std::size_t>(size));
+                    stream.seekg(0);
+                    if (!stream.read(
+                            reinterpret_cast<char*>(_fallbackFontData.data()), size)) {
+                        _fallbackFontData.clear();
+                        continue;
+                    }
+                    const Rml::Span<const Rml::byte> bytes(
+                        _fallbackFontData.data(), _fallbackFontData.size());
+                    if (Rml::LoadFontFace(
+                            bytes, "DragonBoardCJK", Rml::Style::FontStyle::Normal,
+                            Rml::Style::FontWeight::Normal, true)) {
+                        break;
+                    }
+                    _fallbackFontData.clear();
+                }
+                return true;
             }
             std::cerr << "No usable font was found.\n";
             return false;
@@ -741,7 +780,12 @@ namespace
                 return false;
             }
 
-            auto* nextDocument = _context->LoadDocument(path.string());
+            std::ifstream stream(path, std::ios::binary);
+            const std::string source{
+                std::istreambuf_iterator<char>(stream),
+                std::istreambuf_iterator<char>() };
+            auto* nextDocument = _context->LoadDocumentFromMemory(
+                _localization.TranslateMarkup(source), path.string());
             if (!nextDocument) {
                 SetStatus("Failed to load " + path.filename().string());
                 return false;
@@ -778,7 +822,8 @@ namespace
         {
             if (!_context || !_document) return;
             if (path.extension() == ".rml") {
-                auto* nextDocument = _context->LoadDocumentFromMemory(source, path.string());
+                auto* nextDocument = _context->LoadDocumentFromMemory(
+                    _localization.TranslateMarkup(source), path.string());
                 if (!nextDocument) {
                     SetStatus("Preview waiting for valid RML - changes are not saved");
                     return;
@@ -824,6 +869,14 @@ namespace
 
         void BindDocument()
         {
+            if (_localization.ActiveCode() == "ru") {
+                auto* languageRoot = _document->GetElementById("app");
+                if (!languageRoot) languageRoot = _document->GetElementById("welcome-app");
+                if (!languageRoot) languageRoot = _document->GetElementById("keyboard-app");
+                if (!languageRoot) languageRoot = _document;
+                languageRoot->SetClass("lang-ru", true);
+            }
+
             // Listen once at the document root so arbitrary buttons and controls,
             // including elements created dynamically, work without C++ registration.
             _document->AddEventListener("click", _listener.get());
@@ -1522,7 +1575,7 @@ namespace
         void SetText(const char* id, std::string_view value)
         {
             if (auto* element = _document->GetElementById(id)) {
-                element->SetInnerRML(std::string(value));
+                element->SetInnerRML(_localization.Translate(value));
             }
         }
 
@@ -1645,6 +1698,8 @@ namespace
         Rml::ElementDocument* _document = nullptr;
         std::unique_ptr<PreviewEventListener> _listener;
         std::vector<unsigned char> _fontData;
+        std::vector<unsigned char> _fallbackFontData;
+        LocalizationManager _localization;
         std::filesystem::path _assetsDirectory;
         std::filesystem::path _documentPath;
         std::vector<std::filesystem::path> _documentFiles;
@@ -1686,11 +1741,24 @@ int wmain(int argumentCount, wchar_t* arguments[])
 {
     SetProcessDPIAware();
     std::optional<std::filesystem::path> requestedDocument;
-    if (argumentCount > 1) requestedDocument = std::filesystem::path(arguments[1]);
+    std::string requestedLanguage = "en";
+    for (int index = 1; index < argumentCount; ++index) {
+        const std::wstring_view argument(arguments[index]);
+        if (argument == L"--language" && index + 1 < argumentCount) {
+            const std::wstring value(arguments[++index]);
+            requestedLanguage.assign(value.begin(), value.end());
+        } else if (argument.starts_with(L"--language=")) {
+            const auto value = argument.substr(11);
+            requestedLanguage.assign(value.begin(), value.end());
+        } else if (!requestedDocument) {
+            requestedDocument = std::filesystem::path(argument);
+        }
+    }
 
     PreviewApp app;
     g_app = &app;
-    if (!app.Initialize(GetModuleHandleW(nullptr), requestedDocument)) {
+    if (!app.Initialize(
+            GetModuleHandleW(nullptr), requestedDocument, requestedLanguage)) {
         std::cerr << "DragonBoard Rml Preview initialization failed.\n";
         MessageBoxW(
             nullptr,

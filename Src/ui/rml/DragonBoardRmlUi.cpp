@@ -412,8 +412,13 @@ namespace dragonboard::ui::rml
         _context->SetDefaultScrollBehavior(Rml::ScrollBehavior::Instant, 1.0f);
 
         _localization = std::make_unique<LocalizationManager>();
-        _localization->Load(vrui::VRUISettings::get().uiLanguage);
+        const auto& requestedLanguage = vrui::VRUISettings::get().uiLanguage;
+        _localization->Load(requestedLanguage);
         _settingsLanguageCode = _localization->ActiveCode();
+        logger::info(
+            "DragonBoardVR: RmlUi localization initialized (requested='{}', active='{}').",
+            requestedLanguage,
+            _settingsLanguageCode);
 
         bool fontLoaded = false;
         for (const auto* path : kFontCandidates) {
@@ -547,6 +552,18 @@ namespace dragonboard::ui::rml
                         source = _localization->TranslateMarkup(source);
                     }
                     destination = _context->LoadDocumentFromMemory(source, path);
+                    if (destination && _localization &&
+                        _localization->ActiveCode() == "ru") {
+                        auto* languageRoot = destination->GetElementById("app");
+                        if (!languageRoot) {
+                            languageRoot = destination->GetElementById("welcome-app");
+                        }
+                        if (!languageRoot) {
+                            languageRoot = destination->GetElementById("keyboard-app");
+                        }
+                        if (!languageRoot) languageRoot = destination;
+                        languageRoot->SetClass("lang-ru", true);
+                    }
                     const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - started).count();
                     logger::info(

@@ -795,6 +795,33 @@ body {
     border-color: #e0e0e0;
 }
 
+.inventory-app.lang-ru .inventory-list-shell {
+    height: 600px;
+    max-height: 600px;
+    overflow: hidden;
+}
+
+.inventory-app.lang-ru .inventory-list-item {
+    height: 112px;
+    max-height: 112px;
+}
+
+.inventory-app.lang-ru .description-text {
+    overflow: hidden;
+    font-size: 30px;
+    line-height: 1.0;
+}
+
+.inventory-app.lang-ru .inventory-action {
+    font-size: 30px;
+    letter-spacing: 1px;
+}
+
+.inventory-app.lang-ru #inventory-equip {
+    font-size: 25px;
+    letter-spacing: 0;
+}
+
 .inventory-action.primary-action {
     background-color: rgba(56, 56, 56, 184);
     border-color: rgba(210, 215, 217, 218);

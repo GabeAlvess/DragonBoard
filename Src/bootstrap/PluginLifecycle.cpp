@@ -13,6 +13,7 @@
 #include "vrui/ModEventHandler.h"
 #include "vrui/VRFrameUpdater.h"
 #include "vrui/VRMenuManager.h"
+#include "vrui/VRUISettings.h"
 
 #include <filesystem>
 #include <memory>
@@ -34,6 +35,17 @@ namespace dragonboard::bootstrap
         spdlog::set_default_logger(std::move(pluginLogger));
         spdlog::set_level(spdlog::level::info);
         spdlog::flush_on(spdlog::level::info);
+    }
+
+    void LoadInitialSettings()
+    {
+        auto& settings = vrui::VRUISettings::get();
+        const auto iniPath = vrui::VRUISettings::getDefaultIniPath();
+        settings.load(iniPath);
+        logger::info(
+            "DragonBoardVR: Initial settings loaded from '{}' (language='{}').",
+            iniPath,
+            settings.uiLanguage);
     }
 
     void HandleSKSEMessage(SKSE::MessagingInterface::Message* message)

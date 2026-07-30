@@ -1147,3 +1147,102 @@
     left: 161px;
     top: 38px;
 }
+
+/* Russian localization uses wider labels than the English layout. */
+.journal-app.lang-ru .journal-top-tab {
+    font-size: 38px;
+}
+
+.journal-app.lang-ru .journal-filter-button,
+.journal-app.lang-ru .journal-filter-button span {
+    font-size: 23px;
+    letter-spacing: 0;
+}
+
+.journal-app.lang-ru .journal-section-label {
+    font-size: 28px;
+    letter-spacing: 1px;
+}
+
+.journal-app.lang-ru .journal-quest-button {
+    font-size: 39px;
+    line-height: 1.05;
+}
+
+.journal-app.lang-ru .journal-details-card .subheading,
+.journal-app.lang-ru .journal-tracking-state {
+    font-size: 31px;
+    letter-spacing: 1px;
+}
+
+.journal-app.lang-ru .journal-title {
+    font-size: 54px;
+    line-height: 1.05;
+}
+
+.journal-app.lang-ru .journal-summary {
+    font-size: 38px;
+    line-height: 1.12;
+}
+
+.journal-app.lang-ru .journal-objectives-heading {
+    font-size: 32px;
+    letter-spacing: 1px;
+}
+
+.journal-app.lang-ru .journal-objective-state {
+    width: 180px;
+    font-size: 27px;
+    letter-spacing: 1px;
+}
+
+.journal-app.lang-ru .journal-objective-text {
+    width: 969px;
+    font-size: 38px;
+    line-height: 1.08;
+}
+
+.journal-app.lang-ru .journal-empty {
+    font-size: 34px;
+}
+
+.journal-app.lang-ru .journal-stat-card .subheading {
+    font-size: 29px;
+    letter-spacing: 1px;
+}
+
+.journal-app.lang-ru .journal-stat-row {
+    font-size: 27px;
+}
+
+.journal-app.lang-ru .journal-stat-label {
+    width: 58%;
+}
+
+.journal-app.lang-ru .journal-stat-value {
+    width: 42%;
+}
+
+.journal-app.lang-ru .journal-skills-card .journal-stat-label {
+    width: 48%;
+}
+
+.journal-app.lang-ru .journal-skills-card .journal-stat-value {
+    width: 52%;
+    font-size: 25px;
+}
+
+.journal-app.lang-ru .journal-footer-active {
+    width: 820px;
+    font-size: 32px;
+}
+
+.journal-app.lang-ru .journal-track-button {
+    font-size: 31px;
+    line-height: 1.0;
+}
+
+.journal-app.lang-ru .journal-track-button span {
+    width: 100%;
+    white-space: nowrap;
+}
