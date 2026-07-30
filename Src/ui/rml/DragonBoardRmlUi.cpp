@@ -253,8 +253,8 @@ namespace dragonboard::ui::rml
             "general", "visuals", "items"
         };
 
-        constexpr std::array<const char*, 7> kSliders{
-            "menuScale", "reticleScale", "itemWeaponScale", "itemArmorScale",
+        constexpr std::array<const char*, 6> kSliders{
+            "reticleScale", "itemWeaponScale", "itemArmorScale",
             "itemPotionScale", "itemFoodScale", "itemMiscScale"
         };
 
@@ -361,7 +361,7 @@ namespace dragonboard::ui::rml
                 logger::warn("DragonBoardVR RmlUi: {}", message);
                 break;
             case Rml::Log::LT_INFO:
-                logger::info("DragonBoardVR RmlUi: {}", message);
+                logger::trace("DragonBoardVR RmlUi: {}", message);
                 break;
             default:
                 logger::debug("DragonBoardVR RmlUi: {}", message);
@@ -440,7 +440,7 @@ namespace dragonboard::ui::rml
                     "DragonBoard",
                     Rml::Style::FontStyle::Normal,
                     Rml::Style::FontWeight::Normal)) {
-                logger::info("DragonBoardVR: RmlUi font '{}' registered as DragonBoard.", path);
+                logger::trace("DragonBoardVR: RmlUi font '{}' registered as DragonBoard.", path);
                 fontLoaded = true;
                 break;
             }
@@ -473,7 +473,7 @@ namespace dragonboard::ui::rml
                     Rml::Style::FontStyle::Normal,
                     Rml::Style::FontWeight::Normal,
                     true)) {
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: RmlUi fallback font '{}' registered for CJK glyphs.",
                     path);
                 break;
@@ -566,7 +566,7 @@ namespace dragonboard::ui::rml
                     }
                     const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - started).count();
-                    logger::info(
+                    logger::trace(
                         "DragonBoardVR: staged RmlUi {} document load took {} ms "
                         "(path='{}', success={}).",
                         name,
@@ -592,7 +592,6 @@ namespace dragonboard::ui::rml
                 }
                 for (const auto* slider : kSliders) BindSlider(_settingsDocument, slider);
                 BindClick(_settingsDocument, "save");
-                BindClick(_settingsDocument, "close");
                 BindClick(_settingsDocument, "position-adjustment");
                 BindClick(_settingsDocument, "toggle-lock-pins");
                 BindClick(_settingsDocument, "toggle-dev-panel");
@@ -603,7 +602,7 @@ namespace dragonboard::ui::rml
                 BindClick(_settingsDocument, "restart-dragonboard");
                 SelectSettingsPage("general");
                 _settingsDocument->Hide();
-                logger::info("DragonBoardVR: external RmlUi settings loaded from '{}'.", path);
+                logger::trace("DragonBoardVR: external RmlUi settings loaded from '{}'.", path);
             }
             break;
         }
@@ -612,13 +611,12 @@ namespace dragonboard::ui::rml
                 kDeveloperDocumentCandidates, _developerDocument, "Developer");
             loadedDocument = _developerDocument;
             if (_developerDocument) {
-                for (const auto* page : kDeveloperPages) {
+                for (const auto* page : { "commands", "info" }) {
                     const std::string tabId = std::string("dev-tab-") + page;
                     BindClick(_developerDocument, tabId.c_str());
                 }
                 BindClick(_developerDocument, "dev-add-command");
                 BindClick(_developerDocument, "dev-execute");
-                BindClick(_developerDocument, "dev-close");
                 BindClick(_developerDocument, "dev-calibration-surface");
                 BindClick(_developerDocument, "dev-calibration-reset");
                 for (std::size_t city = 0; city < kMapCalibrationCities.size(); ++city) {
@@ -627,7 +625,7 @@ namespace dragonboard::ui::rml
                 }
                 SelectDeveloperPage("commands");
                 _developerDocument->Hide();
-                logger::info("DragonBoardVR: external RmlUi developer panel loaded from '{}'.", path);
+                logger::trace("DragonBoardVR: external RmlUi developer panel loaded from '{}'.", path);
             }
             break;
         }
@@ -648,7 +646,7 @@ namespace dragonboard::ui::rml
                 }
                 SelectItemEditPage("position");
                 _itemEditDocument->Hide();
-                logger::info("DragonBoardVR: external RmlUi item editor loaded from '{}'.", path);
+                logger::trace("DragonBoardVR: external RmlUi item editor loaded from '{}'.", path);
             }
             break;
         }
@@ -667,7 +665,7 @@ namespace dragonboard::ui::rml
                 BindClick(_modsDocument, "mods-ini-show-hidden");
                 SelectModsPage(false);
                 _modsDocument->Hide();
-                logger::info("DragonBoardVR: external RmlUi mods panel loaded from '{}'.", path);
+                logger::trace("DragonBoardVR: external RmlUi mods panel loaded from '{}'.", path);
             }
             break;
         }
@@ -677,7 +675,7 @@ namespace dragonboard::ui::rml
             loadedDocument = _inventoryDocument;
             if (_inventoryDocument) {
                 for (const auto* id : {
-                         "inventory-equip", "inventory-drop", "inventory-pin", "inventory-close",
+                         "inventory-equip", "inventory-drop", "inventory-pin",
                          "inventory-search", "inventory-search-clear",
                          "inventory-filter-weapons", "inventory-filter-armor",
                          "inventory-filter-consumables", "inventory-filter-quest",
@@ -685,7 +683,7 @@ namespace dragonboard::ui::rml
                     BindClick(_inventoryDocument, id);
                 }
                 _inventoryDocument->Hide();
-                logger::info("DragonBoardVR: external RmlUi inventory panel loaded from '{}'.", path);
+                logger::trace("DragonBoardVR: external RmlUi inventory panel loaded from '{}'.", path);
             }
             break;
         }
@@ -694,17 +692,17 @@ namespace dragonboard::ui::rml
             loadedDocument = _magicDocument;
             if (_magicDocument) {
                 for (const auto* id : {
-                         "magic-equip", "magic-edit", "magic-pin", "magic-close",
+                         "magic-equip", "magic-pin",
                          "magic-search", "magic-search-clear",
                          "magic-filter-destruction", "magic-filter-conjuration",
                          "magic-filter-restoration", "magic-filter-illusion",
                          "magic-filter-alteration", "magic-filter-powers",
                          "magic-filter-passive", "magic-pin-dashboard",
-                         "magic-pin-left", "magic-pin-right", "magic-pin-label" }) {
+                         "magic-pin-left", "magic-pin-right" }) {
                     BindClick(_magicDocument, id);
                 }
                 _magicDocument->Hide();
-                logger::info("DragonBoardVR: external RmlUi magic panel loaded from '{}'.", path);
+                logger::trace("DragonBoardVR: external RmlUi magic panel loaded from '{}'.", path);
             }
             break;
         }
@@ -714,7 +712,7 @@ namespace dragonboard::ui::rml
             if (_journalDocument) {
                 for (const auto* id : {
                          "journal-tab-quests", "journal-tab-stats",
-                         "journal-settings", "journal-close",
+                         "journal-settings",
                          "journal-toggle-tracking", "journal-filter-all",
                          "journal-filter-main", "journal-filter-side",
                          "journal-filter-misc" }) {
@@ -722,7 +720,7 @@ namespace dragonboard::ui::rml
                 }
                 SelectJournalPage("quests");
                 _journalDocument->Hide();
-                logger::info("DragonBoardVR: external RmlUi journal loaded from '{}'.", path);
+                logger::trace("DragonBoardVR: external RmlUi journal loaded from '{}'.", path);
             }
             break;
         }
@@ -736,7 +734,7 @@ namespace dragonboard::ui::rml
                 BindClick(_welcomeDocument, "welcome-next-2");
                 SetWelcomePage(1, false);
                 _welcomeDocument->Hide();
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: Welcome tutorial loaded from '{}'.", path);
             }
             break;
@@ -753,7 +751,7 @@ namespace dragonboard::ui::rml
                     BindClick(_keyboardDocument, id);
                 }
                 _keyboardDocument->Hide();
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: shared RmlUi keyboard loaded from '{}'.", path);
             }
             break;
@@ -1430,7 +1428,7 @@ namespace dragonboard::ui::rml
                                 0.0f,
                                 _gripScrollTarget->GetScrollHeight() -
                                     _gripScrollTarget->GetClientHeight()));
-                    logger::info(
+                    logger::trace(
                         "DragonBoardVR: grip scroll captured '{}' "
                         "(tag={}, top={:.1f}, max={:.1f}, pointerOnPanel={}).",
                         _gripScrollTarget->GetId(),
@@ -1439,7 +1437,7 @@ namespace dragonboard::ui::rml
                         maximum,
                         pointerOnPanel);
                 } else {
-                    logger::warn(
+                    logger::trace(
                         "DragonBoardVR: grip scroll started without a scroll target.");
                 }
                 CaptureGripScrollHoverLock();
@@ -1548,7 +1546,7 @@ namespace dragonboard::ui::rml
                         }
                     }
                     if (!_gripScrollMovedLogged) {
-                        logger::info(
+                        logger::trace(
                             "DragonBoardVR: grip scroll moved '{}' {:.1f} -> {:.1f}.",
                             _gripScrollTarget->GetId(),
                             current,
@@ -1588,7 +1586,7 @@ namespace dragonboard::ui::rml
         ApplyGripScrollHoverLock();
 
         if (triggerDown != _previousTriggerDown) {
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: RmlUi trigger {} (pointerOnPanel={}, x={}, y={}).",
                 triggerDown ? "down" : "up",
                 pointerOnPanel,
@@ -1676,7 +1674,7 @@ namespace dragonboard::ui::rml
                              (_triggerCaptureMode == TriggerCaptureMode::kButton ?
                                   "button" :
                                   "none"));
-                    logger::info("DragonBoardVR: RmlUi trigger captured {} target.", captureName);
+                    logger::trace("DragonBoardVR: RmlUi trigger captured {} target.", captureName);
                     if (_triggerCaptureMode != TriggerCaptureMode::kSlider &&
                         !_triggerCaptureProgrammatic) {
                         _context->ProcessMouseButtonDown(0, 0);
@@ -2220,7 +2218,7 @@ namespace dragonboard::ui::rml
         if (targetMoved) _triggerScrollTarget->SetScrollTop(_triggerScrollTargetTop);
 
         if ((pageMoved || nestedMoved || targetMoved) && !_triggerScrollSuppressionLogged) {
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: suppressed RmlUi trigger drag scroll (page={}, nested={}, target={}).",
                 pageMoved,
                 nestedMoved,
@@ -2253,7 +2251,7 @@ namespace dragonboard::ui::rml
         }
 
         if (pageTop != _observedPageScrollTop) {
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: RmlUi page scrollTop {:.1f} -> {:.1f} (trigger={}, grip={}).",
                 _observedPageScrollTop,
                 pageTop,
@@ -2262,7 +2260,7 @@ namespace dragonboard::ui::rml
             _observedPageScrollTop = pageTop;
         }
         if (nestedTop != _observedNestedScrollTop) {
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: RmlUi nested scrollTop {:.1f} -> {:.1f} (trigger={}, grip={}).",
                 _observedNestedScrollTop,
                 nestedTop,
@@ -2819,7 +2817,7 @@ namespace dragonboard::ui::rml
             _inventoryVirtualList.Reset();
             _inventoryVirtualList.SetItemCount(_inventoryVirtualItems.size());
             refreshVisibleRows = true;
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: virtualized Inventory uses {} pooled rows for {} items.",
                 _inventoryVirtualRows.size(),
                 _inventoryVirtualItems.size());
@@ -3174,7 +3172,7 @@ namespace dragonboard::ui::rml
             _magicVirtualList.Reset();
             _magicVirtualList.SetItemCount(_magicVirtualItems.size());
             refreshVisibleRows = true;
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: virtualized Magic uses {} pooled rows for {} spells.",
                 _magicVirtualRows.size(),
                 _magicVirtualItems.size());
@@ -3858,6 +3856,11 @@ namespace dragonboard::ui::rml
     {
         if (!_welcomeDocument) return;
         page = std::clamp<std::uint8_t>(page, 1, 4);
+        if (auto* pinTutorial =
+                _welcomeDocument->GetElementById("pin-tutorial-page")) {
+            pinTutorial->SetClass("active", false);
+            pinTutorial->SetProperty("display", "none");
+        }
         const auto visiblePage = page == 4 ? 3 : std::min<std::uint8_t>(page, 2);
         for (std::uint8_t candidate = 1; candidate <= 3; ++candidate) {
             const auto id = "welcome-page-" + std::to_string(candidate);
@@ -3888,6 +3891,23 @@ namespace dragonboard::ui::rml
         if (auto* next =
                 _welcomeDocument->GetElementById("welcome-next-2")) {
             next->SetClass("disabled", page == 2 && !grabCompleted);
+        }
+    }
+
+    void DragonBoardRmlUi::SetPinTutorial()
+    {
+        if (!_welcomeDocument) return;
+        for (std::uint8_t candidate = 1; candidate <= 3; ++candidate) {
+            const auto id = "welcome-page-" + std::to_string(candidate);
+            if (auto* element = _welcomeDocument->GetElementById(id)) {
+                element->SetClass("active", false);
+                element->SetProperty("display", "none");
+            }
+        }
+        if (auto* pinTutorial =
+                _welcomeDocument->GetElementById("pin-tutorial-page")) {
+            pinTutorial->SetClass("active", true);
+            pinTutorial->SetProperty("display", "block");
         }
     }
 
@@ -4058,7 +4078,7 @@ namespace dragonboard::ui::rml
     {
         if (!id) return;
         RequestHaptic(ResolveClickHaptic(id));
-        logger::info("DragonBoardVR: RmlUi click on '{}'.", id);
+        logger::trace("DragonBoardVR: RmlUi click on '{}'.", id);
         const std::string_view value(id);
         if (_activeDocument == _keyboardDocument) {
             if (value == "keyboard-cancel") {
@@ -4131,7 +4151,7 @@ namespace dragonboard::ui::rml
                 panel, PanelEventType::kClick, id, std::move(value), 0.0f });
             return;
         }
-        if (value == "welcome-close") {
+        if (value == "welcome-close" || value == "pin-tutorial-close") {
             _welcomeCloseRequested = true;
         } else if (value == "welcome-next-1" || value == "welcome-next-2") {
             _welcomeNextRequested = true;
@@ -4425,7 +4445,7 @@ namespace dragonboard::ui::rml
     void DragonBoardRmlUi::HandleSliderChange(const char* id, float value)
     {
         if (_synchronizingSliderValues || !id || !*id) return;
-        logger::info("DragonBoardVR: RmlUi slider '{}' changed to {:.3f}.", id, value);
+        logger::trace("DragonBoardVR: RmlUi slider '{}' changed to {:.3f}.", id, value);
         const auto now = std::chrono::steady_clock::now();
         if (now - _lastSliderHaptic >= std::chrono::milliseconds(55)) {
             _lastSliderHaptic = now;

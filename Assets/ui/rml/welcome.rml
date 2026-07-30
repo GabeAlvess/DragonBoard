@@ -31,6 +31,13 @@
             </div>
         </section>
 
+        <section id="pin-tutorial-page" class="welcome-page welcome-image-page pin-tutorial-page">
+            <div class="welcome-copy pin-tutorial-title"><span>Item pinned</span></div>
+            <div class="welcome-copy welcome-card pin-tutorial-copy">
+                <span>Your pinned item stays available on DragonBoard. Point at it and hold the grab button to move it. Use both grips to resize it.</span>
+            </div>
+        </section>
+
         <div id="vr-cursor"></div>
     </div>
 </body>

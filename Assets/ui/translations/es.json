@@ -327,6 +327,8 @@
     "INSTANT": "INSTANTE",
     "DONE": "COMPLETADO",
     "FAILED": "FALLIDO",
-    "ACTIVE": "ACTIVO"
+    "ACTIVE": "ACTIVO",
+    "Item pinned": "Objeto fijado",
+    "Your pinned item stays available on DragonBoard. Point at it and hold the grab button to move it. Use both grips to resize it.": "Tu objeto fijado permanece disponible en DragonBoard. Apunta hacia él y mantén pulsado el botón de agarre para moverlo. Usa ambos agarres para cambiar su tamaño."
   }
 }

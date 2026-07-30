@@ -149,6 +149,27 @@ namespace vrui
         return isPoseMirroredForHand(useLeftHandAsMenu);
     }
 
+    bool VRUISettings::isTutorialComplete(TutorialId tutorial) const
+    {
+        const auto bit = 1u << static_cast<std::uint8_t>(tutorial);
+        return (tutorialCompletionMask & bit) != 0;
+    }
+
+    void VRUISettings::setTutorialComplete(TutorialId tutorial, bool complete)
+    {
+        const auto bit = 1u << static_cast<std::uint8_t>(tutorial);
+        if (complete) {
+            tutorialCompletionMask |= bit;
+        } else {
+            tutorialCompletionMask &= ~bit;
+        }
+    }
+
+    void VRUISettings::resetTutorialProgress()
+    {
+        tutorialCompletionMask = 0;
+    }
+
     void VRUISettings::setUseLeftHandAsMenu(
         bool useLeftHand,
         bool nativeLeftHandedMode)
@@ -907,13 +928,18 @@ namespace vrui
                 "Tutorials",
                 "bPreviouslyEnabled",
                 tutorialsPreviouslyEnabled);
-            welcomeTutorialComplete = stateIni.GetBoolValue(
+            const bool legacyWelcomeComplete = stateIni.GetBoolValue(
                 "Tutorials",
                 "bWelcomeComplete",
-                welcomeTutorialComplete);
+                false);
+            tutorialCompletionMask = static_cast<std::uint32_t>(
+                stateIni.GetLongValue(
+                    "Tutorials",
+                    "uCompletedMask",
+                    legacyWelcomeComplete ? 1L : 0L));
             if (showTutorials &&
                 (!showTutorialsBeforeLoad || !tutorialsPreviouslyEnabled)) {
-                welcomeTutorialComplete = false;
+                resetTutorialProgress();
                 tutorialPositionResetRequested = true;
                 tutorialStateChanged = true;
                 logger::info(
@@ -1422,8 +1448,13 @@ namespace vrui
             "Tutorials", "bPreviouslyEnabled", showTutorials,
             "; Internal state used to detect when tutorials are re-enabled");
         stateOut.SetBoolValue(
-            "Tutorials", "bWelcomeComplete", welcomeTutorialComplete,
-            "; Welcome tutorial completion state");
+            "Tutorials", "bWelcomeComplete",
+            isTutorialComplete(TutorialId::Welcome),
+            "; Legacy Welcome tutorial completion state");
+        stateOut.SetLongValue(
+            "Tutorials", "uCompletedMask",
+            static_cast<long>(tutorialCompletionMask),
+            "; Completion bits shared by all RmlUi tutorials");
 
         const auto layoutPath = GetSiblingIniPath(iniPath, "DragonBoardVR_Layout.ini");
         const auto statePath = GetSiblingIniPath(iniPath, "DragonBoardVR_State.ini");

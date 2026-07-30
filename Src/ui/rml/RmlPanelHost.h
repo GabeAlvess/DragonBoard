@@ -141,6 +141,17 @@ namespace dragonboard::ui::rml
             kExternal
         };
 
+        enum class ActiveTutorial : std::uint8_t
+        {
+            kWelcome,
+            kInventory,
+            kMagic,
+            kSettings,
+            kMods,
+            kJournal,
+            kPin
+        };
+
         enum class RenderCommandType : std::uint8_t
         {
             kRegister,
@@ -464,7 +475,9 @@ namespace dragonboard::ui::rml
         void UpdateKeyboardSurfaceHoverGameThread();
         bool UpdateScenePanelGameThread(RE::NiNode* backgroundNode);
         bool UpdateWelcomeSceneSurfaceGameThread(RE::NiNode* backgroundNode);
-        void CompleteWelcomeTutorialGameThread();
+        bool OpenPinTutorialIfNeeded();
+        void HandleSuccessfulPinGameThread();
+        void CompleteActiveTutorialGameThread();
         void ResetWelcomeSurfaceGameThread();
         void ResetTutorialProgressAndPositionGameThread();
 
@@ -517,6 +530,7 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _welcomeResetPending{ false };
         std::atomic<std::uint8_t> _welcomePage{ 1 };
         std::atomic<bool> _welcomeGrabCompleted{ false };
+        std::atomic<ActiveTutorial> _activeTutorial{ ActiveTutorial::kWelcome };
         std::atomic<LocalPanelMode> _localPanelMode{ LocalPanelMode::kSettings };
         std::atomic<DragonBoardVR_API::PanelHandle> _activeExternalPanel{
             DragonBoardVR_API::InvalidPanel };

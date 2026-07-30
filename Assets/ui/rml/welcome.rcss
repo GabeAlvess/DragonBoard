@@ -45,6 +45,10 @@ body {
     decorator: image("assets/Welcome3_tutorial.jpg" fill);
 }
 
+.pin-tutorial-page {
+    decorator: image("assets/welcome_Tutorial.jpg" fill);
+}
+
 .welcome-copy {
     position: absolute;
     display: flex;
@@ -52,7 +56,6 @@ body {
     justify-content: center;
     color: #eeeeee;
     text-align: center;
-    text-shadow: 2px 2px 5px #000000;
 }
 
 .welcome-card {
@@ -123,6 +126,24 @@ body {
     height: 420px;
     font-size: 40px;
     line-height: 1.26;
+}
+
+.pin-tutorial-title {
+    left: 690px;
+    top: 350px;
+    width: 540px;
+    height: 100px;
+    font-size: 48px;
+    line-height: 1.1;
+}
+
+.pin-tutorial-copy {
+    left: 690px;
+    top: 445px;
+    width: 540px;
+    height: 260px;
+    font-size: 34px;
+    line-height: 1.24;
 }
 
 .welcome-close {

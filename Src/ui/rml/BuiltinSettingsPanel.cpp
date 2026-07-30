@@ -120,7 +120,7 @@ namespace dragonboard::ui::rml
         settings.showTutorials = _draft.showTutorials;
         if (applyLanguage) settings.uiLanguage = _draft.uiLanguage;
         if (tutorialsReenabled) {
-            settings.welcomeTutorialComplete = false;
+            settings.resetTutorialProgress();
             settings.tutorialsPreviouslyEnabled = true;
             settings.tutorialPositionResetRequested = true;
         }

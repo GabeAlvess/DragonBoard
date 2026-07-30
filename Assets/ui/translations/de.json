@@ -327,6 +327,8 @@
     "INSTANT": "SOFORT",
     "DONE": "ERLEDIGT",
     "FAILED": "FEHLGESCHLAGEN",
-    "ACTIVE": "AKTIV"
+    "ACTIVE": "AKTIV",
+    "Item pinned": "Gegenstand angeheftet",
+    "Your pinned item stays available on DragonBoard. Point at it and hold the grab button to move it. Use both grips to resize it.": "Dein angehefteter Gegenstand bleibt auf dem DragonBoard verfügbar. Zeige darauf und halte die Greifentaste gedrückt, um ihn zu bewegen. Verwende beide Grifftasten, um seine Größe zu ändern."
   }
 }

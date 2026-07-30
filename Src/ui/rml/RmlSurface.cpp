@@ -131,7 +131,7 @@ namespace dragonboard::ui::rml
             _dirty = false;
             ++_renderCount;
             if (_renderCount <= 3) {
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: independent surface '{}' rendered frame {} "
                     "to target {} ({}x{}).",
                     _contextName,

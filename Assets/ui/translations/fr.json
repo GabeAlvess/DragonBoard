@@ -327,6 +327,8 @@
     "INSTANT": "INSTANTANÉ",
     "DONE": "TERMINÉ",
     "FAILED": "ÉCHOUÉ",
-    "ACTIVE": "ACTIF"
+    "ACTIVE": "ACTIF",
+    "Item pinned": "Objet épinglé",
+    "Your pinned item stays available on DragonBoard. Point at it and hold the grab button to move it. Use both grips to resize it.": "Votre objet épinglé reste disponible sur DragonBoard. Pointez-le et maintenez le bouton de saisie pour le déplacer. Utilisez les deux poignées pour le redimensionner."
   }
 }

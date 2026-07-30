@@ -29,29 +29,25 @@ namespace dragonboard::integrations::spellwheel
 
         ISpellWheelInterface001* g_spellWheelInterface = nullptr;
 
-        void ToggleUsingOpenWheelState()
+        bool ToggleUsingOpenWheelState()
         {
             if (!g_spellWheelInterface) {
-                logger::warn(
-                    "DragonBoardVR: Spell Wheel event received without an active API; "
-                    "using the configured menu hand.");
-                vrui::VRMenuManager::get().toggleMenu(true);
-                return;
+                return false;
             }
 
             const bool mainOpen = g_spellWheelInterface->IsMainWheelOpen();
             const bool secondaryOpen = g_spellWheelInterface->IsSecondaryWheelOpen();
             if (mainOpen != secondaryOpen) {
                 ToggleMenuForWheel(secondaryOpen ? 1 : 0);
-                return;
+                return true;
             }
 
-            logger::warn(
-                "DragonBoardVR: Spell Wheel fallback had an ambiguous wheel state "
-                "(main={}, secondary={}); using the configured menu hand.",
+            logger::trace(
+                "DragonBoardVR: Spell Wheel state was ambiguous during activation "
+                "(main={}, secondary={}); requesting the last wheel as fallback.",
                 mainOpen,
                 secondaryOpen);
-            vrui::VRMenuManager::get().toggleMenu(true);
+            return false;
         }
 
         class WheelIdCallback final : public RE::BSScript::IStackCallbackFunctor
@@ -61,7 +57,7 @@ namespace dragonboard::integrations::spellwheel
             {
                 if (result.IsInt()) {
                     const auto wheelId = static_cast<std::int32_t>(result.GetUInt());
-                    logger::info(
+                    logger::trace(
                         "DragonBoardVR: Spell Wheel reported last activated wheel {}.",
                         wheelId == 0 ? "main" : "secondary");
                     ToggleMenuForWheel(wheelId);
@@ -70,8 +66,8 @@ namespace dragonboard::integrations::spellwheel
 
                 logger::warn(
                     "DragonBoardVR: GetLastActivatedWheelId returned an unexpected type; "
-                    "using wheel-state fallback.");
-                ToggleUsingOpenWheelState();
+                    "using the configured menu hand.");
+                vrui::VRMenuManager::get().toggleMenu(true);
             }
 
             void SetObject(const RE::BSTSmartPointer<RE::BSScript::Object>&) override {}
@@ -105,15 +101,23 @@ namespace dragonboard::integrations::spellwheel
                 const RE::BSAnimationGraphEvent* event,
                 RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override
             {
-                if (!event || event->tag != kToggleEvent) {
+                if (!event) {
+                    return RE::BSEventNotifyControl::kContinue;
+                }
+
+                if (event->tag != kToggleEvent) {
+                    return RE::BSEventNotifyControl::kContinue;
+                }
+
+                if (ToggleUsingOpenWheelState()) {
                     return RE::BSEventNotifyControl::kContinue;
                 }
 
                 if (!RequestLastActivatedWheel()) {
                     logger::warn(
                         "DragonBoardVR: Could not dispatch GetLastActivatedWheelId; "
-                        "using wheel-state fallback.");
-                    ToggleUsingOpenWheelState();
+                        "using the configured menu hand.");
+                    vrui::VRMenuManager::get().toggleMenu(true);
                 }
 
                 return RE::BSEventNotifyControl::kContinue;
@@ -160,7 +164,7 @@ namespace dragonboard::integrations::spellwheel
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) {
             if (!g_playerSinkRegistered) {
-                logger::warn("DragonBoardVR: Player unavailable for Spell Wheel event registration.");
+                logger::trace("DragonBoardVR: Player unavailable for Spell Wheel event registration; will retry.");
             }
             return;
         }
@@ -184,7 +188,7 @@ namespace dragonboard::integrations::spellwheel
             }
             g_playerSinkRegistered = true;
         } else if (!g_playerSinkRegistered) {
-            logger::warn("DragonBoardVR: Failed to register Spell Wheel event bridge.");
+            logger::trace("DragonBoardVR: Spell Wheel event bridge not ready; will retry.");
         }
     }
 
@@ -194,7 +198,7 @@ namespace dragonboard::integrations::spellwheel
         registrationCheckTimer -= (std::max)(deltaTime, 0.0f);
         if (registrationCheckTimer > 0.0f) return;
 
-        registrationCheckTimer = 1.0f;
+        registrationCheckTimer = 0.1f;
         RegisterPlayerEventSink();
     }
 
@@ -209,7 +213,7 @@ namespace dragonboard::integrations::spellwheel
         }
 
         const bool secondaryWheel = wheelId != 0;
-        logger::info(
+        logger::trace(
             "DragonBoardVR: Spell Wheel bridge requested (wheel={}).",
             secondaryWheel ? "secondary" : "main");
         tasks->AddTask([secondaryWheel]() {
@@ -231,7 +235,7 @@ namespace dragonboard::integrations::spellwheel
                 useLeftHand,
                 leftHandedMode);
 
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: Spell Wheel activation mapped to {} hand "
                 "(wheel={}, leftHandedMode={}, poseMirrored={}, "
                 "offsetX={:.1f}, rotY={:.1f}, rotZ={:.1f}).",

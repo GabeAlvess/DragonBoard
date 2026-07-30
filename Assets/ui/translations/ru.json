@@ -327,6 +327,8 @@
     "INSTANT": "МГНОВЕННЫЙ",
     "DONE": "ВЫПОЛНЕНО",
     "FAILED": "ПРОВАЛЕНО",
-    "ACTIVE": "АКТИВНО"
+    "ACTIVE": "АКТИВНО",
+    "Item pinned": "Предмет закреплён",
+    "Your pinned item stays available on DragonBoard. Point at it and hold the grab button to move it. Use both grips to resize it.": "Закреплённый предмет остаётся доступным на DragonBoard. Наведите на него указатель и удерживайте кнопку захвата, чтобы переместить его. Используйте оба грипа, чтобы изменить его размер."
   }
 }

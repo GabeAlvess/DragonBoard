@@ -3,6 +3,7 @@
 #include "MapCalibration.h"
 
 #include <array>
+#include <cstdint>
 #include <string>
 #include <map>
 #include <vector>
@@ -19,6 +20,17 @@ namespace vrui
         GripPlusY          = 4,  // grip + Y (left hand)
         GripPlusB          = 5,  // grip + B (right hand)
         Hotkey8            = 6   // keyboard key 8 or F8
+    };
+
+    enum class TutorialId : std::uint8_t
+    {
+        Welcome = 0,
+        Inventory,
+        Magic,
+        Settings,
+        Mods,
+        Journal,
+        Pin
     };
 
     struct ItemOffsetData {
@@ -77,7 +89,7 @@ namespace vrui
         std::string uiLanguage = "en";
         bool showTutorials = true;
         bool tutorialsPreviouslyEnabled = true;
-        bool welcomeTutorialComplete = false;
+        std::uint32_t tutorialCompletionMask = 0;
         bool tutorialPositionResetRequested = false;
 
         // -----------------------------------------------------------------------
@@ -395,6 +407,9 @@ namespace vrui
         // -----------------------------------------------------------------------
         void load(const std::string& iniPath);
         void save(const std::string& iniPath) const;
+        bool isTutorialComplete(TutorialId tutorial) const;
+        void setTutorialComplete(TutorialId tutorial, bool complete = true);
+        void resetTutorialProgress();
         void setUseLeftHandAsMenu(bool useLeftHand, bool nativeLeftHandedMode = false);
         bool isMenuPoseMirrored() const;
         bool isPoseMirroredForHand(bool leftHand) const;

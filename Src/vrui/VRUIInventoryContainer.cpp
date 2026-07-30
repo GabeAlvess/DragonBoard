@@ -995,7 +995,7 @@ namespace vrui
             }
             VRMenuManager::get().notifyEquip();
             VRMenuManager::get().scheduleEquipRefresh(0.15f);
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: unequipped {:08X} '{}' from {} hand "
                 "(matchedExtraList={}).",
                 formID,
@@ -1027,7 +1027,7 @@ namespace vrui
                     break;
                 }
             }
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: equipping second copy of {:08X} '{}' in {} hand "
                 "(count={}, separateExtraList={}).",
                 formID,

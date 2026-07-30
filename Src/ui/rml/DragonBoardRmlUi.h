@@ -533,6 +533,7 @@ namespace dragonboard::ui::rml
         void SetMagic(MagicInfo info);
         void SetJournal(const JournalInfo& info);
         void SetWelcomePage(std::uint8_t page, bool grabCompleted);
+        void SetPinTutorial();
         void SetPositionAdjustmentActive(bool active);
         void SetPinsLocked(bool locked);
         void SetDeveloperButtonEnabled(bool enabled);

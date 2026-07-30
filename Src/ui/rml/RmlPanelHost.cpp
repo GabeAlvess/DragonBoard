@@ -894,7 +894,7 @@ namespace dragonboard::ui::rml
                     _itemEditDraft.scale = changed.scale;
                 }
                 _rmlItemEditSyncPending.store(true, std::memory_order_release);
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: synchronized item editor draft after preview release "
                     "pos=({:.2f}, {:.2f}, {:.2f}) rot=({:.2f}, {:.2f}, {:.2f}) scale={:.3f}.",
                     changed.posX, changed.posY, changed.posZ,
@@ -905,7 +905,7 @@ namespace dragonboard::ui::rml
         _itemEditApplyPending.store(false);
         _itemEditActionPending.store(ItemEditAction::kNone);
         _visible.store(true);
-        logger::info("DragonBoardVR: opened RmlUi item editor for {:08X} '{}'.", state.formID, state.itemName);
+        logger::trace("DragonBoardVR: opened RmlUi item editor for {:08X} '{}'.", state.formID, state.itemName);
         return true;
     }
 
@@ -946,8 +946,10 @@ namespace dragonboard::ui::rml
         if (!inventory || !preview) return false;
         if (_localPanelMode.load(std::memory_order_acquire) ==
                 LocalPanelMode::kWelcome &&
+            _activeTutorial.load(std::memory_order_acquire) ==
+                ActiveTutorial::kWelcome &&
             _welcomePage.load(std::memory_order_acquire) == 4) {
-            CompleteWelcomeTutorialGameThread();
+            CompleteActiveTutorialGameThread();
         }
         if (!EnsurePresentHookInstalled()) {
             logger::error("DragonBoardVR: RmlUi Inventory render hook unavailable.");
@@ -981,7 +983,7 @@ namespace dragonboard::ui::rml
                         formID);
                 }
             });
-        logger::info("DragonBoardVR: capturing RmlUi inventory snapshot.");
+        logger::trace("DragonBoardVR: capturing RmlUi inventory snapshot.");
         CaptureInventoryGameThread(false);
         ResetPanelInput();
         _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
@@ -994,7 +996,7 @@ namespace dragonboard::ui::rml
         _inventoryPollAccumulator = 0.0f;
         _visible.store(true);
         const auto entryCount = _inventoryPresenter.ItemCount();
-        logger::info(
+        logger::trace(
             "DragonBoardVR: opened RmlUi inventory with {} entries.",
             entryCount);
         return true;
@@ -1048,7 +1050,7 @@ namespace dragonboard::ui::rml
         _magicRefreshDelay = -1.0f;
         _magicPollAccumulator = 0.0f;
         _visible.store(true);
-        logger::info(
+        logger::trace(
             "DragonBoardVR: opened RmlUi magic panel with {} entries.",
             _magicPresenter.ItemCount());
         return true;
@@ -1079,14 +1081,15 @@ namespace dragonboard::ui::rml
         _journalActionObjectiveID.store(0);
         _journalPollAccumulator = 0.0f;
         _visible.store(true);
-        logger::info("DragonBoardVR: opened RmlUi journal.");
+        logger::trace("DragonBoardVR: opened RmlUi journal.");
         return true;
     }
 
     bool RmlPanelHost::OpenWelcomeTutorialIfNeeded()
     {
         const auto& settings = vrui::VRUISettings::get();
-        if (!settings.showTutorials || settings.welcomeTutorialComplete) {
+        if (!settings.showTutorials ||
+            settings.isTutorialComplete(vrui::TutorialId::Welcome)) {
             return false;
         }
         if (!EnsurePresentHookInstalled()) {
@@ -1104,6 +1107,7 @@ namespace dragonboard::ui::rml
 
         ResetPanelInput();
         _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
+        _activeTutorial.store(ActiveTutorial::kWelcome, std::memory_order_release);
         _welcomePage.store(1, std::memory_order_release);
         _welcomeGrabCompleted.store(false, std::memory_order_release);
         _rmlWelcomeSyncPending.store(true, std::memory_order_release);
@@ -1111,6 +1115,43 @@ namespace dragonboard::ui::rml
         _visible.store(true);
         logger::info("DragonBoardVR: Welcome tutorial queued for first presentation.");
         return true;
+    }
+
+    bool RmlPanelHost::OpenPinTutorialIfNeeded()
+    {
+        const auto& settings = vrui::VRUISettings::get();
+        if (!settings.showTutorials ||
+            settings.isTutorialComplete(vrui::TutorialId::Pin)) {
+            return false;
+        }
+        if (!EnsurePresentHookInstalled()) {
+            logger::error("DragonBoardVR: Pin tutorial render hook unavailable.");
+            return false;
+        }
+        if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
+            (_rendererReady.load() &&
+             (!_rmlUi ||
+              (_rmlUi->AreBuiltinDocumentsLoaded() &&
+               !_rmlUi->IsWelcomeReady())))) {
+            logger::error("DragonBoardVR: shared tutorial document is unavailable.");
+            return false;
+        }
+
+        ResetPanelInput();
+        _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
+        _activeTutorial.store(ActiveTutorial::kPin, std::memory_order_release);
+        _rmlWelcomeSyncPending.store(true, std::memory_order_release);
+        _localPanelMode.store(LocalPanelMode::kWelcome);
+        _visible.store(true);
+        logger::info("DragonBoardVR: first-pin tutorial queued on the shared tutorial surface.");
+        return true;
+    }
+
+    void RmlPanelHost::HandleSuccessfulPinGameThread()
+    {
+        Close();
+        vrui::VRMenuManager::get().switchToPanel("MainPanel");
+        (void)OpenPinTutorialIfNeeded();
     }
 
     void RmlPanelHost::RequestRmlWarmup()
@@ -1496,9 +1537,11 @@ namespace dragonboard::ui::rml
         }
 
         if (_welcomeClosePending.exchange(false, std::memory_order_acq_rel)) {
-            CompleteWelcomeTutorialGameThread();
+            CompleteActiveTutorialGameThread();
         }
-        if (_welcomeNextPending.exchange(false, std::memory_order_acq_rel)) {
+        if (_welcomeNextPending.exchange(false, std::memory_order_acq_rel) &&
+            _activeTutorial.load(std::memory_order_acquire) ==
+                ActiveTutorial::kWelcome) {
             const auto page = _welcomePage.load(std::memory_order_acquire);
             auto nextPage = page;
             if (page == 1 || page == 3 ||
@@ -1985,9 +2028,7 @@ namespace dragonboard::ui::rml
             if (handle == kWelcomeSurfaceHandle) {
                 const bool welcomeGrabEnabled =
                     _localPanelMode.load(std::memory_order_acquire) ==
-                        LocalPanelMode::kWelcome &&
-                    _welcomePage.load(std::memory_order_acquire) == 2 &&
-                    !_welcomeGrabCompleted.load(std::memory_order_acquire);
+                    LocalPanelMode::kWelcome;
                 surface.grabController.SetEnabled(welcomeGrabEnabled);
                 if (!welcomeGrabEnabled || !surface.node) continue;
                 const auto result = surface.grabController.Update(
@@ -2006,18 +2047,26 @@ namespace dragonboard::ui::rml
                     deltaTime);
                 if (result.grabStarted) {
                     manager.triggerHaptic(true, 0.55f, 0.08f);
-                    logger::info(
+                    logger::trace(
                         "DragonBoardVR: Welcome tutorial grab started after "
                         "the required one-second hold.");
                 }
                 if (result.grabEnded) {
                     PersistSurfaceTransform(surface);
-                    _welcomeGrabCompleted.store(true, std::memory_order_release);
-                    _rmlWelcomeSyncPending.store(true, std::memory_order_release);
+                    const bool firstGrabCompleted =
+                        !_welcomeGrabCompleted.exchange(
+                            true, std::memory_order_acq_rel);
+                    if (firstGrabCompleted) {
+                        _rmlWelcomeSyncPending.store(true, std::memory_order_release);
+                        logger::info(
+                            "DragonBoardVR: Welcome tutorial first grab completed; "
+                            "explanation and Next unlocked.");
+                    } else {
+                        logger::trace(
+                            "DragonBoardVR: Welcome tutorial transform persisted "
+                            "after grab release.");
+                    }
                     manager.triggerHaptic(true, 0.35f, 0.05f);
-                    logger::info(
-                        "DragonBoardVR: Welcome tutorial grab completed; "
-                        "explanation and Next unlocked.");
                 }
                 continue;
             }
@@ -2070,15 +2119,20 @@ namespace dragonboard::ui::rml
         }
     }
 
-    void RmlPanelHost::CompleteWelcomeTutorialGameThread()
+    void RmlPanelHost::CompleteActiveTutorialGameThread()
     {
         auto& settings = vrui::VRUISettings::get();
-        if (!settings.welcomeTutorialComplete) {
-            settings.welcomeTutorialComplete = true;
+        const auto activeTutorial =
+            _activeTutorial.load(std::memory_order_acquire);
+        const auto tutorialId = static_cast<vrui::TutorialId>(
+            static_cast<std::uint8_t>(activeTutorial));
+        if (!settings.isTutorialComplete(tutorialId)) {
+            settings.setTutorialComplete(tutorialId);
             settings.tutorialsPreviouslyEnabled = settings.showTutorials;
             vrui::VRMenuManager::get().saveSettingsNow();
             logger::info(
-                "DragonBoardVR: Welcome tutorial marked complete.");
+                "DragonBoardVR: RmlUi tutorial {} marked complete.",
+                static_cast<std::uint8_t>(activeTutorial));
         }
         Close();
         ResetWelcomeSurfaceGameThread();
@@ -2097,7 +2151,7 @@ namespace dragonboard::ui::rml
     void RmlPanelHost::ResetTutorialProgressAndPositionGameThread()
     {
         auto& settings = vrui::VRUISettings::get();
-        settings.welcomeTutorialComplete = false;
+        settings.resetTutorialProgress();
         settings.tutorialsPreviouslyEnabled = settings.showTutorials;
 
         auto& surface = WelcomeSceneSurface();
@@ -2672,7 +2726,7 @@ namespace dragonboard::ui::rml
                 surface.shaderProperty->DoClearRenderPasses();
             }
 
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: RmlUi texture bound to scene screen ({}x{}, "
                 "property={}, source={}, geometry={}, bridge={}, texture={}, srv={}).",
                 _panelWidth,
@@ -2685,7 +2739,7 @@ namespace dragonboard::ui::rml
                 static_cast<const void*>(_panelShaderResource));
             const auto& status = StatusSceneSurface();
             if (status.sourceTexture) {
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: surface isolation check propertyShared={} "
                     "sourceShared={} geometryShared={}.",
                     status.shaderProperty == surface.shaderProperty,
@@ -2699,7 +2753,7 @@ namespace dragonboard::ui::rml
                 surface.node->parent->DetachChild(surface.node.get());
             }
             backgroundNode->AttachChild(surface.node.get());
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: RmlUi scene screen attached to tablet node '{}'.",
                 backgroundNode->name.c_str());
         }
@@ -2793,7 +2847,7 @@ namespace dragonboard::ui::rml
                     }
                     surface.sourceTexture = material->diffuseTexture;
                     surface.originalRendererTexture = surface.sourceTexture->rendererTexture;
-                    logger::info(
+                    logger::trace(
                         "DragonBoardVR: status surface uses intrinsic texture "
                         "(material={}, status={}, main={}, path='{}').",
                         static_cast<const void*>(material),
@@ -2833,7 +2887,7 @@ namespace dragonboard::ui::rml
             }
             RegisterAndApplySurfaceTransform(surface);
             backgroundNode->AttachChild(surface.node.get());
-            logger::info("DragonBoardVR: independent status surface attached.");
+            logger::trace("DragonBoardVR: independent status surface attached.");
         } else if (surface.node->parent != backgroundNode &&
                    !surface.grabController.IsGrabbed()) {
             if (surface.node->parent) surface.node->parent->DetachChild(surface.node.get());
@@ -2983,7 +3037,7 @@ namespace dragonboard::ui::rml
             surface.hasDefaultTransform = true;
             RegisterAndApplySurfaceTransform(surface);
             backgroundNode->AttachChild(surface.node.get());
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: Welcome tutorial surface attached at the "
                 "saved DragonBoard-relative transform.");
         } else if (surface.node->parent != backgroundNode &&
@@ -3129,7 +3183,7 @@ namespace dragonboard::ui::rml
             }
             RegisterAndApplySurfaceTransform(surface);
             backgroundNode->AttachChild(surface.node.get());
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: independent keyboard surface attached.");
         } else if (surface.node->parent != backgroundNode &&
                    !surface.grabController.IsGrabbed()) {
@@ -3380,7 +3434,7 @@ namespace dragonboard::ui::rml
         }
         surface.textureWidth = width;
         surface.textureHeight = height;
-        logger::info(
+        logger::trace(
             "DragonBoardVR: created independent keyboard render target {}x{}.",
             width,
             height);
@@ -3577,7 +3631,7 @@ namespace dragonboard::ui::rml
                 std::chrono::steady_clock::now() - started).count();
             _rmlPrewarmTotalMs += elapsedMs;
             ++_rmlPrewarmFrameCount;
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: staged one RmlUi document in {} ms (loaded={}).",
                 elapsedMs,
                 loaded);
@@ -3639,7 +3693,7 @@ namespace dragonboard::ui::rml
             std::chrono::steady_clock::now() - started).count();
         _rmlPrewarmTotalMs += elapsedMs;
         ++_rmlPrewarmFrameCount;
-        logger::info(
+        logger::trace(
             "DragonBoardVR: RmlUi prewarmed {} in {} ms (shown={}, rendered={}).",
             document.name,
             elapsedMs,
@@ -3759,9 +3813,14 @@ namespace dragonboard::ui::rml
             } else if (welcomeRmlActive) {
                 _rmlUi->ShowWelcome();
                 if (_rmlWelcomeSyncPending.exchange(false)) {
-                    _rmlUi->SetWelcomePage(
-                        _welcomePage.load(std::memory_order_acquire),
-                        _welcomeGrabCompleted.load(std::memory_order_acquire));
+                    if (_activeTutorial.load(std::memory_order_acquire) ==
+                        ActiveTutorial::kPin) {
+                        _rmlUi->SetPinTutorial();
+                    } else {
+                        _rmlUi->SetWelcomePage(
+                            _welcomePage.load(std::memory_order_acquire),
+                            _welcomeGrabCompleted.load(std::memory_order_acquire));
+                    }
                     _renderScheduler.MarkDirty(RmlDirtyReason::kData);
                 }
             } else {
@@ -3989,7 +4048,7 @@ namespace dragonboard::ui::rml
                 case RmlInventoryAction::kEquip:
                     {
                         const bool leftHand = _inputBridge.WasLastTriggerLeft();
-                        logger::info(
+                        logger::trace(
                             "DragonBoardVR: RmlUi inventory equip requested by {} hand.",
                             leftHand ? "left" : "right");
                         _inventoryActionLeftHand.store(
@@ -4059,7 +4118,7 @@ namespace dragonboard::ui::rml
                 case RmlMagicAction::kEquip:
                     {
                         const bool leftHand = _inputBridge.WasLastTriggerLeft();
-                        logger::info(
+                        logger::trace(
                             "DragonBoardVR: RmlUi magic equip requested by {} hand.",
                             leftHand ? "left" : "right");
                         _magicActionLeftHand.store(
@@ -7118,8 +7177,7 @@ namespace dragonboard::ui::rml
                         dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kStrong :
                         dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
                 if (succeeded) {
-                    Close();
-                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                    HandleSuccessfulPinGameThread();
                 }
             }
             return;
@@ -7360,8 +7418,7 @@ namespace dragonboard::ui::rml
                 const bool succeeded = preview && hasSelection && preview->pinToDashboard();
                 queuePinHaptic(succeeded);
                 if (succeeded) {
-                    Close();
-                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                    HandleSuccessfulPinGameThread();
                 }
             }
             return;
@@ -7370,8 +7427,7 @@ namespace dragonboard::ui::rml
                 const bool succeeded = preview && hasSelection && preview->pinToLeftHand();
                 queuePinHaptic(succeeded);
                 if (succeeded) {
-                    Close();
-                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                    HandleSuccessfulPinGameThread();
                 }
             }
             return;
@@ -7380,8 +7436,7 @@ namespace dragonboard::ui::rml
                 const bool succeeded = preview && hasSelection && preview->pinToRightHand();
                 queuePinHaptic(succeeded);
                 if (succeeded) {
-                    Close();
-                    vrui::VRMenuManager::get().switchToPanel("MainPanel");
+                    HandleSuccessfulPinGameThread();
                 }
             }
             return;
@@ -7549,8 +7604,7 @@ namespace dragonboard::ui::rml
         if (pinAction && succeeded) {
             _inputBridge.SetHaptic(static_cast<std::uint8_t>(
                 dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kStrong));
-            Close();
-            vrui::VRMenuManager::get().switchToPanel("MainPanel");
+            HandleSuccessfulPinGameThread();
             return;
         }
 

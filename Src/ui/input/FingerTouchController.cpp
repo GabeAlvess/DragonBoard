@@ -361,7 +361,7 @@ namespace dragonboard::ui::input
             _contactIsRml = false;
             _rmlFrontApproachArmed = false;
             _frontApproachArmedWidget.reset();
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: finger touch mode active within {:.1f} units "
                 "of the board with physicalHand={}, skeletonHand={}; "
                 "laser suspended.",
@@ -405,7 +405,7 @@ namespace dragonboard::ui::input
         touchDiagnosticCooldown -= (std::max)(deltaTime, 0.0f);
         if (_active && touchDiagnosticCooldown <= 0.0f) {
             touchDiagnosticCooldown = 1.0f;
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: finger touch sample physicalHand={}, "
                 "skeletonHand={}, boardDistance={:.2f}, "
                 "rmlInBounds={}, rmlOnFront={}, u={:.3f}, v={:.3f}, "
@@ -654,7 +654,7 @@ namespace dragonboard::ui::input
         }
         _active = false;
         dragonboard::integrations::vrik::RestoreTouchHandPose();
-        logger::info("DragonBoardVR: finger touch mode inactive; laser restored.");
+        logger::trace("DragonBoardVR: finger touch mode inactive; laser restored.");
     }
 
     void FingerTouchController::ReleasePressedWidget()

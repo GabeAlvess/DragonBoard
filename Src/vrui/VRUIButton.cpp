@@ -1719,7 +1719,7 @@ namespace vrui
             float effectivePosZ = _persistItemPosZ + localDelta.z;
             float effectiveScale = _persistItemScale * scaleRatio;
 
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: Item override grab save formID={:08X} label='{}' "
                 "effectiveDeg=({:.2f}, {:.2f}, {:.2f}) "
                 "pos=({:.2f}, {:.2f}, {:.2f}) scale={:.3f}",
@@ -1728,7 +1728,7 @@ namespace vrui
                 effectiveRx / kDegToRad, effectiveRy / kDegToRad, effectiveRz / kDegToRad,
                 effectivePosX, effectivePosY, effectivePosZ,
                 effectiveScale);
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: Item override grab matrices formID={:08X} label='{}' "
                 "visualLocal={} reconstructed={}",
                 _itemOverrideFormID,

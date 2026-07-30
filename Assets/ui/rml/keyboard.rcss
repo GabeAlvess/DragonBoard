@@ -9,7 +9,7 @@ body {
     position: relative;
     width: 1920px;
     height: 1080px;
-    opacity: 0.80;
+    opacity: 1;
     color: #f2f2f2;
     background-color: #0b0c0c;
     decorator: image("assets/keyboard.jpg" fill);

@@ -889,7 +889,7 @@ input.range sliderbar:active {
 
 /* Extreme VR exposure compensation requested after the in-game test. */
 #app {
-    opacity: 0.95;
+    opacity: 1;
     background-color: #080706;
     border-color: #59401f;
 }
@@ -1020,7 +1020,7 @@ body {
 }
 
 #app {
-    opacity: 0.95;
+    opacity: 1;
     background-color: #181818;
     border-color: #505050;
 }

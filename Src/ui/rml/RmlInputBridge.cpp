@@ -28,7 +28,7 @@ namespace dragonboard::ui::rml
     {
         if (pressed) {
             _lastTriggerWasLeft.store(leftHand, std::memory_order_release);
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: finger touch click from {} hand.",
                 leftHand ? "left" : "right");
         }
@@ -64,7 +64,7 @@ namespace dragonboard::ui::rml
             const bool previous = _triggerDown.exchange(
                 anyTriggerDown, std::memory_order_acq_rel);
             if (previous != anyTriggerDown) {
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: local panel {} trigger {}.",
                     leftHand ? "left" : "right",
                     anyTriggerDown ? "down" : "up");
@@ -73,7 +73,7 @@ namespace dragonboard::ui::rml
             const bool previous = _gripDown.exchange(
                 pressed, std::memory_order_acq_rel);
             if (previous != pressed) {
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: local panel dominant grip {}.",
                     pressed ? "down" : "up");
             }

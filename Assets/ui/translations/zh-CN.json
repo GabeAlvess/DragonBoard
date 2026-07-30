@@ -327,6 +327,8 @@
     "INSTANT": "立即的",
     "DONE": "已完成",
     "FAILED": "失败",
-    "ACTIVE": "进行中"
+    "ACTIVE": "进行中",
+    "Item pinned": "物品已固定",
+    "Your pinned item stays available on DragonBoard. Point at it and hold the grab button to move it. Use both grips to resize it.": "固定的物品会保留在 DragonBoard 上。将指针对准它并按住抓取按钮即可移动。使用双手握把可调整其大小。"
   }
 }

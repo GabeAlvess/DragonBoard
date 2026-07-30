@@ -420,7 +420,11 @@ namespace
                 } else if (wParam == VK_F6) {
                     CycleSyntheticDataset();
                 } else if (wParam == VK_F7) {
-                    ToggleSyntheticEmptySearch();
+                    if (_documentPath.filename() == "welcome.rml") {
+                        ShowPinTutorialPreview();
+                    } else {
+                        ToggleSyntheticEmptySearch();
+                    }
                 } else if (wParam == 'O' && (GetKeyState(VK_CONTROL) & 0x8000)) {
                     const auto path = SelectDocumentWithDialog();
                     if (!path.empty()) LoadDocument(path);
@@ -1412,6 +1416,23 @@ namespace
                 "Synthetic dataset: " +
                 std::to_string(kSyntheticDatasetSizes[_syntheticDatasetIndex]) +
                 " entries, max 10 DOM rows");
+        }
+
+        void ShowPinTutorialPreview()
+        {
+            if (!_document) return;
+            for (std::uint8_t candidate = 1; candidate <= 3; ++candidate) {
+                const auto id = "welcome-page-" + std::to_string(candidate);
+                if (auto* page = _document->GetElementById(id)) {
+                    page->SetClass("active", false);
+                    page->SetProperty("display", "none");
+                }
+            }
+            if (auto* pin = _document->GetElementById("pin-tutorial-page")) {
+                pin->SetClass("active", true);
+                pin->SetProperty("display", "block");
+                SetStatus("Pin tutorial preview");
+            }
         }
 
         void ToggleSyntheticEmptySearch()
