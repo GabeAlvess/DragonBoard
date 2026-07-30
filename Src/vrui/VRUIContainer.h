@@ -51,9 +51,6 @@ namespace vrui
         int getCurrentPage() const { return _currentPage; }
         void resetPage() { _currentPage = 0; }
         virtual int getTotalPages() const;
-        virtual void nextPage();
-        virtual void prevPage();
-
         void onChildLayoutChanged(VRUIWidget* child) override;
 
 

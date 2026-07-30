@@ -26,6 +26,7 @@ namespace Rml
 namespace dragonboard::ui::rml
 {
     class DragonBoardRmlRenderer;
+    class LocalizationManager;
 
     class DragonBoardRmlUi
     {
@@ -416,6 +417,7 @@ namespace dragonboard::ui::rml
         ~DragonBoardRmlUi();
 
         bool Initialize(ID3D11Device* device, ID3D11DeviceContext* context);
+        bool ReloadLanguage(std::string_view code);
         bool LoadNextBuiltinDocument();
         [[nodiscard]] bool AreBuiltinDocumentsLoaded() const;
         void Shutdown();
@@ -427,6 +429,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsInventoryReady() const;
         [[nodiscard]] bool IsMagicReady() const;
         [[nodiscard]] bool IsJournalReady() const;
+        [[nodiscard]] bool IsWelcomeReady() const;
         [[nodiscard]] bool IsKeyboardReady() const;
         [[nodiscard]] bool IsKeyboardOpen() const;
         bool ShowSettings();
@@ -436,6 +439,7 @@ namespace dragonboard::ui::rml
         bool ShowInventory();
         bool ShowMagic();
         bool ShowJournal();
+        bool ShowWelcome();
         bool OpenKeyboard(
             std::string prompt,
             std::string initialText,
@@ -471,6 +475,8 @@ namespace dragonboard::ui::rml
             float pointerV,
             bool triggerDown,
             bool gripDown,
+            bool fingerTouchActive,
+            bool fingerTouchScrolling,
             float stickX,
             float stickY,
             int width,
@@ -489,6 +495,8 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool ConsumePositionAdjustmentRequested();
         [[nodiscard]] bool ConsumeLockPinsToggleRequested();
         [[nodiscard]] bool ConsumeDeveloperPanelToggleRequested();
+        [[nodiscard]] bool ConsumeShowTutorialsToggleRequested();
+        [[nodiscard]] std::optional<std::string> ConsumeLanguageSelectionRequested();
         [[nodiscard]] bool ConsumeWorldPinToggleRequested();
         [[nodiscard]] bool ConsumeRestartRequested();
         [[nodiscard]] HapticCue ConsumeHapticCue();
@@ -502,6 +510,8 @@ namespace dragonboard::ui::rml
         [[nodiscard]] std::pair<InventoryAction, std::size_t> ConsumeInventoryAction();
         [[nodiscard]] std::pair<MagicAction, std::size_t> ConsumeMagicAction();
         [[nodiscard]] JournalActionRequest ConsumeJournalAction();
+        [[nodiscard]] bool ConsumeWelcomeNextRequested();
+        [[nodiscard]] bool ConsumeWelcomeCloseRequested();
         [[nodiscard]] std::optional<std::size_t> GetHoveredModsIndex() const;
         [[nodiscard]] bool IsPreviewInteractionZoneHovered() const
         {
@@ -522,10 +532,14 @@ namespace dragonboard::ui::rml
         void SetInventory(InventoryInfo info);
         void SetMagic(MagicInfo info);
         void SetJournal(const JournalInfo& info);
+        void SetWelcomePage(std::uint8_t page, bool grabCompleted);
         void SetPositionAdjustmentActive(bool active);
         void SetPinsLocked(bool locked);
         void SetDeveloperButtonEnabled(bool enabled);
+        void SetShowTutorialsEnabled(bool enabled);
+        void SetLanguageSelection(std::string_view code);
         void SetWorldPinned(bool pinned);
+        [[nodiscard]] std::string ActiveLanguageCode() const;
         void SetDeveloperCommands(
             std::vector<DeveloperCommand> commands,
             std::size_t selectedIndex = 0);
@@ -601,6 +615,8 @@ namespace dragonboard::ui::rml
         [[nodiscard]] std::uint32_t FindPanelHandle(Rml::ElementDocument* document) const;
         void HideAllDocuments();
         void UpdateCapturedSlider(int pointerX);
+        void UpdateVirtualScrollbarPosition(
+            int pointerY, bool inventoryScrollbar, bool magicScrollbar);
         void UpdateInventoryMarquee(float deltaTime);
         void ResetInventoryMarquee();
         void UpdateInventoryVirtualRows(bool refreshVisibleRows = false);
@@ -615,11 +631,14 @@ namespace dragonboard::ui::rml
         void CaptureGripScrollHoverLock();
         void ApplyGripScrollHoverLock();
         void ClearGripScrollHoverLock();
+        [[nodiscard]] std::string Tr(std::string_view english) const;
 
         std::unique_ptr<DragonBoardRmlRenderer> _renderer;
+        std::unique_ptr<LocalizationManager> _localization;
         std::unique_ptr<UiEventListener> _eventListener;
         std::unique_ptr<SystemLogger> _systemLogger;
         std::vector<unsigned char> _fontData;
+        std::vector<unsigned char> _fallbackFontData;
         Rml::Context* _context = nullptr;
         Rml::ElementDocument* _settingsDocument = nullptr;
         Rml::ElementDocument* _developerDocument = nullptr;
@@ -628,6 +647,7 @@ namespace dragonboard::ui::rml
         Rml::ElementDocument* _inventoryDocument = nullptr;
         Rml::ElementDocument* _magicDocument = nullptr;
         Rml::ElementDocument* _journalDocument = nullptr;
+        Rml::ElementDocument* _welcomeDocument = nullptr;
         Rml::ElementDocument* _keyboardDocument = nullptr;
         Rml::ElementDocument* _activeDocument = nullptr;
         Rml::ElementDocument* _keyboardReturnDocument = nullptr;
@@ -674,6 +694,7 @@ namespace dragonboard::ui::rml
         bool _magicScrollbarDragging = false;
         std::vector<InteractiveBinding> _interactiveBindings;
         bool _gripScrollActive = false;
+        bool _gripScrollDirectVirtualScrollbar = false;
         enum class GripScrollHoverList : std::uint8_t
         {
             kNone,
@@ -694,8 +715,13 @@ namespace dragonboard::ui::rml
         bool _positionAdjustmentRequested = false;
         bool _lockPinsToggleRequested = false;
         bool _developerPanelToggleRequested = false;
+        bool _showTutorialsToggleRequested = false;
+        std::optional<std::string> _languageSelectionRequested;
+        std::string _settingsLanguageCode{ "en" };
         bool _worldPinToggleRequested = false;
         bool _restartRequested = false;
+        bool _welcomeNextRequested = false;
+        bool _welcomeCloseRequested = false;
         bool _keyboardShift = false;
         std::size_t _keyboardMaximumLength = 0;
         std::string _keyboardText;

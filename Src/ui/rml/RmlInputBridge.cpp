@@ -11,6 +11,7 @@ namespace dragonboard::ui::rml
         _triggerDown.store(false, std::memory_order_release);
         _leftTriggerDown.store(false, std::memory_order_release);
         _rightTriggerDown.store(false, std::memory_order_release);
+        _fingerTouchActive.store(false, std::memory_order_release);
         _fingerTouchTriggerDown.store(false, std::memory_order_release);
         _fingerTouchScrollDown.store(false, std::memory_order_release);
         _gripDown.store(false, std::memory_order_release);
@@ -18,10 +19,18 @@ namespace dragonboard::ui::rml
         _stickY.store(0.0f, std::memory_order_release);
     }
 
+    void RmlInputBridge::SetFingerTouchActive(bool active)
+    {
+        _fingerTouchActive.store(active, std::memory_order_release);
+    }
+
     void RmlInputBridge::SetFingerTouchTrigger(bool leftHand, bool pressed)
     {
         if (pressed) {
             _lastTriggerWasLeft.store(leftHand, std::memory_order_release);
+            logger::info(
+                "DragonBoardVR: finger touch click from {} hand.",
+                leftHand ? "left" : "right");
         }
         _fingerTouchTriggerDown.store(pressed, std::memory_order_release);
     }
@@ -99,16 +108,28 @@ namespace dragonboard::ui::rml
         update.state.pointerOnPanel = _pointerOnPanel.load(std::memory_order_acquire);
         update.state.pointerU = _pointerU.load(std::memory_order_acquire);
         update.state.pointerV = _pointerV.load(std::memory_order_acquire);
+        update.state.fingerTouchActive =
+            _fingerTouchActive.load(std::memory_order_acquire);
+        update.state.fingerTouchScrolling =
+            update.state.fingerTouchActive &&
+            _fingerTouchScrollDown.load(std::memory_order_acquire);
         const bool physicalTriggerDown =
             _triggerDown.load(std::memory_order_acquire);
-        update.state.triggerDown = physicalTriggerDown ||
-            _fingerTouchTriggerDown.load(std::memory_order_acquire);
-        update.state.gripDown =
-            _gripDown.load(std::memory_order_acquire) ||
-            (_fingerTouchScrollDown.load(std::memory_order_acquire) &&
-             !physicalTriggerDown);
-        update.state.stickX = _stickX.load(std::memory_order_acquire);
-        update.state.stickY = _stickY.load(std::memory_order_acquire);
+        if (update.state.fingerTouchActive) {
+            update.state.triggerDown =
+                _fingerTouchTriggerDown.load(std::memory_order_acquire);
+            update.state.gripDown =
+                update.state.fingerTouchScrolling &&
+                !update.state.triggerDown;
+            update.state.stickX = 0.0f;
+            update.state.stickY = 0.0f;
+        } else {
+            update.state.triggerDown = physicalTriggerDown;
+            update.state.gripDown =
+                _gripDown.load(std::memory_order_acquire);
+            update.state.stickX = _stickX.load(std::memory_order_acquire);
+            update.state.stickY = _stickY.load(std::memory_order_acquire);
+        }
 
         const float pointerThresholdU = logicalWidth > 0 ?
             0.5f / static_cast<float>(logicalWidth) : 0.0f;
@@ -118,9 +139,13 @@ namespace dragonboard::ui::rml
             update.state.pointerOnPanel != _lastPresentState.pointerOnPanel ||
             std::abs(update.state.pointerU - _lastPresentState.pointerU) >= pointerThresholdU ||
             std::abs(update.state.pointerV - _lastPresentState.pointerV) >= pointerThresholdV ||
-            update.state.triggerDown != _lastPresentState.triggerDown;
+            update.state.triggerDown != _lastPresentState.triggerDown ||
+            update.state.fingerTouchActive !=
+                _lastPresentState.fingerTouchActive;
         update.scrollChanged = !_presentStateInitialized ||
             update.state.gripDown != _lastPresentState.gripDown ||
+            update.state.fingerTouchScrolling !=
+                _lastPresentState.fingerTouchScrolling ||
             std::abs(update.state.stickX - _lastPresentState.stickX) >= 0.01f ||
             std::abs(update.state.stickY - _lastPresentState.stickY) >= 0.01f;
         _presentStateInitialized = true;
@@ -140,15 +165,20 @@ namespace dragonboard::ui::rml
 
     bool RmlInputBridge::IsTriggerDown() const
     {
-        return _triggerDown.load(std::memory_order_acquire) ||
-            _fingerTouchTriggerDown.load(std::memory_order_acquire);
+        if (_fingerTouchActive.load(std::memory_order_acquire)) {
+            return _fingerTouchTriggerDown.load(std::memory_order_acquire);
+        }
+        return _triggerDown.load(std::memory_order_acquire);
     }
 
     bool RmlInputBridge::IsScrollActive() const
     {
-        return (_gripDown.load(std::memory_order_acquire) ||
-                _fingerTouchScrollDown.load(std::memory_order_acquire)) &&
-            !IsTriggerDown();
+        if (_fingerTouchActive.load(std::memory_order_acquire)) {
+            return _fingerTouchScrollDown.load(std::memory_order_acquire) &&
+                !_fingerTouchTriggerDown.load(std::memory_order_acquire);
+        }
+        return _gripDown.load(std::memory_order_acquire) &&
+            !_triggerDown.load(std::memory_order_acquire);
     }
 
     bool RmlInputBridge::DidTriggerReleaseSinceLastCheck()

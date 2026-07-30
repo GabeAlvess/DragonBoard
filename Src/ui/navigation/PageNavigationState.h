@@ -13,8 +13,6 @@ namespace dragonboard::ui::navigation
     {
     public:
         void SetActive(const std::shared_ptr<vrui::VRUIContainer>& container);
-        void Next();
-        void Previous();
         void Home();
 
     private:

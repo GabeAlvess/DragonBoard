@@ -21,7 +21,9 @@ namespace dragonboard::ui::input
         struct FingerTipPose
         {
             RE::NiPoint3 position{};
+            RE::NiPoint3 physicalPosition{};
             bool leftHand = false;
+            bool skeletonLeftHand = false;
         };
 
         struct WidgetPointSample
@@ -31,6 +33,9 @@ namespace dragonboard::ui::input
             float absoluteDistance = std::numeric_limits<float>::max();
             float frontSign = 1.0f;
         };
+
+        constexpr float kBoardHalfWidth = 17.0f;
+        constexpr float kBoardHalfHeight = 11.0f;
 
         RE::NiAVObject* FindFirst(
             RE::NiNode* root,
@@ -48,14 +53,17 @@ namespace dragonboard::ui::input
         bool ResolveDominantFingerTip(
             RE::NiNode* root,
             bool useLeftHandAsMenu,
+            bool nativeLeftHandedMode,
             float extension,
             const RE::NiPoint3& localOffset,
             FingerTipPose& result)
         {
             if (!root) return false;
             result.leftHand = !useLeftHandAsMenu;
+            result.skeletonLeftHand =
+                result.leftHand != nativeLeftHandedMode;
 
-            const std::array<const char*, 3> previousNames = result.leftHand ?
+            const std::array<const char*, 3> previousNames = result.skeletonLeftHand ?
                 std::array{
                     "NPC L Finger11 [LF11]",
                     "NPC L Finger10 [LF10]",
@@ -64,7 +72,7 @@ namespace dragonboard::ui::input
                     "NPC R Finger11 [RF11]",
                     "NPC R Finger10 [RF10]",
                     "NPC R Finger12 [RF12]" };
-            const std::array<const char*, 3> tipNames = result.leftHand ?
+            const std::array<const char*, 3> tipNames = result.skeletonLeftHand ?
                 std::array{
                     "NPC L Finger12 [LF12]",
                     "NPC L Finger11 [LF11]",
@@ -78,6 +86,8 @@ namespace dragonboard::ui::input
             auto* tip = FindFirst(root, tipNames);
             if (!tip) return false;
 
+            result.physicalPosition =
+                tip->world.translate + tip->world.rotate * localOffset;
             result.position = tip->world.translate;
             if (previous) {
                 RE::NiPoint3 direction = tip->world.translate - previous->world.translate;
@@ -132,39 +142,99 @@ namespace dragonboard::ui::input
             return true;
         }
 
-        void FindClosestPanelSurface(
-            const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
-            const RE::NiPoint3& point,
+        bool ResolvePanelFrontDirection(
+            const std::shared_ptr<vrui::VRUIPanel>& panel,
             const RE::NiPoint3& frontReferencePoint,
-            float padding,
-            float& closestDistance)
+            RE::NiPoint3& frontDirection)
         {
-            closestDistance = std::numeric_limits<float>::max();
-            for (const auto& panel : panels) {
-                if (!panel || !panel->isActive() || !panel->isShown()) continue;
-                const auto& name = panel->getName();
-                if (name != "Background_Panel" &&
-                    name != "Persistent_Panel" &&
-                    name != "MainPanel") {
-                    continue;
-                }
-                float signedDistance = 0.0f;
-                if (SampleWidgetPoint(
-                        panel,
-                        point,
-                        padding,
-                        std::numeric_limits<float>::max(),
-                        signedDistance,
-                        &frontReferencePoint)) {
-                    closestDistance = std::min(closestDistance, std::abs(signedDistance));
+            if (!panel || !panel->isActive() || !panel->isShown() ||
+                !panel->getNode()) {
+                return false;
+            }
+
+            const auto& panelTransform = panel->getNode()->world;
+            const float panelScale = std::abs(panelTransform.scale);
+            if (panelScale <= 1.0e-5f) {
+                return false;
+            }
+
+            const RE::NiPoint3 referenceLocal =
+                panelTransform.rotate.Transpose() *
+                (frontReferencePoint - panelTransform.translate) /
+                panelScale;
+            const float panelFrontSign =
+                referenceLocal.y < 0.0f ? 1.0f : -1.0f;
+            frontDirection = {
+                panelTransform.rotate.entry[0][1] * panelFrontSign,
+                panelTransform.rotate.entry[1][1] * panelFrontSign,
+                panelTransform.rotate.entry[2][1] * panelFrontSign };
+            return true;
+        }
+
+        bool ResolveBoardFrontDirection(
+            const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
+            const RE::NiPoint3& frontReferencePoint,
+            RE::NiPoint3& frontDirection)
+        {
+            constexpr std::array<std::string_view, 3> preferredPanels{
+                "Background_Panel", "Persistent_Panel", "MainPanel" };
+            for (const auto preferredName : preferredPanels) {
+                for (const auto& panel : panels) {
+                    if (panel && panel->getName() == preferredName &&
+                        ResolvePanelFrontDirection(
+                            panel, frontReferencePoint, frontDirection)) {
+                        return true;
+                    }
                 }
             }
+            return false;
+        }
+
+        bool SampleBoardDistance(
+            const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
+            const RE::NiPoint3& worldPoint,
+            float& distance)
+        {
+            constexpr std::array<std::string_view, 3> preferredPanels{
+                "Background_Panel", "Persistent_Panel", "MainPanel" };
+            for (const auto preferredName : preferredPanels) {
+                for (const auto& panel : panels) {
+                    if (!panel || panel->getName() != preferredName ||
+                        !panel->isActive() || !panel->isShown() ||
+                        !panel->getNode()) {
+                        continue;
+                    }
+
+                    const auto& transform = panel->getNode()->world;
+                    const float scale = std::abs(transform.scale);
+                    if (scale <= 1.0e-5f) {
+                        continue;
+                    }
+
+                    const RE::NiPoint3 local =
+                        transform.rotate.Transpose() *
+                        (worldPoint - transform.translate) / scale;
+                    const float outsideX =
+                        std::max(std::abs(local.x) - kBoardHalfWidth, 0.0f) *
+                        scale;
+                    const float outsideZ =
+                        std::max(std::abs(local.z) - kBoardHalfHeight, 0.0f) *
+                        scale;
+                    const float depth = std::abs(local.y) * scale;
+                    distance = std::sqrt(
+                        outsideX * outsideX +
+                        outsideZ * outsideZ +
+                        depth * depth);
+                    return true;
+                }
+            }
+            return false;
         }
 
         void FindClosestButtonRecursive(
             const std::shared_ptr<vrui::VRUIWidget>& widget,
             const RE::NiPoint3& point,
-            const RE::NiPoint3& frontReferencePoint,
+            const RE::NiPoint3& panelFrontDirection,
             float hoverDistance,
             WidgetPointSample& result)
         {
@@ -179,11 +249,20 @@ namespace dragonboard::ui::input
                         point,
                         0.0f,
                         std::numeric_limits<float>::max(),
-                        signedDistance,
-                        &frontReferencePoint,
-                        &frontSign)) {
+                        signedDistance)) {
+                    const auto& widgetRotation = widget->getNode()->world.rotate;
+                    const RE::NiPoint3 widgetDepthAxis(
+                        widgetRotation.entry[0][1],
+                        widgetRotation.entry[1][1],
+                        widgetRotation.entry[2][1]);
+                    const float alignment =
+                        widgetDepthAxis.x * panelFrontDirection.x +
+                        widgetDepthAxis.y * panelFrontDirection.y +
+                        widgetDepthAxis.z * panelFrontDirection.z;
+                    frontSign = alignment < 0.0f ? -1.0f : 1.0f;
                     const float absoluteDistance = std::abs(signedDistance);
-                    if (absoluteDistance <= hoverDistance &&
+                    if (signedDistance * frontSign >= 0.0f &&
+                        absoluteDistance <= hoverDistance &&
                         absoluteDistance < result.absoluteDistance) {
                         result = {
                             widget, signedDistance, absoluteDistance, frontSign };
@@ -193,7 +272,7 @@ namespace dragonboard::ui::input
 
             for (const auto& child : widget->getChildren()) {
                 FindClosestButtonRecursive(
-                    child, point, frontReferencePoint, hoverDistance, result);
+                    child, point, panelFrontDirection, hoverDistance, result);
             }
         }
 
@@ -206,41 +285,18 @@ namespace dragonboard::ui::input
             WidgetPointSample result;
             for (const auto& panel : panels) {
                 if (panel && panel->isActive() && panel->isShown()) {
+                    RE::NiPoint3 panelFrontDirection;
+                    if (!ResolvePanelFrontDirection(
+                            panel, frontReferencePoint, panelFrontDirection)) {
+                        continue;
+                    }
                     FindClosestButtonRecursive(
-                        panel, point, frontReferencePoint, hoverDistance, result);
+                        panel, point, panelFrontDirection, hoverDistance, result);
                 }
             }
             return result;
         }
 
-        bool HasHiggsProximityForHandRecursive(
-            const std::shared_ptr<vrui::VRUIWidget>& widget,
-            bool leftHand)
-        {
-            if (!widget || !widget->isVisible()) return false;
-            if (auto* button = dynamic_cast<vrui::VRUIButton*>(widget.get());
-                button && button->isDashboardPinned() &&
-                button->isInHiggsProximityForHand(leftHand)) {
-                return true;
-            }
-            for (const auto& child : widget->getChildren()) {
-                if (HasHiggsProximityForHandRecursive(child, leftHand)) return true;
-            }
-            return false;
-        }
-
-        bool HasHiggsProximityForHand(
-            const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
-            bool leftHand)
-        {
-            for (const auto& panel : panels) {
-                if (panel && panel->isActive() && panel->isShown() &&
-                    HasHiggsProximityForHandRecursive(panel, leftHand)) {
-                    return true;
-                }
-            }
-            return false;
-        }
     }
 
     FingerTouchController& FingerTouchController::GetSingleton()
@@ -264,6 +320,7 @@ namespace dragonboard::ui::input
         if (!ResolveDominantFingerTip(
                 manager.getPlayerSkeletonRoot(),
                 settings.useLeftHandAsMenu,
+                settings.isNativeLeftHandedMode(),
                 settings.fingerTouchTipExtension,
                 RE::NiPoint3{
                     settings.fingerTouchOffsetX,
@@ -283,67 +340,15 @@ namespace dragonboard::ui::input
             return false;
         }
         const RE::NiPoint3 frontReferencePoint = headNode->world.translate;
+        const auto& panels = manager._panelRegistry.GetPanels();
 
-        float closestPanelDistance = std::numeric_limits<float>::max();
-        FindClosestPanelSurface(
-            manager._panelRegistry.GetPanels(),
-            finger.position,
-            frontReferencePoint,
-            4.0f,
-            closestPanelDistance);
-
-        float rmlU = 0.0f;
-        float rmlV = 0.0f;
-        float rmlSignedDistance = std::numeric_limits<float>::max();
-        float rmlFrontSign = 1.0f;
-        const bool rmlInBounds = rmlHost.IsOpen() &&
-            rmlHost.SampleFingerTouchSurface(
-                finger.position,
-                frontReferencePoint,
-                rmlU,
-                rmlV,
-                rmlSignedDistance,
-                rmlFrontSign);
-        const bool rmlOnFront =
-            rmlInBounds && rmlSignedDistance * rmlFrontSign >= 0.0f;
-        if (rmlOnFront) {
-            closestPanelDistance = std::min(
-                closestPanelDistance, std::abs(rmlSignedDistance));
-        }
-
-        const float modeLimit = _active ?
-            settings.fingerTouchExitDistance : settings.fingerTouchEnterDistance;
-        WidgetPointSample proximityButton = FindClosestButton(
-            manager._panelRegistry.GetPanels(),
-            finger.position,
-            frontReferencePoint,
-            modeLimit);
-        if (proximityButton.widget) {
-            closestPanelDistance = std::min(
-                closestPanelDistance, proximityButton.absoluteDistance);
-        }
-
-        bool latchedSurfaceNear = false;
-        if (_contactLatched) {
-            if (_contactIsRml) {
-                latchedSurfaceNear = rmlInBounds &&
-                    std::abs(rmlSignedDistance) <=
-                        settings.fingerTouchExitDistance;
-            } else if (auto pressed = _pressedWidget.lock()) {
-                float pressedDistance = 0.0f;
-                latchedSurfaceNear = SampleWidgetPoint(
-                    pressed,
-                    finger.position,
-                    0.0f,
-                    std::numeric_limits<float>::max(),
-                    pressedDistance) &&
-                    std::abs(pressedDistance) <=
-                        settings.fingerTouchExitDistance;
-            }
-        }
-        const bool shouldBeActive =
-            latchedSurfaceNear || closestPanelDistance <= modeLimit;
-        if (!shouldBeActive) {
+        float boardDistance = std::numeric_limits<float>::max();
+        const bool hasBoardSurface =
+            SampleBoardDistance(panels, finger.physicalPosition, boardDistance);
+        const bool boardWithinEntry =
+            hasBoardSurface &&
+            boardDistance <= settings.fingerTouchEnterDistance;
+        if (!_active && !boardWithinEntry) {
             rmlHost.SetFingerTouchInput(
                 false, false, 0.0f, 0.0f, false, false, finger.leftHand);
             Deactivate(manager);
@@ -356,46 +361,89 @@ namespace dragonboard::ui::input
             _contactIsRml = false;
             _rmlFrontApproachArmed = false;
             _frontApproachArmedWidget.reset();
-            logger::info("DragonBoardVR: finger touch mode active; laser suspended.");
+            logger::info(
+                "DragonBoardVR: finger touch mode active within {:.1f} units "
+                "of the board with physicalHand={}, skeletonHand={}; "
+                "laser suspended.",
+                settings.fingerTouchEnterDistance,
+                finger.leftHand ? "left" : "right",
+                finger.skeletonLeftHand ? "left" : "right");
         }
 
-        const bool higgsProximity = HasHiggsProximityForHand(
-            manager._panelRegistry.GetPanels(), finger.leftHand);
-        if (higgsProximity) {
-            dragonboard::integrations::vrik::RestoreTouchHandPose();
-
-            // HIGGS owns the hand while a pinned item is in proximity. End
-            // every in-flight touch state, including the virtual grip used by
-            // RmlUi scrolling, so the old surface cannot keep following the
-            // hand after control changes systems.
-            ReleasePressedWidget();
-            _contactLatched = false;
-            _contactIsRml = false;
-            _awaitingWithdrawal = false;
-            _rmlTouchScrolling = false;
-            _rmlTapPulseDown = false;
-            _rmlFrontApproachArmed = false;
-            _frontApproachArmedWidget.reset();
-            rmlHost.SetFingerTouchInput(
-                true, false, 0.0f, 0.0f, false, false, finger.leftHand);
-            const auto transition = manager._interactionFocus.UpdateHover(
-                nullptr, deltaTime, 0.0f);
-            if (transition.changed && transition.previous) {
-                transition.previous->onRayExit();
-            }
-            dragonboard::ui::pointer::PointerVisualController::Hide(manager);
-            return true;
-        } else {
-            dragonboard::integrations::vrik::ApplyTouchPointingPose(finger.leftHand);
-        }
-        dragonboard::ui::pointer::PointerVisualController::Hide(manager);
+        float rmlU = 0.0f;
+        float rmlV = 0.0f;
+        float rmlSignedDistance = std::numeric_limits<float>::max();
+        float rmlFrontSign = 1.0f;
+        RE::NiPoint3 boardFrontDirection;
+        const bool hasBoardFrontDirection = ResolveBoardFrontDirection(
+            panels,
+            frontReferencePoint,
+            boardFrontDirection);
+        const bool rmlInBounds = rmlHost.IsOpen() &&
+            hasBoardFrontDirection &&
+            rmlHost.SampleFingerTouchSurface(
+                finger.position,
+                boardFrontDirection,
+                rmlU,
+                rmlV,
+                rmlSignedDistance,
+                rmlFrontSign);
+        const bool rmlOnFront =
+            rmlInBounds && rmlSignedDistance * rmlFrontSign >= 0.0f;
+        WidgetPointSample proximityButton = FindClosestButton(
+            panels,
+            finger.position,
+            frontReferencePoint,
+            settings.fingerTouchHoverDistance);
 
         WidgetPointSample button;
-        if (proximityButton.widget &&
-            proximityButton.absoluteDistance <=
-                settings.fingerTouchHoverDistance) {
-            button = std::move(proximityButton);
+        if (proximityButton.widget) {
+            button = proximityButton;
         }
+
+        static float touchDiagnosticCooldown = 0.0f;
+        touchDiagnosticCooldown -= (std::max)(deltaTime, 0.0f);
+        if (_active && touchDiagnosticCooldown <= 0.0f) {
+            touchDiagnosticCooldown = 1.0f;
+            logger::info(
+                "DragonBoardVR: finger touch sample physicalHand={}, "
+                "skeletonHand={}, boardDistance={:.2f}, "
+                "rmlInBounds={}, rmlOnFront={}, u={:.3f}, v={:.3f}, "
+                "signedDistance={:.2f}, frontSign={:.0f}, button={}.",
+                finger.leftHand ? "left" : "right",
+                finger.skeletonLeftHand ? "left" : "right",
+                boardDistance,
+                rmlInBounds,
+                rmlOnFront,
+                rmlU,
+                rmlV,
+                rmlSignedDistance,
+                rmlFrontSign,
+                button.widget != nullptr);
+        }
+
+        const bool boardWithinExit =
+            hasBoardSurface &&
+            boardDistance <= settings.fingerTouchExitDistance;
+        const bool rmlWithinExit =
+            rmlInBounds &&
+            std::abs(rmlSignedDistance) <= settings.fingerTouchExitDistance;
+        const bool buttonWithinExit =
+            proximityButton.widget &&
+            proximityButton.absoluteDistance <= settings.fingerTouchExitDistance;
+        const bool gestureOwnsTouch =
+            _contactLatched || _rmlTapPulseDown || _awaitingWithdrawal;
+        if (!boardWithinExit && !rmlWithinExit && !buttonWithinExit &&
+            !gestureOwnsTouch) {
+            rmlHost.SetFingerTouchInput(
+                false, false, 0.0f, 0.0f, false, false, finger.leftHand);
+            Deactivate(manager);
+            return false;
+        }
+
+        dragonboard::integrations::vrik::ApplyTouchPointingPose(
+            finger.skeletonLeftHand);
+        dragonboard::ui::pointer::PointerVisualController::Hide(manager);
 
         const auto processClassicButton = [&](WidgetPointSample candidate) {
             if (_contactLatched) {

@@ -222,17 +222,26 @@ namespace dragonboard::integrations::spellwheel
                     "assuming right-handed mode.");
             }
 
-            // Spell Wheel: right-handed mode maps main=right and secondary=left.
-            // Skyrim's left-handed mode swaps those physical hands.
-            const bool useLeftHand = leftHandedMode ? !secondaryWheel : secondaryWheel;
-            vrui::VRUISettings::get().setUseLeftHandAsMenu(useLeftHand);
+            // GetLastActivatedWheelId already reports the physical wheel:
+            // main=right and secondary=left, including Skyrim's native
+            // left-handed mode. Applying bLeftHandedMode again swaps it twice.
+            const bool useLeftHand = secondaryWheel;
+            auto& settings = vrui::VRUISettings::get();
+            settings.setUseLeftHandAsMenu(
+                useLeftHand,
+                leftHandedMode);
 
             logger::info(
                 "DragonBoardVR: Spell Wheel activation mapped to {} hand "
-                "(wheel={}, leftHandedMode={}).",
+                "(wheel={}, leftHandedMode={}, poseMirrored={}, "
+                "offsetX={:.1f}, rotY={:.1f}, rotZ={:.1f}).",
                 useLeftHand ? "left" : "right",
                 secondaryWheel ? "secondary" : "main",
-                leftHandedMode);
+                leftHandedMode,
+                settings.isMenuPoseMirrored(),
+                settings.menuOffsetX,
+                settings.menuRotY,
+                settings.menuRotZ);
             vrui::VRMenuManager::get().toggleMenu(true);
         });
     }

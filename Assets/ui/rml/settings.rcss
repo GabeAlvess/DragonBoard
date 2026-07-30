@@ -163,6 +163,32 @@ button:active {
     background-color: #e9cf9e;
 }
 
+.language-picker {
+    width: 430px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: rgba(255, 250, 238, 190);
+    border: 2px #bd8b3e;
+    border-radius: 6px;
+}
+
+.language-arrow {
+    width: 72px;
+    height: 60px;
+    color: #5b3c24;
+    font-size: 38px;
+    text-align: center;
+}
+
+.language-current {
+    width: 276px;
+    color: #3a2719;
+    font-size: 29px;
+    text-align: center;
+}
+
 .nav-item {
     width: 346px;
     height: 76px;
@@ -615,6 +641,15 @@ footer {
 .restart-button {
     width: 360px;
     margin-left: auto;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: center;
+}
+
+.restart-button span {
+    display: block;
+    width: 100%;
+    text-align: center;
 }
 
 .keycap.light {
@@ -1557,6 +1592,28 @@ input.range sliderbar:active {
     color: #fff1f2;
     background-color: #3b1218;
     border-color: #5d343c;
+}
+
+.language-picker,
+.position-adjustment-button {
+    margin-left: auto;
+}
+
+.language-picker {
+    background-color: #2c0d12;
+    border-color: #452027;
+}
+
+.language-current,
+.language-arrow {
+    color: #e5dcde;
+}
+
+.language-arrow:hover,
+.language-arrow:active {
+    color: #fff1f2;
+    background-color: #3b1218;
+    border-color: transparent;
 }
 
 footer {

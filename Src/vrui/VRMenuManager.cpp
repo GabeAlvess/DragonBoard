@@ -337,8 +337,13 @@ namespace vrui
         float intensity,
         float duration)
     {
+        const auto& settings = VRUISettings::get();
         dragonboard::runtime::vr::TriggerHaptic(
-            isDominantHand, VRUISettings::get().useLeftHandAsMenu, intensity, duration);
+            isDominantHand,
+            settings.useLeftHandAsMenu,
+            settings.isNativeLeftHandedMode(),
+            intensity,
+            duration);
     }
 
     RE::NiPoint3 VRMenuManager::getLaserOrigin() const

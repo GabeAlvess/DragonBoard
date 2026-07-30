@@ -140,25 +140,6 @@ namespace vrui
         return static_cast<int>(std::ceil((float)numVisible / _pageSize));
     }
 
-    void VRUIContainer::nextPage()
-    {
-        int total = getTotalPages();
-        if (_currentPage + 1 < total) {
-            setPage(_currentPage + 1);
-        } else {
-            setPage(0); // Wrap around?
-        }
-    }
-
-    void VRUIContainer::prevPage()
-    {
-        if (_currentPage > 0) {
-            setPage(_currentPage - 1);
-        } else {
-            setPage(getTotalPages() - 1); // Wrap around?
-        }
-    }
-
     void VRUIContainer::recalculateLayout()
     {
         _layoutDirty = false;

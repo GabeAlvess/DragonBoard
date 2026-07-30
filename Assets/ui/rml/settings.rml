@@ -45,6 +45,22 @@
                             </button>
                         </div>
                         <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Show tutorials</span><span class="setting-help">Show tutorial panels; enabling this again resets their progress and position</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-show-tutorials" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-show-tutorials-state" class="toggle-state">Enabled</span>
+                            </button>
+                        </div>
+                        <div class="setting-row language-setting">
+                            <div class="setting-copy"><span class="setting-label">Interface language</span><span class="setting-help">Applied after saving and reopening DragonBoard</span></div>
+                            <div class="language-picker">
+                                <button id="language-previous" class="language-arrow"><span>&lt;</span></button>
+                                <span id="language-current" class="language-current">English</span>
+                                <button id="language-next" class="language-arrow"><span>&gt;</span></button>
+                            </div>
+                        </div>
+                        <div class="setting-row toggle-setting">
                             <div class="setting-copy"><span class="setting-label">Pin board to world</span><span class="setting-help">Keep the whole DragonBoard at its current world position</span></div>
                             <div class="toggle-space"></div>
                             <button id="toggle-world-pin" class="toggle-button">

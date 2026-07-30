@@ -70,6 +70,18 @@ target('DragonBoardVR')
     add_installfiles('Assets/ui/rml/assets/*.ttf', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
     })
+    add_installfiles('Assets/ui/rml/assets/*.otf', {
+        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
+    })
+    add_installfiles('Assets/ui/rml/assets/OFL-NotoSansCJK.txt', {
+        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
+    })
+    add_installfiles('Assets/ui/translations/*.json', {
+        prefixdir = 'SKSE/Plugins/DragonBoardVR/translations'
+    })
+    add_installfiles('Assets/ui/translations/README.txt', {
+        prefixdir = 'SKSE/Plugins/DragonBoardVR/translations'
+    })
     add_installfiles('Assets/tools/DragonBoardIniScanner.exe', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/tools'
     })
@@ -154,12 +166,22 @@ target('DragonBoardVR')
                 installRoot, 'meshes', 'DragonBoardVR', 'KeyboardScreen.nif'),
             '-Replacement', 'ImGui2.dds'
         })
+        os.vrunv('powershell', {
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', path.join(os.projectdir(), 'Tools', 'GenerateStatusScreen.ps1'),
+            '-Source', screenNif,
+            '-Destination', path.join(
+                installRoot, 'meshes', 'DragonBoardVR', 'TutorialScreen.nif'),
+            '-Replacement', 'ImGui3.dds'
+        })
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
         os.cp(questMarkerNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'QuestMarker.nif'))
         os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui0.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui1.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui2.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'ImGui3.dds'))
         os.cp(spellWheelTextures, path.join(installRoot, 'textures'))
         os.cp(questMarkerTextures, path.join(installRoot, 'textures'))
         os.cp(categoryMarkerTextures, path.join(installRoot, 'textures'))
@@ -174,6 +196,13 @@ target('DragonBoardVR')
         os.cp(path.join(rmlUiDir, 'assets', '*.jpeg'), installedRmlUiAssetsDir)
         os.cp(path.join(rmlUiDir, 'assets', '*.jpg'), installedRmlUiAssetsDir)
         os.cp(path.join(rmlUiDir, 'assets', '*.ttf'), installedRmlUiAssetsDir)
+        os.cp(path.join(rmlUiDir, 'assets', '*.otf'), installedRmlUiAssetsDir)
+        os.cp(path.join(rmlUiDir, 'assets', 'OFL-NotoSansCJK.txt'), installedRmlUiAssetsDir)
+        local translationDir = path.join(os.projectdir(), 'Assets', 'ui', 'translations')
+        local installedTranslationDir = path.join(outputDir, 'DragonBoardVR', 'translations')
+        os.mkdir(installedTranslationDir)
+        os.cp(path.join(translationDir, '*.json'), installedTranslationDir)
+        os.cp(path.join(translationDir, 'README.txt'), installedTranslationDir)
         local iniScanner = path.join(
             os.projectdir(), 'Assets', 'tools', 'DragonBoardIniScanner.exe')
         local installedToolsDir = path.join(outputDir, 'DragonBoardVR', 'tools')
@@ -262,6 +291,25 @@ target('RmlEntranceAnimationTests')
         'Src/ui/rml/RmlEntranceAnimation.cpp'
     )
     add_includedirs('Src')
+
+target('LocalizationManagerTests')
+    set_kind('binary')
+    set_default(false)
+    add_deps('commonlibsse-ng')
+    add_files(
+        'Tools/RmlPreview/LocalizationManagerTests.cpp',
+        'Src/ui/rml/LocalizationManager.cpp'
+    )
+    add_includedirs(
+        'Src',
+        '$(projectdir)',
+        '$(projectdir)/ClibUtil/include',
+        '$(projectdir)/xbyak',
+        '$(projectdir)/simpleini',
+        '$(projectdir)/lib'
+    )
+    set_pcxxheader('Src/pch.h')
+    add_defines('ENABLE_SKYRIM_VR')
 
 target('IniEditorTests')
     set_kind('binary')

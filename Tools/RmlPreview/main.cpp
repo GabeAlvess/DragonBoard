@@ -60,6 +60,9 @@ namespace
     constexpr std::array<const char*, 2> kDeveloperPages{
         "commands", "info"
     };
+    constexpr std::array<const char*, 2> kJournalPages{
+        "quests", "stats"
+    };
     constexpr std::array<const char*, 4> kItemEditPages{
         "position", "rotation", "scale", "pin"
     };
@@ -472,6 +475,14 @@ namespace
                 SelectPage(kSettingsPages, "tab-", "page-", id.substr(4));
             } else if (id.starts_with("dev-tab-")) {
                 SelectPage(kDeveloperPages, "dev-tab-", "dev-page-", id.substr(8));
+            } else if (id == "journal-tab-quests") {
+                SelectJournalPreviewPage("quests");
+            } else if (id == "journal-tab-stats") {
+                SelectJournalPreviewPage("stats");
+            } else if (id == "journal-settings") {
+                SetJournalQuestNavigationVisible(false);
+                SelectPage(kJournalPages, "journal-tab-", "journal-page-", "");
+                SetStatus("Settings replaces Journal in game");
             } else if (id == "mods-tab-actions") {
                 SelectModsPreviewPage(false);
             } else if (id == "mods-tab-ini") {
@@ -497,6 +508,48 @@ namespace
                 element->SetClass("enabled", _editModeEnabled);
                 if (auto* state = _document->GetElementById("toggle-edit-state")) {
                     state->SetInnerRML(_editModeEnabled ? "Enabled" : "Disabled");
+                }
+            } else if (id == "welcome-next-1") {
+                if (auto* page = _document->GetElementById("welcome-page-1")) {
+                    page->SetClass("active", false);
+                    page->SetProperty("display", "none");
+                }
+                if (auto* page = _document->GetElementById("welcome-page-2")) {
+                    page->SetClass("active", true);
+                    page->SetProperty("display", "block");
+                }
+                SetStatus("Welcome page 2 - waiting for grab");
+            } else if (id == "welcome-grab-instruction") {
+                element->SetClass("completed", true);
+                element->SetProperty("display", "none");
+                if (auto* result = _document->GetElementById("welcome-grab-result")) {
+                    result->SetClass("revealed", true);
+                    result->SetProperty("display", "flex");
+                }
+                if (auto* next = _document->GetElementById("welcome-next-2")) {
+                    next->SetClass("disabled", false);
+                }
+                SetStatus("Welcome page 2 - grab completed");
+            } else if (id == "welcome-next-2") {
+                auto* scale = _document->GetElementById("welcome-scale-instruction");
+                if (scale && !scale->IsClassSet("revealed")) {
+                    if (auto* result = _document->GetElementById("welcome-grab-result")) {
+                        result->SetClass("revealed", false);
+                        result->SetProperty("display", "none");
+                    }
+                    scale->SetClass("revealed", true);
+                    scale->SetProperty("display", "flex");
+                    SetStatus("Welcome page 2 - scale instruction");
+                } else {
+                    if (auto* page = _document->GetElementById("welcome-page-2")) {
+                        page->SetClass("active", false);
+                        page->SetProperty("display", "none");
+                    }
+                    if (auto* page = _document->GetElementById("welcome-page-3")) {
+                        page->SetClass("active", true);
+                        page->SetProperty("display", "block");
+                    }
+                    SetStatus("Welcome page 3 preview");
                 }
             } else if (id == "dev-add-command") {
                 SetStatus("SteamVR command keyboard opens in game");
@@ -785,6 +838,7 @@ namespace
                 SelectPage(kDeveloperPages, "dev-tab-", "dev-page-", "commands");
             } else if (fileName == "journal.rml") {
                 PopulateJournalDocument();
+                SelectJournalPreviewPage("quests");
             } else if (fileName == "edit.rml") {
                 PopulateItemEditDocument();
                 SelectPage(kItemEditPages, "edit-tab-", "edit-page-", "position");
@@ -842,6 +896,33 @@ namespace
                     "<span class=\"journal-objective-text\">Speak to Arngeir</span>"
                     "<span class=\"journal-map-marker\"></span></button>");
             }
+        }
+
+        void SetJournalQuestNavigationVisible(bool visible)
+        {
+            if (!_document) return;
+            if (auto* filters = _document->GetElementById("journal-quest-filters")) {
+                filters->SetProperty("display", visible ? "flex" : "none");
+            }
+            if (auto* list = _document->GetElementById("journal-quest-list")) {
+                list->SetProperty("display", visible ? "block" : "none");
+            }
+            if (auto* activeQuest = _document->QuerySelector(".journal-footer-active")) {
+                activeQuest->SetProperty("display", visible ? "flex" : "none");
+            }
+            if (auto* tracking = _document->GetElementById("journal-toggle-tracking")) {
+                tracking->SetProperty("display", visible ? "flex" : "none");
+            }
+        }
+
+        void SelectJournalPreviewPage(std::string_view selected)
+        {
+            SelectPage(
+                kJournalPages,
+                "journal-tab-",
+                "journal-page-",
+                selected);
+            SetJournalQuestNavigationVisible(selected == "quests");
         }
 
         void PopulateItemEditDocument()

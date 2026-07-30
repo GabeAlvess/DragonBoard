@@ -7,6 +7,7 @@ namespace dragonboard::runtime::vr
     void TriggerHaptic(
         bool isDominantHand,
         bool useLeftHandAsMenu,
+        bool nativeLeftHandedMode,
         float intensity,
         float duration)
     {
@@ -14,7 +15,10 @@ namespace dragonboard::runtime::vr
         auto* openVR = RE::BSOpenVR::GetSingleton();
         if (!openVR) return;
 
-        const bool rightController = useLeftHandAsMenu ? isDominantHand : !isDominantHand;
+        const bool physicalRightController =
+            useLeftHandAsMenu ? isDominantHand : !isDominantHand;
+        const bool rightController =
+            physicalRightController != nativeLeftHandedMode;
         const float gameDuration = duration * 250.0f * intensity;
         if (gameDuration > 0.0f) {
             openVR->TriggerHapticPulse(rightController, gameDuration);

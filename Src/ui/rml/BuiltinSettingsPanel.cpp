@@ -81,6 +81,8 @@ namespace dragonboard::ui::rml
         std::scoped_lock lock(_draftMutex);
         _draft.lockPins = settings.lockPins;
         _draft.showDevButton = settings.showDevButton;
+        _draft.showTutorials = settings.showTutorials;
+        _draft.uiLanguage = settings.uiLanguage;
         _draft.worldPinned = vrui::VRMenuManager::get().isBoardWorldPinned();
         _draft.menuScale = settings.menuScale;
         _draft.buttonSpacingX = settings.buttonSpacingX;
@@ -107,12 +109,21 @@ namespace dragonboard::ui::rml
         _draft.labelZOffset = settings.labelZOffset;
     }
 
-    void RmlPanelHost::ApplyDraftGameThread()
+    void RmlPanelHost::ApplyDraftGameThread(bool applyLanguage)
     {
         auto& settings = vrui::VRUISettings::get();
         std::scoped_lock lock(_draftMutex);
+        const bool tutorialsReenabled =
+            !settings.showTutorials && _draft.showTutorials;
         settings.lockPins = _draft.lockPins;
         settings.showDevButton = _draft.showDevButton;
+        settings.showTutorials = _draft.showTutorials;
+        if (applyLanguage) settings.uiLanguage = _draft.uiLanguage;
+        if (tutorialsReenabled) {
+            settings.welcomeTutorialComplete = false;
+            settings.tutorialsPreviouslyEnabled = true;
+            settings.tutorialPositionResetRequested = true;
+        }
         dragonboard::ui::menu::SetDeveloperButtonVisible(settings.showDevButton);
         settings.menuScale = _draft.menuScale;
         settings.buttonSpacingX = _draft.buttonSpacingX;

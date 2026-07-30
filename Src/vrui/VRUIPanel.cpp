@@ -65,9 +65,9 @@ namespace vrui
             rotY = settings.menuRotY;
             rotZ = settings.menuRotZ;
 
-            const bool currentValuesAreMirrored = !settings.useLeftHandAsMenu;
-            const bool targetValuesAreMirrored =
-                basis == VRUIPanel::HandFollowBasis::kRight;
+            const bool currentValuesAreMirrored = settings.isMenuPoseMirrored();
+            const bool targetValuesAreMirrored = settings.isPoseMirroredForHand(
+                basis == VRUIPanel::HandFollowBasis::kLeft);
             if (basis != VRUIPanel::HandFollowBasis::kMenu &&
                 currentValuesAreMirrored != targetValuesAreMirrored) {
                 rotY = -rotY;

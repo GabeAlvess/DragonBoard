@@ -139,12 +139,28 @@ namespace vrui
         categoryButtons["Btn_Cat_Magic"] = { -6.500000f, -0.250000f, 10.000000f, 10.000000f, 0.000000f, 0.000000f, 0.800000f };
     }
 
-    void VRUISettings::setUseLeftHandAsMenu(bool useLeftHand)
+    bool VRUISettings::isPoseMirroredForHand(bool leftHand) const
     {
-        if (useLeftHandAsMenu == useLeftHand) return;
+        return leftHand == _nativeLeftHandedMode;
+    }
+
+    bool VRUISettings::isMenuPoseMirrored() const
+    {
+        return isPoseMirroredForHand(useLeftHandAsMenu);
+    }
+
+    void VRUISettings::setUseLeftHandAsMenu(
+        bool useLeftHand,
+        bool nativeLeftHandedMode)
+    {
+        const bool wasMirrored = isMenuPoseMirrored();
+        const bool willBeMirrored = useLeftHand == nativeLeftHandedMode;
 
         useLeftHandAsMenu = useLeftHand;
-        ReflectMenuPoseAcrossHands(menuOffsetX, menuRotY, menuRotZ);
+        _nativeLeftHandedMode = nativeLeftHandedMode;
+        if (wasMirrored != willBeMirrored) {
+            ReflectMenuPoseAcrossHands(menuOffsetX, menuRotY, menuRotZ);
+        }
     }
 
     std::string VRUISettings::getDefaultIniPath()
@@ -164,6 +180,7 @@ namespace vrui
 
     void VRUISettings::load(const std::string& iniPath)
     {
+        const bool showTutorialsBeforeLoad = showTutorials;
         CSimpleIniA ini;
         ini.SetUnicode();
 
@@ -194,6 +211,9 @@ namespace vrui
         verboseLogging = ini.GetBoolValue("General", "bVerboseLogging", verboseLogging);
         editModeEnabled = ini.GetBoolValue("General", "bEditModeEnabled", editModeEnabled);
         lockPins = ini.GetBoolValue("General", "bLockPins", lockPins);
+        uiLanguage = ini.GetValue("Interface", "sLanguage", uiLanguage.c_str());
+        showTutorials = ini.GetBoolValue(
+            "General", "bShowTutorials", showTutorials);
 
         // [Combat]
         const bool combatEnabledMissing = !ini.KeyExists("Combat", "bSlowTimeOnOpen");
@@ -294,22 +314,13 @@ namespace vrui
             containerGridOffsetZ = (float)ini.GetDoubleValue("Visual", "fContainerGridOffsetZ", containerGridOffsetZ);
 
             const bool hasLegacyMenuRotation = ini.KeyExists("Visual", "fMenuRotZ");
-            const bool zeroFaceRotation =
-                ini.GetBoolValue("Visual", "bMenuFaceRotationZeroBased", false);
-            if (hasLegacyMenuRotation && !zeroFaceRotation) {
+            if (hasLegacyMenuRotation) {
                 menuRotZ = std::fmod(menuRotZ - 180.0f, 360.0f);
                 if (menuRotZ <= -180.0f) menuRotZ += 360.0f;
                 if (menuRotZ > 180.0f) menuRotZ -= 360.0f;
-                ini.SetDoubleValue("Visual", "fMenuRotZ", menuRotZ);
-                ini.SetBoolValue("Visual", "bMenuFaceRotationZeroBased", true,
-                    "; true = fMenuRotZ 0 shows the front face of the board");
-                if (ini.SaveFile(iniPath.c_str()) < 0) {
-                    logger::warn("DragonBoardVR: Could not persist zero-based menu rotation migration to '{}'.", iniPath);
-                } else {
-                    logger::info(
-                        "DragonBoardVR: Migrated menu rotation to zero-based front-face convention (fMenuRotZ={:.1f}).",
-                        menuRotZ);
-                }
+                logger::info(
+                    "DragonBoardVR: Migrated legacy menu rotation to the current front-face convention (fMenuRotZ={:.1f}).",
+                    menuRotZ);
             }
         }
 
@@ -416,9 +427,7 @@ namespace vrui
         favNifPath         = ini.GetValue("Interaction", "sFavNifPath",         favNifPath.c_str());
 
         statusNifPath      = ini.GetValue("Interaction", "sStatusNifPath",      statusNifPath.c_str());
-        nextPageNifPath    = ini.GetValue("Interaction", "sNextPageNifPath",    nextPageNifPath.c_str());
         homeNifPath        = ini.GetValue("Interaction", "sHomeNifPath",        homeNifPath.c_str());
-        prevPageNifPath    = ini.GetValue("Interaction", "sPrevPageNifPath",    prevPageNifPath.c_str());
         bEnableButtonEditMode = ini.GetBoolValue("Interaction", "bEnableButtonEditMode", bEnableButtonEditMode);
 
         // [LaserPointer]
@@ -497,9 +506,7 @@ namespace vrui
         loadBtn("fMagic",  bMagicPosX,  bMagicPosY,  bMagicPosZ,  bMagicRotX,  bMagicRotY,  bMagicRotZ,  bMagicScale);
         loadBtn("fSys",    bSysPosX,    bSysPosY,    bSysPosZ,    bSysRotX,    bSysRotY,    bSysRotZ,    bSysScale);
         loadBtn("fSave",   bSavePosX,   bSavePosY,   bSavePosZ,   bSaveRotX,   bSaveRotY,   bSaveRotZ,   bSaveScale);
-        loadBtn("fPrev",   bPrevPosX,   bPrevPosY,   bPrevPosZ,   bPrevRotX,   bPrevRotY,   bPrevRotZ,   bPrevScale);
         loadBtn("fHome",   bHomePosX,   bHomePosY,   bHomePosZ,   bHomeRotX,   bHomeRotY,   bHomeRotZ,   bHomeScale);
-        loadBtn("fNext",   bNextPosX,   bNextPosY,   bNextPosZ,   bNextRotX,   bNextRotY,   bNextRotZ,   bNextScale);
         loadBtn("fMods",   bModsPosX,   bModsPosY,   bModsPosZ,   bModsRotX,   bModsRotY,   bModsRotZ,   bModsScale);
         loadBtn("fFav",    bFavPosX,    bFavPosY,    bFavPosZ,    bFavRotX,    bFavRotY,    bFavRotZ,    bFavScale);
         loadBtn("fAddFunc",bAddFuncPosX,bAddFuncPosY,bAddFuncPosZ,bAddFuncRotX,bAddFuncRotY,bAddFuncRotZ,bAddFuncScale);
@@ -750,12 +757,8 @@ namespace vrui
                 "LaserPointer", "sFavNifPath", favNifPath.c_str());
             statusNifPath = layoutIni.GetValue(
                 "LaserPointer", "sStatusNifPath", statusNifPath.c_str());
-            nextPageNifPath = layoutIni.GetValue(
-                "LaserPointer", "sNextPageNifPath", nextPageNifPath.c_str());
             homeNifPath = layoutIni.GetValue(
                 "LaserPointer", "sHomeNifPath", homeNifPath.c_str());
-            prevPageNifPath = layoutIni.GetValue(
-                "LaserPointer", "sPrevPageNifPath", prevPageNifPath.c_str());
             bEnableButtonEditMode = layoutIni.GetBoolValue(
                 "LaserPointer", "bEnableButtonEditMode", bEnableButtonEditMode);
 
@@ -791,12 +794,8 @@ namespace vrui
                 bSysRotX, bSysRotY, bSysRotZ, bSysScale);
             loadLayoutButton("fSave", bSavePosX, bSavePosY, bSavePosZ,
                 bSaveRotX, bSaveRotY, bSaveRotZ, bSaveScale);
-            loadLayoutButton("fPrev", bPrevPosX, bPrevPosY, bPrevPosZ,
-                bPrevRotX, bPrevRotY, bPrevRotZ, bPrevScale);
             loadLayoutButton("fHome", bHomePosX, bHomePosY, bHomePosZ,
                 bHomeRotX, bHomeRotY, bHomeRotZ, bHomeScale);
-            loadLayoutButton("fNext", bNextPosX, bNextPosY, bNextPosZ,
-                bNextRotX, bNextRotY, bNextRotZ, bNextScale);
             loadLayoutButton("fMods", bModsPosX, bModsPosY, bModsPosZ,
                 bModsRotX, bModsRotY, bModsRotZ, bModsScale);
             loadLayoutButton("fFav", bFavPosX, bFavPosY, bFavPosZ,
@@ -882,7 +881,7 @@ namespace vrui
 
         // The INI/layout pose is stored as a left-hand base. Reflect the lateral
         // translation and orientation once after all sources have been layered.
-        if (!useLeftHandAsMenu) {
+        if (isMenuPoseMirrored()) {
             ReflectMenuPoseAcrossHands(menuOffsetX, menuRotY, menuRotZ);
         }
 
@@ -903,11 +902,39 @@ namespace vrui
             }
         }
 
+        bool tutorialStateChanged = false;
+        if (stateExists) {
+            tutorialsPreviouslyEnabled = stateIni.GetBoolValue(
+                "Tutorials",
+                "bPreviouslyEnabled",
+                tutorialsPreviouslyEnabled);
+            welcomeTutorialComplete = stateIni.GetBoolValue(
+                "Tutorials",
+                "bWelcomeComplete",
+                welcomeTutorialComplete);
+            if (showTutorials &&
+                (!showTutorialsBeforeLoad || !tutorialsPreviouslyEnabled)) {
+                welcomeTutorialComplete = false;
+                tutorialPositionResetRequested = true;
+                tutorialStateChanged = true;
+                logger::info(
+                    "DragonBoardVR: tutorials re-enabled; tutorial completion state reset.");
+            }
+            if (tutorialsPreviouslyEnabled != showTutorials) {
+                tutorialsPreviouslyEnabled = showTutorials;
+                tutorialStateChanged = true;
+            }
+        } else {
+            tutorialsPreviouslyEnabled = showTutorials;
+        }
+
         if (!layoutExists || !stateExists) {
             logger::info(
                 "DragonBoardVR: Migrating split settings files (layoutExists={}, stateExists={}).",
                 layoutExists,
                 stateExists);
+            save(iniPath);
+        } else if (tutorialStateChanged) {
             save(iniPath);
         }
     }
@@ -986,6 +1013,13 @@ namespace vrui
             "Combat", "fSlowTimeMultiplier", slowTimeMultiplier,
             "; Game-time multiplier while DragonBoard is open in combat (0.05 to 1.0)");
 
+        ini.SetBoolValue(
+            "General", "bShowTutorials", showTutorials,
+            "; Show DragonBoard tutorials; changing false to true resets all tutorials");
+        ini.SetValue(
+            "Interface", "sLanguage", uiLanguage.c_str(),
+            "; DragonBoard interface language code; JSON catalogs are discovered automatically");
+
         // [RmlUi]
         ini.SetBoolValue("RmlUi", "bRenderOnDirty", rmlRenderOnDirty,
             "; Reuse the last RmlUi texture while the active document is unchanged");
@@ -1022,7 +1056,7 @@ namespace vrui
         float outOffsetX = menuOffsetX;
         float outRotY    = menuRotY;
         float outRotZ    = menuRotZ;
-        if (!useLeftHandAsMenu) {
+        if (isMenuPoseMirrored()) {
             ReflectMenuPoseAcrossHands(outOffsetX, outRotY, outRotZ);
         }
 
@@ -1032,8 +1066,6 @@ namespace vrui
         ini.SetDoubleValue("Visual", "fMenuRotX",    (double)menuRotX,    "; Panel rotation X (all panels)");
         ini.SetDoubleValue("Visual", "fMenuRotY",    (double)outRotY,    "; Panel rotation Y");
         ini.SetDoubleValue("Visual", "fMenuRotZ",    (double)outRotZ,    "; Panel rotation Z");
-        ini.SetBoolValue("Visual", "bMenuFaceRotationZeroBased", true,
-            "; true = fMenuRotZ 0 shows the front face of the board");
         ini.SetDoubleValue("Visual", "fContainerGridOffsetZ", containerGridOffsetZ, "; Dynamic grids Z offset");
         ini.SetBoolValue  ("Visual", "bEnableMenuLerp",bEnableMenuLerp,"; Smooth hand-follow");
         ini.SetDoubleValue("Visual", "fMenuLerpSpeed", fMenuLerpSpeed, "; Smoothing speed (higher = snappier)");
@@ -1130,9 +1162,7 @@ namespace vrui
         ini.SetValue      ("Interaction", "sFavNifPath",         favNifPath.c_str(),         "; NIF used for Favorites button");
 
         ini.SetValue      ("Interaction", "sStatusNifPath",      statusNifPath.c_str(),      "; NIF used for Status button");
-        ini.SetValue      ("Interaction", "sNextPageNifPath",    nextPageNifPath.c_str(),    "; NIF used for Next Page button");
         ini.SetValue      ("Interaction", "sHomeNifPath",        homeNifPath.c_str(),        "; NIF used for Home button");
-        ini.SetValue      ("Interaction", "sPrevPageNifPath",    prevPageNifPath.c_str(),    "; NIF used for Previous Page button");
         ini.SetBoolValue  ("Interaction", "bEnableButtonEditMode", bEnableButtonEditMode,   "; Allow grab-and-move of buttons");
 
         // [Labels]
@@ -1187,15 +1217,26 @@ namespace vrui
         saveBtn("fMagic",  bMagicPosX,  bMagicPosY,  bMagicPosZ,  bMagicRotX,  bMagicRotY,  bMagicRotZ,  bMagicScale);
         saveBtn("fSys",    bSysPosX,    bSysPosY,    bSysPosZ,    bSysRotX,    bSysRotY,    bSysRotZ,    bSysScale);
         saveBtn("fSave",   bSavePosX,   bSavePosY,   bSavePosZ,   bSaveRotX,   bSaveRotY,   bSaveRotZ,   bSaveScale);
-        saveBtn("fPrev",   bPrevPosX,   bPrevPosY,   bPrevPosZ,   bPrevRotX,   bPrevRotY,   bPrevRotZ,   bPrevScale);
         saveBtn("fHome",   bHomePosX,   bHomePosY,   bHomePosZ,   bHomeRotX,   bHomeRotY,   bHomeRotZ,   bHomeScale);
-        saveBtn("fNext",   bNextPosX,   bNextPosY,   bNextPosZ,   bNextRotX,   bNextRotY,   bNextRotZ,   bNextScale);
         saveBtn("fMods",   bModsPosX,   bModsPosY,   bModsPosZ,   bModsRotX,   bModsRotY,   bModsRotZ,   bModsScale);
         saveBtn("fFav",    bFavPosX,    bFavPosY,    bFavPosZ,    bFavRotX,    bFavRotY,    bFavRotZ,    bFavScale);
         saveBtn("fAddFunc",bAddFuncPosX,bAddFuncPosY,bAddFuncPosZ,bAddFuncRotX,bAddFuncRotY,bAddFuncRotZ,bAddFuncScale);
         saveBtn("fGold",   bGoldPosX,   bGoldPosY,   bGoldPosZ,   bGoldRotX,   bGoldRotY,   bGoldRotZ,   bGoldScale);
         saveBtn("fMap",    bMapPosX,    bMapPosY,    bMapPosZ,    bMapRotX,    bMapRotY,    bMapRotZ,    bMapScale);
         saveBtn("fDev",    bDevPosX,    bDevPosY,    bDevPosZ,    bDevRotX,    bDevRotY,    bDevRotZ,    bDevScale);
+
+        // Remove obsolete persistent page-button settings from legacy combined
+        // INIs before the split files are reconstructed.
+        ini.Delete("Interaction", "sPrevPageNifPath");
+        ini.Delete("Interaction", "sNextPageNifPath");
+        for (const auto* prefix : { "fPrev", "fNext" }) {
+            for (const auto* suffix : {
+                     "PosX", "PosY", "PosZ",
+                     "RotX", "RotY", "RotZ", "Scale" }) {
+                const auto key = std::string(prefix) + suffix;
+                ini.Delete("FixedButtons", key.c_str());
+            }
+        }
 
 
         // [FixedWidgets]
@@ -1313,8 +1354,10 @@ namespace vrui
         };
 
         copyKeys(mainOut, "General", {
-            "bVerboseLogging", "bEditModeEnabled", "bLockPins"
+            "bVerboseLogging", "bEditModeEnabled", "bLockPins",
+            "bShowTutorials"
         });
+        copyKeys(mainOut, "Interface", { "sLanguage" });
         copyKeys(mainOut, "MapMarker", {
             "bEnableMapMarker", "bDynamicRotation", "sMarkerNifPath"
         });
@@ -1343,7 +1386,6 @@ namespace vrui
             "fMenuScale",
             "fMenuOffsetX", "fMenuOffsetY", "fMenuOffsetZ",
             "fMenuRotX", "fMenuRotY", "fMenuRotZ",
-            "bMenuFaceRotationZeroBased",
             "bEnableMenuLerp", "fMenuLerpSpeed"
         });
         copyKeys(layoutOut, "Buttons", {
@@ -1362,7 +1404,7 @@ namespace vrui
                  "sDevNifPath", "sMagicNifPath", "sInventoryNifPath",
                  "sUnknownNifPath", "sSettingsNifPath", "sSaveNifPath",
                  "sModsNifPath", "sFavNifPath", "sStatusNifPath",
-                 "sNextPageNifPath", "sHomeNifPath", "sPrevPageNifPath",
+                 "sHomeNifPath",
                  "bEnableButtonEditMode" }) {
             CopyIniKeyAs(ini, layoutOut, "Interaction", "LaserPointer", key);
         }
@@ -1378,6 +1420,12 @@ namespace vrui
                 CopyIniKey(ini, stateOut, "MapCalibration", key.c_str());
             }
         }
+        stateOut.SetBoolValue(
+            "Tutorials", "bPreviouslyEnabled", showTutorials,
+            "; Internal state used to detect when tutorials are re-enabled");
+        stateOut.SetBoolValue(
+            "Tutorials", "bWelcomeComplete", welcomeTutorialComplete,
+            "; Welcome tutorial completion state");
 
         const auto layoutPath = GetSiblingIniPath(iniPath, "DragonBoardVR_Layout.ini");
         const auto statePath = GetSiblingIniPath(iniPath, "DragonBoardVR_State.ini");

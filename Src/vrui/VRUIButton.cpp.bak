@@ -1631,18 +1631,10 @@ namespace vrui
                 settings.bSavePosX = _node->local.translate.x; settings.bSavePosY = _node->local.translate.y; settings.bSavePosZ = _node->local.translate.z;
                 settings.bSaveRotX = rx; settings.bSaveRotY = ry; settings.bSaveRotZ = rz;
                 settings.bSaveScale = _node->local.scale;
-            } else if (buttonId == "Previous Page") {
-                settings.bPrevPosX = _node->local.translate.x; settings.bPrevPosY = _node->local.translate.y; settings.bPrevPosZ = _node->local.translate.z;
-                settings.bPrevRotX = rx; settings.bPrevRotY = ry; settings.bPrevRotZ = rz;
-                settings.bPrevScale = _node->local.scale;
             } else if (buttonId == "Home") {
                 settings.bHomePosX = _node->local.translate.x; settings.bHomePosY = _node->local.translate.y; settings.bHomePosZ = _node->local.translate.z;
                 settings.bHomeRotX = rx; settings.bHomeRotY = ry; settings.bHomeRotZ = rz;
                 settings.bHomeScale = _node->local.scale;
-            } else if (buttonId == "Next Page") {
-                settings.bNextPosX = _node->local.translate.x; settings.bNextPosY = _node->local.translate.y; settings.bNextPosZ = _node->local.translate.z;
-                settings.bNextRotX = rx; settings.bNextRotY = ry; settings.bNextRotZ = rz;
-                settings.bNextScale = _node->local.scale;
             } else if (buttonId == "Mods") {
                 settings.bModsPosX = _node->local.translate.x; settings.bModsPosY = _node->local.translate.y; settings.bModsPosZ = _node->local.translate.z;
                 settings.bModsRotX = rx; settings.bModsRotY = ry; settings.bModsRotZ = rz;

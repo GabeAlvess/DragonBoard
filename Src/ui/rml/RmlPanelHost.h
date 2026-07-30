@@ -62,6 +62,7 @@ namespace dragonboard::ui::rml
             vrui::VRUIMagicContainer* magic,
             vrui::VRUIItemEditPanel* preview);
         bool OpenJournal();
+        bool OpenWelcomeTutorialIfNeeded();
         void RequestRmlWarmup();
         void Close();
         void OnVrButtonEvent(
@@ -100,10 +101,10 @@ namespace dragonboard::ui::rml
             const char* className,
             bool enabled) noexcept;
 
-        [[nodiscard]] bool SampleFingerTouchSurface(
-            const RE::NiPoint3& worldPoint,
-            const RE::NiPoint3& frontReferencePoint,
-            float& pointerU,
+    [[nodiscard]] bool SampleFingerTouchSurface(
+        const RE::NiPoint3& worldPoint,
+        const RE::NiPoint3& frontDirection,
+        float& pointerU,
             float& pointerV,
             float& signedDistance,
             float& frontSign) const;
@@ -136,6 +137,7 @@ namespace dragonboard::ui::rml
             kInventory,
             kMagic,
             kJournal,
+            kWelcome,
             kExternal
         };
 
@@ -262,6 +264,8 @@ namespace dragonboard::ui::rml
         {
             bool lockPins = false;
             bool showDevButton = false;
+            bool showTutorials = true;
+            std::string uiLanguage{ "en" };
             bool worldPinned = false;
             float menuScale = 1.0f;
             float buttonSpacingX = 2.4f;
@@ -330,6 +334,7 @@ namespace dragonboard::ui::rml
         void AdvanceRmlPrewarmPresentThread();
         void RenderPanel(float deltaTime);
         void SyncRmlSettingsFromDraft();
+        void ReloadLocalizationPresentThread();
         void ApplyRmlSliderChange(std::string_view id, float value);
         void SyncRmlDeveloperCommands();
         void SyncRmlDeveloperInfo();
@@ -430,7 +435,7 @@ namespace dragonboard::ui::rml
 
         // Built-in Settings adapter.
         void CaptureSettingsGameThread();
-        void ApplyDraftGameThread();
+        void ApplyDraftGameThread(bool applyLanguage = false);
         void BeginPositionAdjustmentGameThread();
         void CancelPositionAdjustmentGameThread();
         void FinishPositionAdjustmentGameThread();
@@ -447,6 +452,7 @@ namespace dragonboard::ui::rml
 
         // Physical RmlUi surface attached to the DragonBoard scene graph.
         void UpdateSurfaceGameThread();
+        void UpdateWelcomeSurfaceHoverGameThread();
         void UpdateStatusSurfaceHoverGameThread();
         void UpdateSurfaceGrabsGameThread(float deltaTime);
         void CaptureStatusSurfaceGameThread(float deltaTime);
@@ -457,6 +463,10 @@ namespace dragonboard::ui::rml
         bool UpdateKeyboardSceneSurfaceGameThread(RE::NiNode* backgroundNode);
         void UpdateKeyboardSurfaceHoverGameThread();
         bool UpdateScenePanelGameThread(RE::NiNode* backgroundNode);
+        bool UpdateWelcomeSceneSurfaceGameThread(RE::NiNode* backgroundNode);
+        void CompleteWelcomeTutorialGameThread();
+        void ResetWelcomeSurfaceGameThread();
+        void ResetTutorialProgressAndPositionGameThread();
 
         ID3D11Device* _device = nullptr;
         ID3D11DeviceContext* _context = nullptr;
@@ -482,6 +492,7 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _rmlInventorySyncPending{ true };
         std::atomic<bool> _rmlMagicSyncPending{ true };
         std::atomic<bool> _rmlJournalSyncPending{ true };
+        std::atomic<bool> _rmlWelcomeSyncPending{ true };
         RmlInputBridge _inputBridge;
         bool _fingerTouchInputActive = false;
         bool _fingerTouchPointerOnPanel = false;
@@ -494,11 +505,18 @@ namespace dragonboard::ui::rml
         std::atomic<bool> _visible{ false };
         std::atomic<bool> _applyPending{ false };
         std::atomic<bool> _savePending{ false };
+        std::atomic<bool> _languageSavePending{ false };
+        std::atomic<bool> _languageReloadPending{ false };
         std::atomic<bool> _positionAdjustmentTogglePending{ false };
         std::atomic<bool> _positionAdjustmentCancelPending{ false };
         std::atomic<bool> _positionAdjustmentActive{ false };
         std::atomic<bool> _worldPinTogglePending{ false };
         std::atomic<bool> _restartPending{ false };
+        std::atomic<bool> _welcomeNextPending{ false };
+        std::atomic<bool> _welcomeClosePending{ false };
+        std::atomic<bool> _welcomeResetPending{ false };
+        std::atomic<std::uint8_t> _welcomePage{ 1 };
+        std::atomic<bool> _welcomeGrabCompleted{ false };
         std::atomic<LocalPanelMode> _localPanelMode{ LocalPanelMode::kSettings };
         std::atomic<DragonBoardVR_API::PanelHandle> _activeExternalPanel{
             DragonBoardVR_API::InvalidPanel };
@@ -710,6 +728,8 @@ namespace dragonboard::ui::rml
             std::uint32_t flags = DragonBoardVR_API::DefaultSurfaceFeatures;
             bool sceneVisible = false;
             bool pointerHovered = false;
+            bool hasDefaultTransform = false;
+            RE::NiTransform defaultTransform{};
             std::unique_ptr<SurfacePointerState> pointer;
             RmlSurfaceGrabController grabController;
             DragonBoardVR_API::SurfaceEventCallback callback = nullptr;
@@ -718,10 +738,13 @@ namespace dragonboard::ui::rml
         static constexpr DragonBoardVR_API::SurfaceHandle kMainSurfaceHandle = 1;
         static constexpr DragonBoardVR_API::SurfaceHandle kStatusSurfaceHandle = 2;
         static constexpr DragonBoardVR_API::SurfaceHandle kKeyboardSurfaceHandle = 3;
+        static constexpr DragonBoardVR_API::SurfaceHandle kWelcomeSurfaceHandle = 4;
         [[nodiscard]] SurfaceState& MainSceneSurface();
         [[nodiscard]] const SurfaceState& MainSceneSurface() const;
         [[nodiscard]] SurfaceState& StatusSceneSurface();
         [[nodiscard]] SurfaceState& KeyboardSceneSurface();
+        [[nodiscard]] SurfaceState& WelcomeSceneSurface();
+        [[nodiscard]] const SurfaceState& WelcomeSceneSurface() const;
         static bool HasSurfaceFlag(
             const SurfaceState& surface,
             DragonBoardVR_API::SurfaceFlags flag);

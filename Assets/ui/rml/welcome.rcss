@@ -1,0 +1,203 @@
+body {
+    width: 1920px;
+    height: 1080px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: DragonBoard;
+}
+
+#welcome-app {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    color: #eeeeee;
+    background-color: #070808;
+}
+
+.welcome-page {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    display: none;
+}
+
+.welcome-page.active {
+    display: block;
+}
+
+.welcome-image-page {
+    background-color: #070808;
+}
+
+.welcome-page-one {
+    decorator: image("assets/welcome_Tutorial.jpg" fill);
+}
+
+.welcome-page-two {
+    decorator: image("assets/Welcome2_tutorial.jpg" fill);
+}
+
+.welcome-page-three {
+    decorator: image("assets/Welcome3_tutorial.jpg" fill);
+}
+
+.welcome-copy {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #eeeeee;
+    text-align: center;
+    text-shadow: 2px 2px 5px #000000;
+}
+
+.welcome-card {
+    padding: 0;
+    background-color: transparent;
+    border: 0px transparent;
+}
+
+.welcome-title {
+    left: 690px;
+    top: 440px;
+    width: 540px;
+    height: 180px;
+    font-size: 58px;
+    line-height: 1.05;
+}
+
+.welcome-page-two .welcome-instruction,
+.welcome-page-two .welcome-result,
+.welcome-page-two .welcome-scale-instruction {
+    left: 690px;
+    top: 390px;
+    width: 540px;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.welcome-page-two .welcome-instruction {
+    font-size: 40px;
+    line-height: 1.24;
+}
+
+.welcome-grab-emphasis {
+    color: #9b2535;
+    font-weight: bold;
+}
+
+.welcome-page-two .welcome-instruction.completed {
+    display: none;
+}
+
+.welcome-page-two .welcome-result {
+    color: #f0f0f0;
+    font-size: 36px;
+    line-height: 1.26;
+    display: none;
+    pointer-events: none;
+}
+
+.welcome-page-two .welcome-result.revealed,
+.welcome-page-two .welcome-scale-instruction.revealed {
+    display: flex;
+}
+
+.welcome-page-two .welcome-scale-instruction {
+    display: none;
+    font-size: 40px;
+    line-height: 1.26;
+    pointer-events: none;
+}
+
+.welcome-inventory-copy {
+    left: 550px;
+    top: 330px;
+    width: 820px;
+    height: 420px;
+    font-size: 40px;
+    line-height: 1.26;
+}
+
+.welcome-close {
+    position: absolute;
+    z-index: 10;
+    right: 46px;
+    top: 42px;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #dedede;
+    font-size: 40px;
+    line-height: 1.0;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 145);
+    border: 1px #565858;
+    border-radius: 3px;
+    tab-index: auto;
+}
+
+.welcome-close:hover {
+    color: #ffffff;
+    background-color: rgba(48, 48, 48, 190);
+    border-color: #858888;
+}
+
+.welcome-close span,
+.welcome-next span {
+    display: block;
+    width: 100%;
+    text-align: center;
+    pointer-events: none;
+}
+
+.welcome-next {
+    position: absolute;
+    left: 805px;
+    bottom: 62px;
+    width: 310px;
+    height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #e5dcde;
+    font-size: 42px;
+    text-align: center;
+    background-color: rgba(34, 10, 14, 226);
+    border: 0px transparent;
+    border-radius: 3px;
+    tab-index: auto;
+}
+
+.welcome-next:hover {
+    color: #ffffff;
+    background-color: rgba(59, 18, 24, 238);
+}
+
+.welcome-next.disabled {
+    display: none;
+}
+
+#vr-cursor {
+    position: absolute;
+    z-index: 100;
+    width: 20px;
+    height: 20px;
+    margin-left: -10px;
+    margin-top: -10px;
+    display: none;
+    background-color: #ffffff;
+    border: 3px #1b1b1b;
+    border-radius: 10px;
+    pointer-events: none;
+}

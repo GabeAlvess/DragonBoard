@@ -103,6 +103,8 @@ namespace dragonboard::ui::menu
                 }
             }
 
+            (void)dragonboard::ui::rml::RmlPanelHost::GetSingleton()
+                .OpenWelcomeTutorialIfNeeded();
             MenuStartupFlow::TriggerEntranceAnimations(manager._panelRegistry.GetPanels());
         }
 

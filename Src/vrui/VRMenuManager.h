@@ -121,16 +121,10 @@ namespace vrui
         /// Check if any menu is currently visible
         bool isMenuOpen() const { return _menuSession.IsOpen(); }
 
-        // --- Active container navigation (called by persistent nav buttons) ---
+        // --- Active container home navigation ---
 
-        /// Set the container that Prev/Next page buttons control
+        /// Set the container whose first page is restored by Home
         void setActivePageableContainer(std::shared_ptr<VRUIContainer> container) { _pageNavigation.SetActive(container); }
-
-        /// Navigate to the next page of the active container
-        void navigateNext() { _pageNavigation.Next(); }
-
-        /// Navigate to the previous page of the active container
-        void navigatePrev() { _pageNavigation.Previous(); }
 
         /// Navigate to page 0 of the active container
         void navigateHome() { _pageNavigation.Home(); }

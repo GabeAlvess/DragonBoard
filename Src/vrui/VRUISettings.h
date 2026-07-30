@@ -74,6 +74,11 @@ namespace vrui
         bool verboseLogging = false;        // Enable trace-level logging (very spammy)
         bool editModeEnabled = true;        // Master switch for item editing (MCM)
         bool lockPins = false;               // Prevent pinned items from being edited, grabbed, or removed
+        std::string uiLanguage = "en";
+        bool showTutorials = true;
+        bool tutorialsPreviouslyEnabled = true;
+        bool welcomeTutorialComplete = false;
+        bool tutorialPositionResetRequested = false;
 
         // -----------------------------------------------------------------------
         // [Combat]
@@ -164,8 +169,8 @@ namespace vrui
         float fingerTouchOffsetX = 0.0f;
         float fingerTouchOffsetY = -0.2f;
         float fingerTouchOffsetZ = 0.0f;
-        float fingerTouchEnterDistance = 2.5f;
-        float fingerTouchExitDistance = 3.0f;
+        float fingerTouchEnterDistance = 5.0f;
+        float fingerTouchExitDistance = 6.0f;
         float fingerTouchHoverDistance = 1.5f;
         float fingerTouchPressDistance = 0.45f;
         float fingerTouchReleaseDistance = 1.0f;
@@ -210,9 +215,7 @@ namespace vrui
         std::string favNifPath         = "DragonBoardVR/IconPlane.nif";
 
         std::string statusNifPath      = "DragonBoardVR/IconPlane.nif";
-        std::string nextPageNifPath    = "DragonBoardVR/IconPlane.nif";
         std::string homeNifPath        = "DragonBoardVR/IconPlane.nif";
-        std::string prevPageNifPath    = "DragonBoardVR/IconPlane.nif";
 
         // -----------------------------------------------------------------------
         // [Interaction] — Edit Mode
@@ -281,17 +284,9 @@ namespace vrui
         float bSaveRotX = 0.000000f; float bSaveRotY = 0.000000f; float bSaveRotZ = -20.000000f;
         float bSaveScale = 1.099043f;
 
-        float bPrevPosX = 3.000000f;  float bPrevPosY = 0.250000f; float bPrevPosZ = -9.000000f;
-        float bPrevRotX = -20.000000f; float bPrevRotY = 0.0f; float bPrevRotZ = 0.0f;
-        float bPrevScale = 1.000000f;
-
         float bHomePosX = 0.000000f;  float bHomePosY = 0.250000f; float bHomePosZ = -9.000000f;
         float bHomeRotX = -20.000000f; float bHomeRotY =  0.0f; float bHomeRotZ = 0.0f;
         float bHomeScale = 1.000000f;
-
-        float bNextPosX = -3.000000f; float bNextPosY = 0.250000f; float bNextPosZ = -9.000000f;
-        float bNextRotX = -20.000000f; float bNextRotY = 0.0f; float bNextRotZ = 0.0f;
-        float bNextScale = 1.000000f;
 
         std::string bModsLabel  = "Mods";     
         std::string bModsAction = "ModsPanel"; 
@@ -401,13 +396,17 @@ namespace vrui
         // -----------------------------------------------------------------------
         void load(const std::string& iniPath);
         void save(const std::string& iniPath) const;
-        void setUseLeftHandAsMenu(bool useLeftHand);
+        void setUseLeftHandAsMenu(bool useLeftHand, bool nativeLeftHandedMode = false);
+        bool isMenuPoseMirrored() const;
+        bool isPoseMirroredForHand(bool leftHand) const;
+        bool isNativeLeftHandedMode() const { return _nativeLeftHandedMode; }
         static std::string getDefaultIniPath();
         static std::string getDefaultLayoutIniPath();
         static std::string getDefaultStateIniPath();
         static VRUISettings& get();
 
     private:
+        bool _nativeLeftHandedMode = false;
         // VRUISettings(); // Already declared above
     };
 }

@@ -7,6 +7,7 @@
 </head>
 <body>
     <div id="app" class="dev-app journal-app">
+        <img class="journal-background" src="assets/Journal.jpg" />
         <aside class="dev-sidebar journal-sidebar">
             <div class="brand">
                 <div class="brand-copy">
@@ -14,7 +15,7 @@
                 </div>
             </div>
 
-            <div class="journal-quest-filters">
+            <div id="journal-quest-filters" class="journal-quest-filters">
                 <button id="journal-filter-all" class="journal-filter-button active"><span>All</span></button>
                 <button id="journal-filter-main" class="journal-filter-button"><span>Main</span></button>
                 <button id="journal-filter-side" class="journal-filter-button"><span>Side</span></button>

@@ -2,7 +2,15 @@
     color: #d8d8d8;
     background-color: #0e0f0f;
     border-color: transparent;
-    decorator: image("assets/mods_nordic_bg.png" fill);
+}
+
+.journal-background {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    pointer-events: none;
 }
 
 .journal-sidebar {
@@ -986,4 +994,156 @@
 .journal-quest-list {
     top: 229px;
     height: 770px;
+}
+
+/* Journal.jpg composition: 29.4% sidebar and reduced main workspace. */
+.journal-sidebar {
+    width: 566px;
+}
+
+.journal-shell,
+.journal-header,
+.journal-main,
+.journal-footer {
+    width: 1350px;
+}
+
+.journal-sidebar .brand-name {
+    left: 72px;
+    width: 450px;
+}
+
+.journal-quest-filters {
+    left: 32px;
+    width: 520px;
+}
+
+.journal-filter-button {
+    width: 122px;
+    min-width: 122px;
+    margin-right: 8px;
+}
+
+.journal-filter-button span {
+    width: 122px;
+}
+
+.journal-quest-list {
+    left: 32px;
+    width: 520px;
+}
+
+.journal-section-label,
+.journal-quest-button {
+    width: 478px;
+}
+
+.journal-section-label {
+    padding-left: 54px;
+}
+
+.journal-quest-button {
+    padding-left: 54px;
+}
+
+.journal-quest-title {
+    width: 378px;
+    min-width: 378px;
+    max-width: 378px;
+}
+
+.journal-top-tabs {
+    left: 272px;
+}
+
+.journal-main {
+    padding-left: 42px;
+    padding-right: 42px;
+}
+
+.journal-page,
+.journal-workspace,
+.journal-details-card,
+.journal-stats-grid {
+    width: 1266px;
+}
+
+.journal-details-card .subheading,
+.journal-title,
+.journal-summary-row,
+.journal-objectives-heading,
+.journal-objective-list {
+    width: 1204px;
+}
+
+.journal-summary {
+    width: 1146px;
+}
+
+.journal-objective {
+    width: 1154px;
+}
+
+.journal-objective-text {
+    width: 949px;
+}
+
+.journal-stat-card {
+    width: 348px;
+    margin-right: 18px;
+}
+
+.journal-skills-card {
+    width: 534px;
+}
+
+.journal-footer-active {
+    left: 35px;
+    width: 760px;
+}
+
+.journal-track-button {
+    left: 870px;
+}
+
+/* Final alignment against the ornaments in Journal.jpg. */
+.journal-sidebar {
+    overflow: hidden;
+}
+
+.journal-sidebar .brand-name {
+    left: 96px;
+}
+
+.journal-quest-list {
+    overflow-x: hidden;
+}
+
+.journal-objective {
+    width: 1204px;
+}
+
+.journal-objective-text {
+    width: 999px;
+}
+
+.journal-track-button {
+    left: auto;
+    right: 105px;
+}
+
+.journal-section-label,
+.journal-quest-button {
+    width: 511px;
+}
+
+.journal-quest-title {
+    width: 411px;
+    min-width: 411px;
+    max-width: 411px;
+}
+
+.journal-top-tabs {
+    left: 161px;
+    top: 38px;
 }

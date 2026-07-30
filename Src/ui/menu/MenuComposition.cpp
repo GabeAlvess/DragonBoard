@@ -567,15 +567,7 @@ void dragonboard::ui::menu::Create()
     g_developerButton = sbDev;
     fixedContainer->addElement(sbDev);
 
-    // --- Persistent Nav Buttons (control the active pageable container) ---
-    // All in the same fixedContainer — uniform snapping alongside sidebar buttons.
-    auto prevBtn = std::make_shared<VRUIButton>("Previous Page", settings.prevPageNifPath, "textures\\test.dds", 2.0f, 2.0f);
-    prevBtn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().navigatePrev(); });
-    prevBtn->setLocalPosition({settings.bPrevPosX, settings.bPrevPosY, settings.bPrevPosZ});
-    setWidgetEulerDegrees(prevBtn, settings.bPrevRotX, settings.bPrevRotY, settings.bPrevRotZ);
-    prevBtn->setLocalScale(settings.bPrevScale);
-    applyJSONTransform(prevBtn, "TopTabs", "Btn_Prev");
-
+    // --- Persistent Home Button ---
     auto homeBtn = std::make_shared<VRUIButton>("Home", settings.homeNifPath, "textures\\test.dds", 2.0f, 2.0f);
     homeBtn->setOnPressHandler([](VRUIButton*, EquipHand) {
         VRMenuManager::get().navigateHome();
@@ -586,13 +578,6 @@ void dragonboard::ui::menu::Create()
     homeBtn->setLocalScale(settings.bHomeScale);
     applyJSONTransform(homeBtn, "TopTabs", "Btn_Home");
     configureFavoriteButton(fixedContainer, homeBtn, "MainPanel", "Home");
-
-    auto nextBtn = std::make_shared<VRUIButton>("Next Page", settings.nextPageNifPath, "textures\\test.dds", 2.0f, 2.0f);
-    nextBtn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().navigateNext(); });
-    nextBtn->setLocalPosition({settings.bNextPosX, settings.bNextPosY, settings.bNextPosZ});
-    setWidgetEulerDegrees(nextBtn, settings.bNextRotX, settings.bNextRotY, settings.bNextRotZ);
-    nextBtn->setLocalScale(settings.bNextScale);
-    applyJSONTransform(nextBtn, "TopTabs", "Btn_Next");
 
     // Populate fixedContainer: sidebar + nav + gold all together for uniform snapping
     fixedContainer->addElement(sbStatus);
@@ -605,9 +590,7 @@ void dragonboard::ui::menu::Create()
 
     fixedContainer->addElement(sbMap);
     // sbDev is always present internally; Settings controls its visibility.
-    fixedContainer->addElement(prevBtn);
     fixedContainer->addElement(homeBtn);
-    fixedContainer->addElement(nextBtn);
     persistentPanel->addElement(fixedContainer);
 
     // =========================================================================
@@ -716,8 +699,6 @@ void dragonboard::ui::menu::Create()
             settings.slotFloatingCache[i] = true;
             settings.slotFloating[i] = true;
         }
-
-        if (lowerAction == "nextpage" || lowerAction == "prevpage") continue;
 
         if (lowerAction == "settings") {
             btn->setOnPressHandler([](VRUIButton*, EquipHand) {
