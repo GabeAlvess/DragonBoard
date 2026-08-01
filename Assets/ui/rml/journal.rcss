@@ -959,38 +959,20 @@
 }
 
 /* Match each sidebar quest's hover/selected fade to its quest category. */
-.journal-quest-button.quest-category-main:hover .fade-1,
-.journal-quest-button.quest-category-main.active .fade-1 { background-color: rgba(49, 13, 19, 210); }
-.journal-quest-button.quest-category-main:hover .fade-2,
-.journal-quest-button.quest-category-main.active .fade-2 { background-color: rgba(49, 13, 19, 155); }
-.journal-quest-button.quest-category-main:hover .fade-3,
-.journal-quest-button.quest-category-main.active .fade-3 { background-color: rgba(49, 13, 19, 100); }
-.journal-quest-button.quest-category-main:hover .fade-4,
-.journal-quest-button.quest-category-main.active .fade-4 { background-color: rgba(49, 13, 19, 58); }
-.journal-quest-button.quest-category-main:hover .fade-5,
-.journal-quest-button.quest-category-main.active .fade-5 { background-color: rgba(49, 13, 19, 25); }
+.journal-quest-button.quest-category-main:hover .fade-layer,
+.journal-quest-button.quest-category-main.active .fade-layer {
+    decorator: horizontal-gradient(rgba(49, 13, 19, 210) rgba(49, 13, 19, 25));
+}
 
-.journal-quest-button.quest-category-side:hover .fade-1,
-.journal-quest-button.quest-category-side.active .fade-1 { background-color: rgba(10, 22, 38, 210); }
-.journal-quest-button.quest-category-side:hover .fade-2,
-.journal-quest-button.quest-category-side.active .fade-2 { background-color: rgba(10, 22, 38, 155); }
-.journal-quest-button.quest-category-side:hover .fade-3,
-.journal-quest-button.quest-category-side.active .fade-3 { background-color: rgba(10, 22, 38, 100); }
-.journal-quest-button.quest-category-side:hover .fade-4,
-.journal-quest-button.quest-category-side.active .fade-4 { background-color: rgba(10, 22, 38, 58); }
-.journal-quest-button.quest-category-side:hover .fade-5,
-.journal-quest-button.quest-category-side.active .fade-5 { background-color: rgba(10, 22, 38, 25); }
+.journal-quest-button.quest-category-side:hover .fade-layer,
+.journal-quest-button.quest-category-side.active .fade-layer {
+    decorator: horizontal-gradient(rgba(10, 22, 38, 210) rgba(10, 22, 38, 25));
+}
 
-.journal-quest-button.quest-category-misc:hover .fade-1,
-.journal-quest-button.quest-category-misc.active .fade-1 { background-color: rgba(48, 40, 10, 210); }
-.journal-quest-button.quest-category-misc:hover .fade-2,
-.journal-quest-button.quest-category-misc.active .fade-2 { background-color: rgba(48, 40, 10, 155); }
-.journal-quest-button.quest-category-misc:hover .fade-3,
-.journal-quest-button.quest-category-misc.active .fade-3 { background-color: rgba(48, 40, 10, 100); }
-.journal-quest-button.quest-category-misc:hover .fade-4,
-.journal-quest-button.quest-category-misc.active .fade-4 { background-color: rgba(48, 40, 10, 58); }
-.journal-quest-button.quest-category-misc:hover .fade-5,
-.journal-quest-button.quest-category-misc.active .fade-5 { background-color: rgba(48, 40, 10, 25); }
+.journal-quest-button.quest-category-misc:hover .fade-layer,
+.journal-quest-button.quest-category-misc.active .fade-layer {
+    decorator: horizontal-gradient(rgba(48, 40, 10, 210) rgba(48, 40, 10, 25));
+}
 
 .journal-quest-list {
     top: 229px;

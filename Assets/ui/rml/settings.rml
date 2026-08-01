@@ -13,9 +13,9 @@
             </div>
 
             <div class="section-label">SETTINGS</div>
-            <button id="tab-general" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>General</span></button>
-            <button id="tab-visuals" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>Visuals</span></button>
-            <button id="tab-items" class="nav-item"><i class="fade-layer fade-1"></i><i class="fade-layer fade-2"></i><i class="fade-layer fade-3"></i><i class="fade-layer fade-4"></i><i class="fade-layer fade-5"></i><span>Item scale</span></button>
+            <button id="tab-general" class="nav-item"><i class="fade-layer"></i><span>General</span></button>
+            <button id="tab-visuals" class="nav-item"><i class="fade-layer"></i><span>Visuals</span></button>
+            <button id="tab-items" class="nav-item"><i class="fade-layer"></i><span>Item scale</span></button>
         </aside>
 
         <div class="content-shell">

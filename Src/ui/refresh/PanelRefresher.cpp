@@ -33,8 +33,6 @@ namespace dragonboard::ui::refresh
                 container->refresh();
             }
         }
-
-        dragonboard::ui::widgets::WidgetTree::RefreshLabels(panel.get());
         dragonboard::ui::widgets::WidgetTree::UpdateContainerSpacing(panel.get(), spacingX, spacingY, 0.0f);
         panel->recalculateLayout();
     }
@@ -46,8 +44,6 @@ namespace dragonboard::ui::refresh
     {
         for (const auto& panel : panels) {
             if (!panel) continue;
-
-            dragonboard::ui::widgets::WidgetTree::RefreshLabels(panel.get());
             dragonboard::ui::widgets::WidgetTree::UpdateContainerSpacing(panel.get(), spacingX, spacingY, 0.0f);
             panel->recalculateLayout();
         }

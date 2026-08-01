@@ -1302,8 +1302,6 @@ namespace vrui
             pending.xOff, pending.yOff, pending.zOff, pending.scaleMult, true,
             ItemUtils::getItemTransformSource(item));
         button->setNoPopAnimation(true);
-        button->setUseDynamicLabelOffset(true);
-        button->setShowLabelsOnHoverOnly(true);
         button->setItemRotationPersistence(
             item->formID,
             pending.xOff, pending.yOff, pending.zOff,

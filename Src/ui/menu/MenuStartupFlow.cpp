@@ -29,7 +29,6 @@ namespace dragonboard::ui::menu
         std::shared_ptr<vrui::VRUIPanel> startupPanel;
         for (const auto& panel : panels) {
             if (panel->getName() == result.action) {
-                result.isVrPanel = true;
                 startupPanel = panel;
                 break;
             }

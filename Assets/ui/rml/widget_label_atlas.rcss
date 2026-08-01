@@ -1,0 +1,29 @@
+* { box-sizing: border-box; }
+
+body {
+    width: 256px;
+    height: 64px;
+    margin: 0;
+    overflow: hidden;
+    background-color: transparent;
+}
+
+.widget-label-panel {
+    width: 256px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: transparent;
+}
+
+#widget-label-text {
+    color: #f2eee4;
+    font-family: DragonBoard;
+    font-size: 63px;
+    letter-spacing: 1px;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+}

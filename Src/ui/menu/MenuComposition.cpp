@@ -1,8 +1,3 @@
-#include <RE/B/BSInputDeviceManager.h>
-#include <RE/P/PlayerControls.h>
-#include <RE/U/UIMessageQueue.h>
-#include <RE/B/ButtonEvent.h>
-#include <RE/U/UserEvents.h>
 #include <RE/I/IFormFactory.h>
 #include <RE/S/Script.h>
 #include <RE/P/PlayerCharacter.h>
@@ -13,6 +8,7 @@
 
 #include "game/actions/ActionExecutor.h"
 #include "ui/rml/RmlPanelHost.h"
+#include "ui/menu/MenuActionRouter.h"
 #include "ui/menu/MenuComposition.h"
 
 #include "vrui/VRMenuManager.h"
@@ -40,32 +36,6 @@ namespace
 // =========================================================================
 // Demo Menu
 // =========================================================================
-
-/// Helper: creates a handler that closes the DragonBoardVR menu and opens a game menu.
-static VRUIButton::PressCallback openGameMenu(const char* menuName)
-{
-    return [menuName](VRUIButton*, EquipHand) {
-        VRMenuManager::get().toggleMenu();
-        auto* queue = RE::UIMessageQueue::GetSingleton();
-        if (queue) queue->AddMessage(menuName, RE::UI_MESSAGE_TYPE::kShow, nullptr);
-    };
-}
-
-static VRUIButton::PressCallback openJournalPanel()
-{
-    return [](VRUIButton*, EquipHand) {
-        auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-        if (rmlHost.IsJournalOpen()) {
-            rmlHost.Close();
-            return;
-        }
-
-        auto& manager = VRMenuManager::get();
-        manager.navigateHome();
-        manager.switchToPanel("MainPanel");
-        (void)rmlHost.OpenJournal();
-    };
-}
 
 #include "vrui/VRUILayoutManager.h"
 
@@ -115,6 +85,48 @@ static void setWidgetEulerDegrees(const std::shared_ptr<vrui::VRUIWidget>& widge
     RE::NiMatrix3 rot;
     vrui::VRUILayoutManager::setMatrixEuler(rot, rotX * kDegToRad, rotY * kDegToRad, rotZ * kDegToRad);
     widget->setLocalRotation(rot);
+}
+
+static void attachRmlButtonLabel(
+    const std::shared_ptr<VRUIButton>& button,
+    std::string id,
+    std::string text)
+{
+    if (!button) return;
+
+    auto& settings = VRUISettings::get();
+    button->setLabel(text);
+
+    dragonboard::ui::rml::RmlWidgetLabelPlacement placement;
+    placement.localPosition = {
+        settings.labelXOffset,
+        settings.labelYOffset,
+        settings.labelZOffset };
+    placement.localRotation.SetEulerAnglesXYZ(
+        90.0f * kDegToRad,
+        0.0f,
+        180.0f * kDegToRad);
+    placement.physicalWidth = 2.5f;
+    placement.physicalHeight = settings.labelScale;
+
+    auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+    if (!rmlHost.AttachWidgetLabel(
+            id,
+            button->getVisualAttachmentNode(),
+            button->getLabel(),
+            placement)) {
+        logger::error(
+            "DragonBoardVR: failed to attach RmlUi label '{}' to button '{}'.",
+            id,
+            button->getLabel());
+        return;
+    }
+
+    button->setLabelChangedCallback(
+        [labelId = std::move(id)](std::string_view updatedText) {
+            dragonboard::ui::rml::RmlPanelHost::GetSingleton().SetWidgetLabelText(
+                labelId, std::string(updatedText));
+        });
 }
 
 static void configureFavoriteButton(const std::shared_ptr<VRUIContainer>& fixedContainer,
@@ -187,89 +199,14 @@ static void ensureRmlHostPanel(const std::string& panelName)
     }
 }
 
-// Helper: resolves a fixed button action string to the correct VRUIButton press handler.
-// Actions can be internal panel names or game menu names. INI value has final priority.
+// Fixed buttons and startup use the same action authority.
 static VRUIButton::PressCallback resolveFixedButtonAction(const std::string& action)
 {
-    std::string lower = action;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c){ return std::tolower(c); });
-
-    if (lower == "statsmenu" || lower == "stats")           return openGameMenu("StatsMenu");
-    if (lower == "inventorymenu")                           return openGameMenu("InventoryMenu");
-    if (lower == "magicmenu")                               return openGameMenu("MagicMenu");
-    if (lower == "mapmenu" || lower == "map")               return openGameMenu("MapMenu");
-    if (lower == "tweenmenu")                               return openGameMenu("TweenMenu");
-    if (lower == "journal" || lower == "journalmenu")       return openJournalPanel();
-    if (lower == "mcm_panel" || lower == "settings") {
-        return [](VRUIButton*, EquipHand) {
-            auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-            if (rmlHost.IsSettingsOpen()) {
-                rmlHost.Close();
-                return;
-            }
-
-            auto& manager = VRMenuManager::get();
-            manager.navigateHome();
-            manager.switchToPanel("MainPanel");
-            (void)rmlHost.OpenSettings();
-        };
-    }
-    if (lower == "inventorypanel") {
-        ensureRmlBackendPanel("InventoryPanel", "Inventory");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("InventoryPanel"); };
-    }
-    if (lower == "magicpanel") {
-        ensureRmlBackendPanel("MagicPanel", "Magic");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("MagicPanel"); };
-    }
-    // Old INIs may still name FavoritesPanel. Route that retired action to the
-    // replacement RmlUi Journal instead of recreating the removed container.
-    if (lower == "favoritespanel")                          return openJournalPanel();
-    if (lower == "modspanel") {
-        ensureRmlHostPanel("ModsPanel");
-        return [](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("ModsPanel"); };
-    }
-    if (lower == "devpanel" || lower == "dev") {
-        return [](VRUIButton*, EquipHand) {
-            auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-            if (rmlHost.IsDeveloperOpen()) {
-                rmlHost.Close();
-                return;
-            }
-            auto& manager = VRMenuManager::get();
-            manager.navigateHome();
-            manager.switchToPanel("MainPanel");
-            rmlHost.OpenDeveloper();
-        };
-    }
-    if (lower == "quicksave" || lower == "save") {
-        return [](VRUIButton*, EquipHand) {
-            VRMenuManager::get().toggleMenu();
-            auto* taskInterface = SKSE::GetTaskInterface();
-            if (taskInterface) {
-                taskInterface->AddTask([]() {
-                    auto* inputMgr = RE::BSInputDeviceManager::GetSingleton();
-                    auto* userEvents = RE::UserEvents::GetSingleton();
-                    if (inputMgr && userEvents) {
-                        auto* down = RE::ButtonEvent::Create(RE::INPUT_DEVICE::kKeyboard, userEvents->quicksave, 0x3F, 1.0f, 0.0f);
-                        if (down) { RE::InputEvent* p = down; inputMgr->SendEvent(&p); }
-                        auto* up   = RE::ButtonEvent::Create(RE::INPUT_DEVICE::kKeyboard, userEvents->quicksave, 0x3F, 0.0f, 0.1f);
-                        if (up)   { RE::InputEvent* p = up;   inputMgr->SendEvent(&p); }
-                    }
-                });
-            }
-        };
-    }
-    // Fallback: try as generic game menu name (keep original casing)
-    if (!action.empty() && action != "None") {
-        std::string menuName = action;
-        return [menuName](VRUIButton*, EquipHand) {
-            VRMenuManager::get().toggleMenu();
-            auto* queue = RE::UIMessageQueue::GetSingleton();
-            if (queue) queue->AddMessage(menuName.c_str(), RE::UI_MESSAGE_TYPE::kShow, nullptr);
-        };
-    }
-    return [](VRUIButton*, EquipHand) {}; // No-op
+    return [action](VRUIButton*, EquipHand) {
+        (void)dragonboard::ui::menu::MenuActionRouter::Execute(
+            action,
+            dragonboard::ui::menu::MenuActionMode::Toggle);
+    };
 }
 
 bool dragonboard::ui::menu::IsCreated()
@@ -393,7 +330,8 @@ void dragonboard::ui::menu::Create()
     applyJSONTransform(sbMagic, "TopTabs", "Btn_Magic");
     configureFavoriteButton(fixedContainer, sbMagic, settings.bMagicAction, settings.bMagicLabel);
 
-    auto sbSys = std::make_shared<VRUIButton>(settings.bSysLabel, settings.settingsNifPath, "", 2.0f, 2.0f, true);
+    auto sbSys = std::make_shared<VRUIButton>("", settings.settingsNifPath, "", 2.0f, 2.0f, true);
+    attachRmlButtonLabel(sbSys, "fixed.settings", settings.bSysLabel);
     sbSys->setOnPressHandler(resolveFixedButtonAction(settings.bSysAction));
     sbSys->setLocalPosition({settings.bSysPosX, settings.bSysPosY, settings.bSysPosZ});
     setWidgetEulerDegrees(sbSys, settings.bSysRotX, settings.bSysRotY, settings.bSysRotZ);
@@ -411,7 +349,8 @@ void dragonboard::ui::menu::Create()
     applyJSONTransform(sbSave, "TopTabs", "Btn_Save");
     configureFavoriteButton(fixedContainer, sbSave, settings.bSaveAction, settings.bSaveLabel);
 
-    auto sbMods = std::make_shared<VRUIButton>(settings.bModsLabel, settings.modsNifPath, "textures\\test.dds", 2.0f, 2.0f);
+    auto sbMods = std::make_shared<VRUIButton>("", settings.modsNifPath, "textures\\test.dds", 2.0f, 2.0f);
+    attachRmlButtonLabel(sbMods, "fixed.mods", settings.bModsLabel);
     sbMods->setOnPressHandler(resolveFixedButtonAction(settings.bModsAction));
     sbMods->setLocalPosition({settings.bModsPosX, settings.bModsPosY, settings.bModsPosZ});
     setWidgetEulerDegrees(sbMods, settings.bModsRotX, settings.bModsRotY, settings.bModsRotZ);
@@ -441,7 +380,8 @@ void dragonboard::ui::menu::Create()
     applyJSONTransform(sbMap, "TopTabs", "Btn_Map");
     configureFavoriteButton(fixedContainer, sbMap, settings.bMapAction, settings.bMapLabel);
 
-    auto sbDev = std::make_shared<VRUIButton>(settings.bDevLabel, settings.devNifPath, "", 2.0f, 2.0f, true);
+    auto sbDev = std::make_shared<VRUIButton>("", settings.devNifPath, "", 2.0f, 2.0f, true);
+    attachRmlButtonLabel(sbDev, "fixed.dev", settings.bDevLabel);
     sbDev->setOnPressHandler(resolveFixedButtonAction(settings.bDevAction));
     sbDev->setLocalPosition({ settings.bDevPosX, settings.bDevPosY, settings.bDevPosZ });
     setWidgetEulerDegrees(sbDev, settings.bDevRotX, settings.bDevRotY, settings.bDevRotZ);
@@ -453,7 +393,8 @@ void dragonboard::ui::menu::Create()
     fixedContainer->addElement(sbDev);
 
     // --- Persistent Home Button ---
-    auto homeBtn = std::make_shared<VRUIButton>("Home", settings.homeNifPath, "textures\\test.dds", 2.0f, 2.0f);
+    auto homeBtn = std::make_shared<VRUIButton>("", settings.homeNifPath, "textures\\test.dds", 2.0f, 2.0f);
+    attachRmlButtonLabel(homeBtn, "fixed.home", "Home");
     homeBtn->setOnPressHandler([](VRUIButton*, EquipHand) {
         VRMenuManager::get().navigateHome();
         VRMenuManager::get().switchToPanel("MainPanel");
@@ -585,79 +526,7 @@ void dragonboard::ui::menu::Create()
             settings.slotFloating[i] = true;
         }
 
-        if (lowerAction == "settings") {
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) {
-                auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-                if (rmlHost.IsSettingsOpen()) {
-                    rmlHost.Close();
-                    return;
-                }
-
-                auto& manager = VRMenuManager::get();
-                manager.navigateHome();
-                manager.switchToPanel("MainPanel");
-            (void)rmlHost.OpenSettings();
-            });
-        } else if (lowerAction == "dev" || lowerAction == "devpanel") {
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) {
-                auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
-                if (rmlHost.IsDeveloperOpen()) {
-                    rmlHost.Close();
-                    return;
-                }
-                auto& manager = VRMenuManager::get();
-                manager.navigateHome();
-                manager.switchToPanel("MainPanel");
-                rmlHost.OpenDeveloper();
-            });
-        } else if (lowerAction == "close") {
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().toggleMenu(); });
-        } else if (lowerAction == "wait" || lowerAction == "sleep") {
-            btn->setOnPressHandler(openGameMenu("Sleep/Wait Menu"));
-        } else if (lowerAction == "journal") {
-            btn->setOnPressHandler(openJournalPanel());
-        } else if (lowerAction == "map") {
-            btn->setOnPressHandler(openGameMenu("MapMenu"));
-        } else if (lowerAction == "inventory") {
-            btn->setOnPressHandler(openGameMenu("InventoryMenu"));
-        } else if (lowerAction == "magic") {
-            btn->setOnPressHandler(openGameMenu("MagicMenu"));
-        } else if (lowerAction == "tweenmenu") {
-            btn->setOnPressHandler(openGameMenu("TweenMenu"));
-        } else if (lowerAction == "inventorypanel" ||
-                   lowerAction == "container:inventory" || lowerAction == "inventory_dyn") {
-            ensureRmlBackendPanel("InventoryPanel", "Inventory");
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("InventoryPanel"); });
-        } else if (lowerAction == "magicpanel" ||
-                   lowerAction == "container:magic" || lowerAction == "magic_dyn") {
-            ensureRmlBackendPanel("MagicPanel", "Magic");
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("MagicPanel"); });
-        } else if (lowerAction == "favoritespanel" ||
-                   lowerAction == "container:favorites" || lowerAction == "favorites_dyn") {
-            btn->setOnPressHandler(openJournalPanel());
-        } else if (lowerAction == "modspanel" || lowerAction == "mods" ||
-                   lowerAction == "container:mods" || lowerAction == "mods_dyn") {
-            ensureRmlHostPanel("ModsPanel");
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) { VRMenuManager::get().togglePanel("ModsPanel"); });
-        } else if (lowerAction == "save") {
-            btn->setOnPressHandler([](VRUIButton*, EquipHand) {
-                VRMenuManager::get().toggleMenu();
-                auto* taskInterface = SKSE::GetTaskInterface();
-                if (taskInterface) {
-                    taskInterface->AddTask([]() {
-                        auto* inputMgr = RE::BSInputDeviceManager::GetSingleton();
-                        auto* userEvents = RE::UserEvents::GetSingleton();
-                        if (inputMgr && userEvents) {
-                            auto* down = RE::ButtonEvent::Create(RE::INPUT_DEVICE::kKeyboard, userEvents->quicksave, 0x3F, 1.0f, 0.0f);
-                            if (down) { RE::InputEvent* p = down; inputMgr->SendEvent(&p); }
-                            auto* up   = RE::ButtonEvent::Create(RE::INPUT_DEVICE::kKeyboard, userEvents->quicksave, 0x3F, 0.0f, 0.1f);
-                            if (up)   { RE::InputEvent* p = up;   inputMgr->SendEvent(&p); }
-                            // RE::DebugNotification("DragonBoardVR: QuickSaving...");
-                        }
-                    });
-                }
-            });
-        } else if (lowerAction.starts_with("console:") || lowerAction.starts_with("cmd:") || lowerAction.starts_with("command:")) {
+        if (lowerAction.starts_with("console:") || lowerAction.starts_with("cmd:") || lowerAction.starts_with("command:")) {
             size_t colonPos = action.find(':');
             // Trim leading whitespace from command
             std::string cmd = action.substr(colonPos + 1);
@@ -677,9 +546,9 @@ void dragonboard::ui::menu::Create()
             });
         } else {
             btn->setOnPressHandler([action](VRUIButton*, EquipHand) {
-                if (action != "None" && !action.empty()) {
-                    // RE::DebugNotification(("DragonBoardVR: Action: " + action).c_str());
-                }
+                (void)dragonboard::ui::menu::MenuActionRouter::Execute(
+                    action,
+                    dragonboard::ui::menu::MenuActionMode::Toggle);
             });
         }
 

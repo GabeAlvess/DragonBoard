@@ -1,0 +1,11 @@
+<rml>
+<head>
+    <title>DragonBoard Widget Labels</title>
+    <link type="text/rcss" href="widget_label_atlas.rcss" />
+</head>
+<body>
+    <div class="widget-label-panel">
+        <span id="widget-label-text">LABEL</span>
+    </div>
+</body>
+</rml>

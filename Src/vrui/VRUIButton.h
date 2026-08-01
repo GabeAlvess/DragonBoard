@@ -1,11 +1,11 @@
 #pragma once
 
 #include "VRUIWidget.h"
-#include "VRUITextHelper.h"
 #include "VRUIModelHelper.h"
 #include "VRUIItemUtils.h"
 #include <RE/B/BSModelDB.h>
 #include <functional>
+#include <string_view>
 
 namespace vrui
 {
@@ -24,6 +24,7 @@ namespace vrui
     public:
         using PressCallback = std::function<void(VRUIButton*, EquipHand)>;
         using HoverCallback = std::function<void(VRUIButton*, bool)>;
+        using LabelChangedCallback = std::function<void(std::string_view)>;
 
         /// Create button with procedural quad (label only)
         explicit VRUIButton(const std::string& label,
@@ -90,15 +91,22 @@ namespace vrui
         void setFixedWidgetIndex(int index) { _fixedWidgetIndex = index; }
  
         const std::string& getLabel() const { return _label; }
-        void setLabel(const std::string& text) { _label = text; if (_isVisualsInitialized) refreshLabel(); }
+        void setLabel(const std::string& text)
+        {
+            _label = text;
+            if (_labelChangedCallback) _labelChangedCallback(_label);
+        }
+        void setLabelChangedCallback(LabelChangedCallback callback)
+        {
+            _labelChangedCallback = std::move(callback);
+            if (_labelChangedCallback) _labelChangedCallback(_label);
+        }
+        [[nodiscard]] RE::NiNode* getVisualAttachmentNode() const;
         const std::string& getButtonId() const { return _buttonId; }
         void setButtonId(const std::string& id) { _buttonId = id; }
         
         const std::string& getSublabel() const { return _sublabel; }
-        void setSublabel(const std::string& text) { _sublabel = text; if (_isVisualsInitialized) refreshLabel(); }
-
-        void setMaxCharsPerLine(int val) { _maxCharsPerLine = val; if (_isVisualsInitialized) refreshLabel(); }
-        int getMaxCharsPerLine() const { return _maxCharsPerLine; }
+        void setSublabel(const std::string& text) { _sublabel = text; }
         void setVisualOffset(float x, float y, float z) { _visualOffsetX = x; _visualOffsetY = y; _visualOffsetZ = z; }
         void setOverlayNif(const std::string& nifPath, float x, float y, float z, float scaleMult = 1.0f)
         {
@@ -108,9 +116,6 @@ namespace vrui
             _overlayOffsetZ = z;
             _overlayScaleMult = scaleMult;
         }
-
-        /// Refreshes the 3D text label using character NIFs
-        void refreshLabel();
 
         /// Load visual meshes post-construction (vtable is ready)
         void initializeVisuals() override;
@@ -125,15 +130,6 @@ namespace vrui
         void setEquipped(bool equipped);
         bool isEquipped() const { return _isEquipped; }
 
-        // --- Dynamic label offset (for inventory/magic/favorites containers) ---
-        /// When true, uses settings.labelYOffsetDynamic (Y axis) instead of the standard label position
-        void setUseDynamicLabelOffset(bool val) { _useDynamicLabelOffset = val; }
-        bool useDynamicLabelOffset() const { return _useDynamicLabelOffset; }
-
-        // --- Hover-only labels (for item grids) ---
-        /// When true, the label nodes stay hidden unless this button is currently hovered by the laser.
-        void setShowLabelsOnHoverOnly(bool val);
-        bool showLabelsOnHoverOnly() const { return _showLabelsOnHoverOnly; }
         void setItemTransformSource(ItemUtils::ItemTransformSource source)
         {
             _itemTransformSource = source;
@@ -203,21 +199,10 @@ namespace vrui
         float _overlayOffsetY = 0.0f;
         float _overlayOffsetZ = 0.0f;
         float _overlayScaleMult = 1.0f;
-        int _maxCharsPerLine = 12;
         
-        RE::NiPointer<RE::NiNode> _labelNode;
-        RE::NiPointer<RE::NiNode> _sublabelNode;
         RE::NiPointer<RE::NiNode> _primaryVisualNode;
         RE::NiPointer<RE::NiNode> _animatedVisualRoot;
         float _primaryVisualReferenceScale = 1.0f;
-        std::vector<RE::NiPointer<RE::NiAVObject>> _labelCharNodes;
-        std::vector<RE::NiPointer<RE::NiAVObject>> _sublabelCharNodes;
-        RE::NiPoint3 _grabInitialLabelPos{ 0.0f, 0.0f, 0.0f };
-        RE::NiMatrix3 _grabInitialLabelRot{};
-        float _grabInitialLabelScale = 1.0f;
-        RE::NiPoint3 _grabInitialSublabelPos{ 0.0f, 0.0f, 0.0f };
-        RE::NiMatrix3 _grabInitialSublabelRot{};
-        float _grabInitialSublabelScale = 1.0f;
 
         ButtonState _state = ButtonState::Normal;
         float _targetScale = 1.0f;   // Target scale for smooth lerp
@@ -265,10 +250,8 @@ namespace vrui
 
         bool _isEquipped = false;
 
-        // Dynamic label offset (for inventory/magic/favorites containers)
-        bool _useDynamicLabelOffset = false;
-        bool _showLabelsOnHoverOnly = false;
         bool _isLaserHovered = false;
+        LabelChangedCallback _labelChangedCallback;
         bool _ambientWiggleEnabled = false;
         bool _worldLockedToHeadSpace = false;
         RE::NiPoint3 _lockedWorldPos{ 0.0f, 0.0f, 0.0f };
@@ -298,7 +281,6 @@ namespace vrui
         float _wiggleTime = 0.0f;
         float _wigglePhaseSeed = 0.0f;
 
-        void updateLabelVisibility();
         RE::NiNode* getVisualParentNode() const;
         void updateAmbientWiggle(float deltaTime);
         void updateHeadLockedWorldTransform();

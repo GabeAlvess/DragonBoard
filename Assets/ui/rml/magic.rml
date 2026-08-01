@@ -54,11 +54,7 @@
             <span id="magic-selected-category" class="spell-category">MAGIC</span>
 
             <div class="spell-description detail-card">
-                <div class="detail-fade fade-soft"></div>
-                <div class="detail-fade fade-mid"></div>
-                <div class="detail-fade fade-strong"></div>
-                <div class="detail-fade fade-solid"></div>
-                <div class="detail-fade fade-whisper"></div>
+                <div class="detail-fade"></div>
                 <div class="description-content">
                     <span id="magic-description" class="description-text">No description available.</span>
                 </div>

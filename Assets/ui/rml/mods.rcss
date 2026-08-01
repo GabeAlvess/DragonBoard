@@ -57,12 +57,7 @@
 .ini-mod-list scrollbarvertical sliderbar { width: 22px; min-height: 116px; margin-left: 10px; background-color: rgba(128, 142, 151, 138); border: 1px rgba(166, 178, 185, 118); border-radius: 5px; }
 .ini-mod-row { position: relative; width: 404px; height: auto; min-height: 82px; display: block; margin: 0 0 12px 0; }
 .ini-mod-card { position: relative; width: 404px; height: auto; min-height: 82px; overflow: hidden; display: block; margin: 0; padding: 18px 68px 18px 16px; color: #f0f0f0; background-color: transparent; border: 0px transparent; border-radius: 3px; tab-index: auto; }
-.sidebar-fade { position: absolute; top: 0; height: 400px; display: block; pointer-events: none; }
-.sidebar-fade-whisper { left: 85%; width: 15%; background-color: rgba(0, 0, 0, 16); }
-.sidebar-fade-soft { left: 70%; width: 15%; background-color: rgba(0, 0, 0, 34); }
-.sidebar-fade-mid { left: 54%; width: 16%; background-color: rgba(0, 0, 0, 56); }
-.sidebar-fade-strong { left: 36%; width: 18%; background-color: rgba(0, 0, 0, 82); }
-.sidebar-fade-solid { left: 0; width: 36%; background-color: rgba(0, 0, 0, 112); }
+.sidebar-fade { position: absolute; left: 0; top: 0; width: 100%; height: 400px; display: block; pointer-events: none; decorator: horizontal-gradient(rgba(0, 0, 0, 112) rgba(0, 0, 0, 16)); }
 .ini-mod-card:hover { background-color: rgba(39, 39, 39, 118); }
 .ini-mod-card.active { background-color: rgba(36, 13, 17, 200); }
 .ini-mod-card.hidden-entry { opacity: 0.68; }

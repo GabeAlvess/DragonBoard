@@ -18,7 +18,6 @@ namespace dragonboard::ui::widgets
         static void CollectDynamicContainers(
             vrui::VRUIWidget* widget,
             std::vector<vrui::VRUIDynamicContainer*>& outContainers);
-        static void RefreshLabels(vrui::VRUIWidget* widget);
         static void UpdateContainerSpacing(
             vrui::VRUIWidget* widget,
             float spacingX,

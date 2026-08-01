@@ -2602,11 +2602,7 @@ namespace dragonboard::ui::rml
                 if (mod.conflictCount > 0) markup += " ini-conflict";
                 if (mod.hidden) markup += " hidden-entry";
                 markup += "\" tabindex=\"0\">"
-                    "<div class=\"sidebar-fade sidebar-fade-whisper\"></div>"
-                    "<div class=\"sidebar-fade sidebar-fade-soft\"></div>"
-                    "<div class=\"sidebar-fade sidebar-fade-mid\"></div>"
-                    "<div class=\"sidebar-fade sidebar-fade-strong\"></div>"
-                    "<div class=\"sidebar-fade sidebar-fade-solid\"></div>"
+                    "<div class=\"sidebar-fade\"></div>"
                     "<span class=\"ini-mod-name\">" +
                     EscapeRml(mod.name) + "</span></div>"
                     "<button id=\"ini-visibility-" + std::to_string(index) +
@@ -2779,11 +2775,7 @@ namespace dragonboard::ui::rml
                 markup +=
                     "<button id=\"inventory-virtual-row-slot-" + suffix +
                     "\" class=\"inventory-list-item\" style=\"display: none;\">"
-                    "<span class=\"row-fade row-fade-solid\"></span>"
-                    "<span class=\"row-fade row-fade-strong\"></span>"
-                    "<span class=\"row-fade row-fade-mid\"></span>"
-                    "<span class=\"row-fade row-fade-soft\"></span>"
-                    "<span class=\"row-fade row-fade-whisper\"></span>"
+                    "<span class=\"row-fade\"></span>"
                     "<span id=\"inventory-virtual-state-slot-" + suffix +
                     "\" class=\"item-state-mark\"></span>"
                     "<span id=\"inventory-virtual-name-slot-" + suffix +
@@ -3139,11 +3131,7 @@ namespace dragonboard::ui::rml
                 markup +=
                     "<button id=\"magic-virtual-row-slot-" + suffix +
                     "\" class=\"magic-list-item\" style=\"display: none;\">"
-                    "<span class=\"row-fade row-fade-solid\"></span>"
-                    "<span class=\"row-fade row-fade-strong\"></span>"
-                    "<span class=\"row-fade row-fade-mid\"></span>"
-                    "<span class=\"row-fade row-fade-soft\"></span>"
-                    "<span class=\"row-fade row-fade-whisper\"></span>"
+                    "<span class=\"row-fade\"></span>"
                     "<span id=\"magic-virtual-state-slot-" + suffix +
                     "\" class=\"spell-state-mark\"></span>"
                     "<span id=\"magic-virtual-name-slot-" + suffix +
@@ -3573,9 +3561,7 @@ namespace dragonboard::ui::rml
                     if (quest.completed) classes += " completed";
                     if (quest.failed) classes += " failed";
                     markup += "<button id=\"" + questButtonId(quest) +
-                        "\" class=\"" + classes + "\"><i class=\"fade-layer fade-1\"></i>"
-                        "<i class=\"fade-layer fade-2\"></i><i class=\"fade-layer fade-3\"></i>"
-                        "<i class=\"fade-layer fade-4\"></i><i class=\"fade-layer fade-5\"></i>"
+                        "\" class=\"" + classes + "\"><i class=\"fade-layer\"></i>"
                         "<span class=\"journal-quest-marker\">" +
                         (quest.active ? "&gt;" : "") +
                         "</span><span id=\"journal-quest-name-" + identity +

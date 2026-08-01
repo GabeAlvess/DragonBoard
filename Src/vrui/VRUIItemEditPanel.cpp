@@ -114,21 +114,6 @@ namespace vrui
             y = -rawY;
         }
 
-        void refreshLabelsRecursive(VRUIWidget* widget)
-        {
-            if (!widget) {
-                return;
-            }
-
-            if (auto* btn = dynamic_cast<VRUIButton*>(widget)) {
-                btn->refreshLabel();
-            }
-
-            for (auto& child : widget->getChildren()) {
-                refreshLabelsRecursive(child.get());
-            }
-        }
-
         void refreshSpacingRecursive(VRUIWidget* widget, float spacingX, float spacingY, float spacingZ)
         {
             if (!widget) {
@@ -787,7 +772,6 @@ namespace vrui
 
         std::string titleText = "Editing: " + _targetItemName;
         auto titleBtn = std::make_shared<VRUIButton>(_name + "_title", "", "", 8.0f, 0.8f);
-        titleBtn->setMaxCharsPerLine(64); // Prevent wrapping in the edit panel title
         titleBtn->setLabel(titleText);
         titleBtn->setLocalPosition({ 0.0f, 0.0f, 9.0f }); // Anchor at very top
         addElement(titleBtn);
@@ -1010,7 +994,6 @@ namespace vrui
 
         // Initialize display
         setEditPage(_activeTab);
-        refreshLabelsRecursive(this);
         {
             auto& settings = VRUISettings::get();
             refreshSpacingRecursive(this, settings.buttonSpacingX, settings.buttonSpacingY, 0.0f);

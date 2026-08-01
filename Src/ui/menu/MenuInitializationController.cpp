@@ -65,7 +65,7 @@ namespace dragonboard::ui::menu
         }
 
         reticle = vrui::VRUIWidget::loadModelFromNif(
-            "DragonBoardVR\\font\\symbol.nif");
+            "DragonBoardVR\\symbol.nif");
         if (!reticle) {
             reticle = vrui::VRUIWidget::loadModelFromNif(
                 "DragonBoardVR\\Dragonbeam.nif");

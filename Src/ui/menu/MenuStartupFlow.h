@@ -14,7 +14,6 @@ namespace dragonboard::ui::menu
     struct MenuStartupResult
     {
         std::string action;
-        bool isVrPanel = false;
     };
 
     class MenuStartupFlow

@@ -1442,28 +1442,19 @@ footer {
 
 .fade-layer {
     position: absolute;
+    left: 0;
     top: 0;
+    width: 100%;
     height: 104px;
     display: block;
     pointer-events: none;
+    decorator: horizontal-gradient(rgba(0, 0, 0, 112) rgba(0, 0, 0, 16));
 }
 
-.fade-1 { left: 0; width: 36%; background-color: rgba(0, 0, 0, 112); }
-.fade-2 { left: 36%; width: 18%; background-color: rgba(0, 0, 0, 82); }
-.fade-3 { left: 54%; width: 16%; background-color: rgba(0, 0, 0, 56); }
-.fade-4 { left: 70%; width: 15%; background-color: rgba(0, 0, 0, 34); }
-.fade-5 { left: 85%; width: 15%; background-color: rgba(0, 0, 0, 16); }
-
-.nav-item:hover .fade-1,
-.nav-item.active .fade-1 { background-color: rgba(44, 13, 18, 210); }
-.nav-item:hover .fade-2,
-.nav-item.active .fade-2 { background-color: rgba(44, 13, 18, 155); }
-.nav-item:hover .fade-3,
-.nav-item.active .fade-3 { background-color: rgba(44, 13, 18, 100); }
-.nav-item:hover .fade-4,
-.nav-item.active .fade-4 { background-color: rgba(44, 13, 18, 58); }
-.nav-item:hover .fade-5,
-.nav-item.active .fade-5 { background-color: rgba(44, 13, 18, 25); }
+.nav-item:hover .fade-layer,
+.nav-item.active .fade-layer {
+    decorator: horizontal-gradient(rgba(44, 13, 18, 210) rgba(44, 13, 18, 25));
+}
 
 .nav-item span {
     position: relative;

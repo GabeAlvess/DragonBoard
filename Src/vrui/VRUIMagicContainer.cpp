@@ -593,8 +593,6 @@ namespace vrui
                 xOff, yOff, zOff,
                 scaleMult, true, transformSource);
             button->setNoPopAnimation(true);
-            button->setUseDynamicLabelOffset(true);
-            button->setShowLabelsOnHoverOnly(true);
             button->setItemRotationPersistence(
                 spell->formID,
                 xOff, yOff, zOff,

@@ -114,30 +114,6 @@ namespace vrui
         return static_cast<float>(hash % 10000u) * 0.001f;
     }
 
-    static void compensateChildTransformForGrab(RE::NiNode* child,
-                                                const RE::NiPoint3& initialChildPos,
-                                                const RE::NiMatrix3& initialChildRot,
-                                                float initialChildScale,
-                                                const RE::NiPoint3& initialButtonPos,
-                                                const RE::NiMatrix3& initialButtonRot,
-                                                float initialButtonScale,
-                                                const RE::NiPoint3& currentButtonPos,
-                                                const RE::NiMatrix3& currentButtonRot,
-                                                float currentButtonScale)
-    {
-        if (!child) {
-            return;
-        }
-
-        float safeCurrentScale = currentButtonScale > 0.0001f ? currentButtonScale : 1.0f;
-        RE::NiPoint3 desiredParentPos =
-            initialButtonPos + rotateVector(initialButtonRot, initialChildPos) * initialButtonScale;
-        RE::NiPoint3 deltaToDesired = desiredParentPos - currentButtonPos;
-        child->local.translate = inverseRotateVector(currentButtonRot, deltaToDesired) / safeCurrentScale;
-        child->local.rotate = currentButtonRot.Transpose() * initialButtonRot * initialChildRot;
-        child->local.scale = initialChildScale * (initialButtonScale / safeCurrentScale);
-    }
-
     static RE::NiMatrix3 orthonormalizeMatrix(RE::NiMatrix3 mat)
     {
         RE::NiPoint3 col0(mat.entry[0][0], mat.entry[1][0], mat.entry[2][0]);
@@ -193,7 +169,6 @@ namespace vrui
         , _buttonId(label)
         , _sublabel("")
         , _state(ButtonState::Normal)
-        , _maxCharsPerLine(12)
         , _slotIndex(-1)
         , _wigglePhaseSeed(makePhaseSeed(label))
     {
@@ -209,7 +184,6 @@ namespace vrui
         , _nifPath(nifPath)
         , _texturePath(texturePath)
         , _state(ButtonState::Normal)
-        , _maxCharsPerLine(12)
         , _slotIndex(-1)
         , _isVisualsInitialized(!deferInit)
         , _wigglePhaseSeed(makePhaseSeed(label + nifPath))
@@ -240,7 +214,6 @@ namespace vrui
         , _itemScaleMult(itemScaleMult)
         , _itemTransformSource(transformSource)
         , _state(ButtonState::Normal)
-        , _maxCharsPerLine(12)
         , _slotIndex(-1)
         , _isVisualsInitialized(!deferInit)
         , _wigglePhaseSeed(makePhaseSeed(label + nifPath))
@@ -746,131 +719,6 @@ namespace vrui
         // Log the resulting node hierarchy for debugging
         logNodeHierarchy("Button '" + _label + "' after initializeVisuals");
 
-        // Refresh 3D labels if they exist
-        if (!_label.empty() || !_sublabel.empty()) {
-            refreshLabel();
-        }
-    }
-
-    void VRUIButton::refreshLabel()
-    {
-        if (!_node) return;
-
-        auto& settings = VRUISettings::get();
-        RE::NiUpdateData updateData;
-        const float kLineHeight = settings.labelSpacing * 1.4f;
-
-        // --- OPTIMIZATION: Persistent Label Containers ---
-        if (!_labelNode) {
-            _labelNode = RE::NiPointer<RE::NiNode>(RE::NiNode::Create());
-            _labelNode->name = "LabelContainer";
-            getVisualParentNode()->AttachChild(_labelNode.get());
-        }
-        if (!_sublabelNode) {
-            _sublabelNode = RE::NiPointer<RE::NiNode>(RE::NiNode::Create());
-            _sublabelNode->name = "SublabelContainer";
-            getVisualParentNode()->AttachChild(_sublabelNode.get());
-        }
-
-        // 1. Refresh Label
-        if (!_label.empty()) {
-            auto lines = VRUITextHelper::wrapText(_label, _maxCharsPerLine);
-            float totalHeight = static_cast<float>(lines.size() - 1) * kLineHeight;
-            float baseZ = totalHeight * 0.5f;
-
-            size_t poolIdx = 0;
-            std::vector<float> lineWidths;
-            std::vector<size_t> lineStartIdx;
-
-            for (int li = 0; li < static_cast<int>(lines.size()); ++li) {
-                lineStartIdx.push_back(poolIdx);
-                float lineZ = baseZ - li * kLineHeight;
-                float width = VRUITextHelper::buildTextLine(_labelNode.get(), lines[li],
-                                           settings.labelScale, settings.labelSpacing,
-                                           lineZ, _labelCharNodes, poolIdx);
-                lineWidths.push_back(width > settings.labelSpacing ? width - settings.labelSpacing : width);
-            }
-
-            // Center each line horizontally using the char pool
-            for (int li = 0; li < static_cast<int>(lines.size()); ++li) {
-                size_t start = lineStartIdx[li];
-                size_t end = (li + 1 < static_cast<int>(lineStartIdx.size())) ? lineStartIdx[li + 1] : poolIdx;
-                float offset = -lineWidths[li] * 0.5f;
-                for (size_t ni = start; ni < end; ++ni) {
-                    if (ni < _labelCharNodes.size() && _labelCharNodes[ni]) {
-                        _labelCharNodes[ni]->local.translate.x += offset;
-                    }
-                }
-            }
-
-            // Hide unused character nodes in the pool
-            for (size_t i = poolIdx; i < _labelCharNodes.size(); ++i) {
-                if (_labelCharNodes[i]) {
-                    _labelCharNodes[i]->SetAppCulled(true);
-                }
-            }
-
-            const float labelYOffset = _useDynamicLabelOffset ? settings.labelYOffsetDynamic : settings.labelYOffset;
-            _labelNode->local.translate = { settings.labelXOffset, labelYOffset, settings.labelZOffset };
-            
-            constexpr float kLabelRotX = 90.0f  * kDegToRad;
-            constexpr float kLabelRotY =  0.0f  * kDegToRad;
-            constexpr float kLabelRotZ = 180.0f * kDegToRad;
-            _labelNode->local.rotate.SetEulerAnglesXYZ(kLabelRotX, kLabelRotY, kLabelRotZ);
-            _labelNode->Update(updateData);
-        }
-
-        // 2. Refresh Sublabel (using its own pool)
-        if (!_sublabel.empty()) {
-            auto lines = VRUITextHelper::wrapText(_sublabel, _maxCharsPerLine);
-            float subSpacing = settings.labelSpacing * 0.7f;
-            float subScale = settings.labelScale * 0.7f;
-            float subLineHeight = subSpacing * 1.4f;
-            
-            float totalHeight = static_cast<float>(lines.size() - 1) * subLineHeight;
-            float baseZ = totalHeight * 0.5f;
-
-            size_t poolIdx = 0;
-            std::vector<float> lineWidths;
-            std::vector<size_t> lineStartIdx;
-
-            for (int li = 0; li < static_cast<int>(lines.size()); ++li) {
-                lineStartIdx.push_back(poolIdx);
-                float lineZ = baseZ - li * subLineHeight;
-                float width = VRUITextHelper::buildTextLine(_sublabelNode.get(), lines[li],
-                                           subScale, subSpacing,
-                                           lineZ, _sublabelCharNodes, poolIdx);
-                lineWidths.push_back(width > subSpacing ? width - subSpacing : width);
-            }
-
-            for (int li = 0; li < static_cast<int>(lines.size()); ++li) {
-                size_t start = lineStartIdx[li];
-                size_t end = (li + 1 < static_cast<int>(lineStartIdx.size())) ? lineStartIdx[li + 1] : poolIdx;
-                float offset = -lineWidths[li] * 0.5f;
-                for (size_t ni = start; ni < end; ++ni) {
-                    if (ni < _sublabelCharNodes.size() && _sublabelCharNodes[ni]) {
-                        _sublabelCharNodes[ni]->local.translate.x += offset;
-                    }
-                }
-            }
-
-            for (size_t i = poolIdx; i < _sublabelCharNodes.size(); ++i) {
-                if (_sublabelCharNodes[i]) {
-                    _sublabelCharNodes[i]->SetAppCulled(true);
-                }
-            }
-
-            const float sublabelYOffset = (_useDynamicLabelOffset ? settings.labelYOffsetDynamic : settings.labelYOffset) - 0.5f;
-            _sublabelNode->local.translate = { settings.labelXOffset, sublabelYOffset, settings.labelZOffset };
-            
-            constexpr float kLabelRotX = 90.0f  * kDegToRad;
-            constexpr float kLabelRotY =  0.0f  * kDegToRad;
-            constexpr float kLabelRotZ = 180.0f * kDegToRad;
-            _sublabelNode->local.rotate.SetEulerAnglesXYZ(kLabelRotX, kLabelRotY, kLabelRotZ);
-            _sublabelNode->Update(updateData);
-        }
-
-        updateLabelVisibility();
     }
 
     RE::NiNode* VRUIButton::getVisualParentNode() const
@@ -881,27 +729,9 @@ namespace vrui
         return _node.get();
     }
 
-    void VRUIButton::updateLabelVisibility()
+    RE::NiNode* VRUIButton::getVisualAttachmentNode() const
     {
-        if (_labelNode) {
-            const bool showLabel = !_label.empty() && (!_showLabelsOnHoverOnly || _isLaserHovered || _isGrabbed);
-            _labelNode->SetAppCulled(!showLabel);
-        }
-
-        if (_sublabelNode) {
-            const bool showSublabel = !_sublabel.empty() && (!_showLabelsOnHoverOnly || _isLaserHovered || _isGrabbed);
-            _sublabelNode->SetAppCulled(!showSublabel);
-        }
-    }
-
-    void VRUIButton::setShowLabelsOnHoverOnly(bool val)
-    {
-        if (_showLabelsOnHoverOnly == val) {
-            return;
-        }
-
-        _showLabelsOnHoverOnly = val;
-        updateLabelVisibility();
+        return getVisualParentNode();
     }
 
     void VRUIButton::setPrimaryVisualTransform(const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scaleMult)
@@ -1151,7 +981,6 @@ namespace vrui
             _isGrabbed = false;
             _isTwoHandScaling = false;
             _grabTimer = 0.0f;
-            updateLabelVisibility();
             VRMenuManager::get().clearGrabbedWidget(this);
             logger::trace(
                 "DragonBoardVR: active widget grab cancelled for '{}' (pinLocked={}, "
@@ -1441,7 +1270,6 @@ namespace vrui
         if (_state != ButtonState::Pressed) {
             setState(ButtonState::Hovered);
         }
-        updateLabelVisibility();
         if (_onHoverHandler) {
             _onHoverHandler(this, true);
         }
@@ -1455,7 +1283,6 @@ namespace vrui
         if (_state != ButtonState::Pressed) {
             setState(ButtonState::Normal);
         }
-        updateLabelVisibility();
         if (_onHoverHandler) {
             _onHoverHandler(this, false);
         }
@@ -1535,7 +1362,6 @@ namespace vrui
 
         _isGrabbed = true;
         _grabTimer = 0.0f;
-        updateLabelVisibility();
         VRMenuManager::get().setGrabbedWidget(shared_from_this());
         VRMenuManager::get().clearHover();
         
@@ -1555,16 +1381,6 @@ namespace vrui
             _grabOffsetLocalHand = inverseRotateVector(hand->world.rotate, worldDiff);
             _grabInitialHandRot = hand->world.rotate;
             _grabInitialButtonRot = _node->world.rotate;
-            if (_labelNode) {
-                _grabInitialLabelPos = _labelNode->local.translate;
-                _grabInitialLabelRot = _labelNode->local.rotate;
-                _grabInitialLabelScale = _labelNode->local.scale;
-            }
-            if (_sublabelNode) {
-                _grabInitialSublabelPos = _sublabelNode->local.translate;
-                _grabInitialSublabelRot = _sublabelNode->local.rotate;
-                _grabInitialSublabelScale = _sublabelNode->local.scale;
-            }
         } else {
             _grabInitialHandPos = RE::NiPoint3(0.0f, 0.0f, 0.0f);
             _grabInitialButtonPos = RE::NiPoint3(0.0f, 0.0f, 0.0f);
@@ -1866,18 +1682,7 @@ namespace vrui
         }
         }
         _isGrabbed = false;
-        updateLabelVisibility();
         VRMenuManager::get().clearGrabbedWidget(this);
-        if (_labelNode) {
-            _labelNode->local.translate = _grabInitialLabelPos;
-            _labelNode->local.rotate = _grabInitialLabelRot;
-            _labelNode->local.scale = _grabInitialLabelScale;
-        }
-        if (_sublabelNode) {
-            _sublabelNode->local.translate = _grabInitialSublabelPos;
-            _sublabelNode->local.rotate = _grabInitialSublabelRot;
-            _sublabelNode->local.scale = _grabInitialSublabelScale;
-        }
 
         if (_onGrabReleaseHandler) {
             _onGrabReleaseHandler(this);

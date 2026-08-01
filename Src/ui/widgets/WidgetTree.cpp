@@ -1,6 +1,5 @@
 #include "WidgetTree.h"
 
-#include "vrui/VRUIButton.h"
 #include "vrui/VRUIContainer.h"
 #include "vrui/VRUIDynamicContainer.h"
 
@@ -19,19 +18,6 @@ namespace dragonboard::ui::widgets
         if (auto* container = dynamic_cast<vrui::VRUIContainer*>(widget)) {
             for (auto& child : container->getChildren()) {
                 CollectDynamicContainers(child.get(), outContainers);
-            }
-        }
-    }
-
-    void WidgetTree::RefreshLabels(vrui::VRUIWidget* widget)
-    {
-        if (!widget) return;
-
-        if (auto* button = dynamic_cast<vrui::VRUIButton*>(widget)) {
-            button->refreshLabel();
-        } else if (auto* container = dynamic_cast<vrui::VRUIContainer*>(widget)) {
-            for (auto& child : container->getChildren()) {
-                RefreshLabels(child.get());
             }
         }
     }

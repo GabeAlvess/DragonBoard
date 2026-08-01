@@ -3,9 +3,9 @@
 #include "MenuPanelPresenter.h"
 #include "MenuComposition.h"
 #include "MenuInitializationController.h"
+#include "MenuActionRouter.h"
 #include "MenuStartupFlow.h"
 #include "gameplay/CombatSlowTime.h"
-#include "runtime/vr/GameMenuActions.h"
 #include "ui/pointer/PointerVisualController.h"
 #include "ui/rml/RmlPanelHost.h"
 #include "vrui/VRMenuManager.h"
@@ -87,21 +87,7 @@ namespace dragonboard::ui::menu
             const auto startup = MenuStartupFlow::Prepare(
                 manager._panelRegistry.GetPanels(), settings.defaultPanelAction);
 
-            if (startup.isVrPanel) {
-                manager.switchToPanel(startup.action);
-            } else {
-                manager.switchToPanel("MainPanel");
-
-                if (startup.action == "Journal" || startup.action == "JournalMenu") {
-                    dragonboard::ui::rml::RmlPanelHost::GetSingleton().OpenJournal();
-                } else if (startup.action == "QuickSave" || startup.action == "Save") {
-                    manager.toggleMenu();
-                    dragonboard::runtime::vr::QueueQuickSave();
-                } else {
-                    manager.toggleMenu();
-                    dragonboard::runtime::vr::ShowGameMenu(startup.action);
-                }
-            }
+            (void)MenuActionRouter::Execute(startup.action, MenuActionMode::Open);
 
             (void)dragonboard::ui::rml::RmlPanelHost::GetSingleton()
                 .OpenWelcomeTutorialIfNeeded();

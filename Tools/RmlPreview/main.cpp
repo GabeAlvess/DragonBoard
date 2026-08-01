@@ -927,9 +927,7 @@ namespace
             if (auto* list = _document->GetElementById("journal-quest-list")) {
                 list->SetInnerRML(
                     "<div class=\"journal-section-label active-section\"><span>ACTIVE QUESTS</span></div>"
-                    "<button id=\"journal-quest-20-1\" class=\"journal-quest-button quest-category-main active\"><i class=\"fade-layer fade-1\"></i>"
-                    "<i class=\"fade-layer fade-2\"></i><i class=\"fade-layer fade-3\"></i>"
-                    "<i class=\"fade-layer fade-4\"></i><i class=\"fade-layer fade-5\"></i>"
+                    "<button id=\"journal-quest-20-1\" class=\"journal-quest-button quest-category-main active\"><i class=\"fade-layer\"></i>"
                     "<span class=\"journal-quest-marker\">&gt;</span><span id=\"journal-quest-name-20-1\" class=\"journal-quest-title\">"
                     "<span id=\"journal-quest-name-track-20-1\" class=\"journal-quest-title-track\">The Horn of Jurgen Windcaller</span></span></button>"
                     "<button class=\"journal-quest-button quest-category-side\"><span class=\"journal-quest-marker\"></span>"
@@ -1006,11 +1004,7 @@ namespace
                     markup += "<div class=\"ini-mod-row\"><button class=\"ini-mod-card";
                     if (active) markup += " active";
                     markup += "\">"
-                        "<div class=\"sidebar-fade sidebar-fade-whisper\"></div>"
-                        "<div class=\"sidebar-fade sidebar-fade-soft\"></div>"
-                        "<div class=\"sidebar-fade sidebar-fade-mid\"></div>"
-                        "<div class=\"sidebar-fade sidebar-fade-strong\"></div>"
-                        "<div class=\"sidebar-fade sidebar-fade-solid\"></div>"
+                        "<div class=\"sidebar-fade\"></div>"
                         "<span class=\"ini-mod-name\">";
                     markup += name;
                     markup += "</span></button>"
@@ -1365,11 +1359,7 @@ namespace
                     std::to_string(static_cast<int>(
                         static_cast<float>(slot) * 120.0f)) +
                     "px;\">";
-                markup += "<span class=\"row-fade row-fade-solid\"></span>"
-                    "<span class=\"row-fade row-fade-strong\"></span>"
-                    "<span class=\"row-fade row-fade-mid\"></span>"
-                    "<span class=\"row-fade row-fade-soft\"></span>"
-                    "<span class=\"row-fade row-fade-whisper\"></span>";
+                markup += "<span class=\"row-fade\"></span>";
                 markup += "<span class=\"" +
                     std::string(inventory ? "item-state-mark" : "spell-state-mark") +
                     "\">" + marker + "</span>";

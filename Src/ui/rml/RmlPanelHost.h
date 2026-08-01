@@ -11,6 +11,7 @@
 #include "ui/rml/RmlEntranceAnimation.h"
 #include "ui/rml/RmlRenderScheduler.h"
 #include "ui/rml/RmlSurfaceGrabController.h"
+#include "ui/rml/RmlWidgetLabelAtlas.h"
 #include "vrui/MapCalibration.h"
 
 #include <RE/Skyrim.h>
@@ -64,6 +65,12 @@ namespace dragonboard::ui::rml
         bool OpenJournal();
         bool OpenWelcomeTutorialIfNeeded();
         void RequestRmlWarmup();
+        bool AttachWidgetLabel(
+            std::string id,
+            RE::NiNode* parent,
+            std::string text,
+            const RmlWidgetLabelPlacement& placement);
+        bool SetWidgetLabelText(std::string_view id, std::string text);
         void Close();
         void OnVrButtonEvent(
             bool leftHand,
@@ -499,6 +506,7 @@ namespace dragonboard::ui::rml
         bool _rmlPrewarmComplete = false;
         std::unique_ptr<dragonboard::ui::rml::DragonBoardRmlUi> _rmlUi;
         std::unique_ptr<dragonboard::ui::rml::StatusWidget> _statusWidget;
+        std::unique_ptr<dragonboard::ui::rml::RmlWidgetLabelAtlas> _widgetLabelAtlas;
         std::atomic<bool> _rmlSettingsSyncPending{ true };
         std::atomic<bool> _rmlDeveloperSyncPending{ true };
         std::atomic<bool> _rmlDeveloperInfoSyncPending{ true };

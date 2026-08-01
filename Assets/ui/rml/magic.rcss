@@ -233,65 +233,18 @@ body {
 
 .row-fade {
     position: absolute;
+    left: 0;
     top: 0;
+    width: 100%;
     height: 112px;
     display: block;
     pointer-events: none;
+    decorator: horizontal-gradient(rgba(0, 0, 0, 112) rgba(0, 0, 0, 16));
 }
 
-.row-fade-solid {
-    left: 0;
-    width: 36%;
-    background-color: rgba(0, 0, 0, 112);
-}
-
-.row-fade-strong {
-    left: 36%;
-    width: 18%;
-    background-color: rgba(0, 0, 0, 82);
-}
-
-.row-fade-mid {
-    left: 54%;
-    width: 16%;
-    background-color: rgba(0, 0, 0, 56);
-}
-
-.row-fade-soft {
-    left: 70%;
-    width: 15%;
-    background-color: rgba(0, 0, 0, 34);
-}
-
-.row-fade-whisper {
-    left: 85%;
-    width: 15%;
-    background-color: rgba(0, 0, 0, 16);
-}
-
-.magic-list-item:hover .row-fade-solid,
-.magic-list-item.grip-scroll-locked .row-fade-solid {
-    background-color: rgba(39, 39, 39, 174);
-}
-
-.magic-list-item:hover .row-fade-strong,
-.magic-list-item.grip-scroll-locked .row-fade-strong {
-    background-color: rgba(39, 39, 39, 142);
-}
-
-.magic-list-item:hover .row-fade-mid,
-.magic-list-item.grip-scroll-locked .row-fade-mid {
-    background-color: rgba(39, 39, 39, 106);
-}
-
-.magic-list-item:hover .row-fade-soft,
-.magic-list-item.grip-scroll-locked .row-fade-soft {
-    background-color: rgba(39, 39, 39, 68);
-}
-
-.magic-list-item:hover .row-fade-whisper,
-.magic-list-item.grip-scroll-locked .row-fade-whisper {
-    background-color: rgba(39, 39, 39, 32);
+.magic-list-item:hover .row-fade,
+.magic-list-item.grip-scroll-locked .row-fade {
+    decorator: horizontal-gradient(rgba(39, 39, 39, 174) rgba(39, 39, 39, 32));
 }
 
 .magic-list-item.active {
@@ -299,24 +252,8 @@ body {
     border-left-color: #c9b77e;
 }
 
-.magic-list-item.active .row-fade-solid {
-    background-color: rgba(54, 50, 42, 188);
-}
-
-.magic-list-item.active .row-fade-strong {
-    background-color: rgba(54, 50, 42, 150);
-}
-
-.magic-list-item.active .row-fade-mid {
-    background-color: rgba(54, 50, 42, 112);
-}
-
-.magic-list-item.active .row-fade-soft {
-    background-color: rgba(54, 50, 42, 72);
-}
-
-.magic-list-item.active .row-fade-whisper {
-    background-color: rgba(54, 50, 42, 34);
+.magic-list-item.active .row-fade {
+    decorator: horizontal-gradient(rgba(54, 50, 42, 188) rgba(54, 50, 42, 34));
 }
 
 .magic-list-item.equipped {
@@ -472,40 +409,13 @@ body {
 
 .detail-fade {
     position: absolute;
+    left: 0;
     top: 0;
+    width: 100%;
     height: 100%;
     display: block;
     pointer-events: none;
-}
-
-.detail-fade.fade-soft {
-    left: 15%;
-    width: 15%;
-    background-color: rgba(0, 0, 0, 34);
-}
-
-.detail-fade.fade-mid {
-    left: 30%;
-    width: 16%;
-    background-color: rgba(0, 0, 0, 56);
-}
-
-.detail-fade.fade-strong {
-    left: 46%;
-    width: 18%;
-    background-color: rgba(0, 0, 0, 82);
-}
-
-.detail-fade.fade-solid {
-    left: 64%;
-    width: 36%;
-    background-color: rgba(0, 0, 0, 112);
-}
-
-.detail-fade.fade-whisper {
-    left: 0;
-    width: 15%;
-    background-color: rgba(0, 0, 0, 16);
+    decorator: horizontal-gradient(rgba(0, 0, 0, 16) rgba(0, 0, 0, 112));
 }
 
 .spell-description {

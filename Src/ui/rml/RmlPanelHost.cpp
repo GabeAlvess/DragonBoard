@@ -3,6 +3,7 @@
 #include "ui/rml/DragonBoardRmlRenderer.h"
 #include "ui/rml/RmlPresentBridge.h"
 #include "ui/rml/StatusWidget.h"
+#include "ui/rml/RmlWidgetLabelAtlas.h"
 #include "ui/mods/IniFileWriter.h"
 
 #include "vrui/VRMenuManager.h"
@@ -476,6 +477,7 @@ namespace dragonboard::ui::rml
 
     RmlPanelHost::RmlPanelHost()
     {
+        _widgetLabelAtlas = std::make_unique<RmlWidgetLabelAtlas>();
         _sceneSurfaces.emplace(
             kMainSurfaceHandle,
             SurfaceState{ "DragonBoardVR.Main", 0 });
@@ -775,6 +777,7 @@ namespace dragonboard::ui::rml
 
     RmlPanelHost::~RmlPanelHost()
     {
+        _widgetLabelAtlas.reset();
         _statusWidget.reset();
         for (auto& [handle, sceneSurface] : _sceneSurfaces) {
             if (sceneSurface.sourceTexture && sceneSurface.textureBridge) {
@@ -795,6 +798,25 @@ namespace dragonboard::ui::rml
         if (_panelRenderTexture) _panelRenderTexture->Release();
         if (_context) _context->Release();
         if (_device) _device->Release();
+    }
+
+    bool RmlPanelHost::AttachWidgetLabel(
+        std::string id,
+        RE::NiNode* parent,
+        std::string text,
+        const RmlWidgetLabelPlacement& placement)
+    {
+        if (!_widgetLabelAtlas || !parent || id.empty()) return false;
+        if (!EnsurePresentHookInstalled()) return false;
+        RequestRmlWarmup();
+        return _widgetLabelAtlas->Attach(
+            std::move(id), parent, std::move(text), placement);
+    }
+
+    bool RmlPanelHost::SetWidgetLabelText(std::string_view id, std::string text)
+    {
+        return _widgetLabelAtlas &&
+            _widgetLabelAtlas->SetText(id, std::move(text));
     }
 
     bool RmlPanelHost::OpenSettings()
@@ -1534,6 +1556,7 @@ namespace dragonboard::ui::rml
     {
         auto& manager = vrui::VRMenuManager::get();
         auto& settings = vrui::VRUISettings::get();
+        if (_widgetLabelAtlas) _widgetLabelAtlas->UpdateGameThread();
 
         if (settings.tutorialPositionResetRequested) {
             settings.tutorialPositionResetRequested = false;
@@ -3356,6 +3379,11 @@ namespace dragonboard::ui::rml
         }
         if (_statusSurfaceHomeVisible.load(std::memory_order_acquire)) {
             RenderStatusSurfacePresentThread();
+        }
+        if (_rendererReady.load(std::memory_order_acquire) && _widgetLabelAtlas &&
+            _rmlUi && _rmlUi->GetRenderer()) {
+            _widgetLabelAtlas->RenderPresentThread(
+                _device, _rmlUi->GetRenderer());
         }
     }
 

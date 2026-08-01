@@ -52,11 +52,7 @@
             <span id="inventory-selected-category" class="selected-category detail-selected-category">ITEM</span>
 
             <div class="description-card detail-card">
-                <div class="detail-fade fade-soft"></div>
-                <div class="detail-fade fade-mid"></div>
-                <div class="detail-fade fade-strong"></div>
-                <div class="detail-fade fade-solid"></div>
-                <div class="detail-fade fade-whisper"></div>
+                <div class="detail-fade"></div>
                 <div class="description-content">
                     <span id="inventory-description" class="description-text">No description available.</span>
                 </div>

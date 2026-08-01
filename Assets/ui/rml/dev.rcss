@@ -725,28 +725,19 @@
 
 .fade-layer {
     position: absolute;
+    left: 0;
     top: 0;
+    width: 100%;
     height: 104px;
     display: block;
     pointer-events: none;
+    decorator: horizontal-gradient(rgba(0, 0, 0, 112) rgba(0, 0, 0, 16));
 }
 
-.fade-1 { left: 0; width: 36%; background-color: rgba(0, 0, 0, 112); }
-.fade-2 { left: 36%; width: 18%; background-color: rgba(0, 0, 0, 82); }
-.fade-3 { left: 54%; width: 16%; background-color: rgba(0, 0, 0, 56); }
-.fade-4 { left: 70%; width: 15%; background-color: rgba(0, 0, 0, 34); }
-.fade-5 { left: 85%; width: 15%; background-color: rgba(0, 0, 0, 16); }
-
-.dev-sidebar .nav-item:hover .fade-1,
-.dev-sidebar .nav-item.active .fade-1 { background-color: rgba(44, 13, 18, 210); }
-.dev-sidebar .nav-item:hover .fade-2,
-.dev-sidebar .nav-item.active .fade-2 { background-color: rgba(44, 13, 18, 155); }
-.dev-sidebar .nav-item:hover .fade-3,
-.dev-sidebar .nav-item.active .fade-3 { background-color: rgba(44, 13, 18, 100); }
-.dev-sidebar .nav-item:hover .fade-4,
-.dev-sidebar .nav-item.active .fade-4 { background-color: rgba(44, 13, 18, 58); }
-.dev-sidebar .nav-item:hover .fade-5,
-.dev-sidebar .nav-item.active .fade-5 { background-color: rgba(44, 13, 18, 25); }
+.dev-sidebar .nav-item:hover .fade-layer,
+.dev-sidebar .nav-item.active .fade-layer {
+    decorator: horizontal-gradient(rgba(44, 13, 18, 210) rgba(44, 13, 18, 25));
+}
 
 .dev-sidebar .nav-item span {
     position: relative;
@@ -798,26 +789,12 @@
     height: 100px;
 }
 
-.command-item:hover .fade-1,
-.command-item.active .fade-1,
-.journal-quest-button:hover .fade-1,
-.journal-quest-button.active .fade-1 { background-color: rgba(44, 13, 18, 210); }
-.command-item:hover .fade-2,
-.command-item.active .fade-2,
-.journal-quest-button:hover .fade-2,
-.journal-quest-button.active .fade-2 { background-color: rgba(44, 13, 18, 155); }
-.command-item:hover .fade-3,
-.command-item.active .fade-3,
-.journal-quest-button:hover .fade-3,
-.journal-quest-button.active .fade-3 { background-color: rgba(44, 13, 18, 100); }
-.command-item:hover .fade-4,
-.command-item.active .fade-4,
-.journal-quest-button:hover .fade-4,
-.journal-quest-button.active .fade-4 { background-color: rgba(44, 13, 18, 58); }
-.command-item:hover .fade-5,
-.command-item.active .fade-5,
-.journal-quest-button:hover .fade-5,
-.journal-quest-button.active .fade-5 { background-color: rgba(44, 13, 18, 25); }
+.command-item:hover .fade-layer,
+.command-item.active .fade-layer,
+.journal-quest-button:hover .fade-layer,
+.journal-quest-button.active .fade-layer {
+    decorator: horizontal-gradient(rgba(44, 13, 18, 210) rgba(44, 13, 18, 25));
+}
 
 .fade-label,
 .journal-quest-marker,

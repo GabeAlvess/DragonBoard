@@ -168,12 +168,22 @@ target('DragonBoardVR')
                 installRoot, 'meshes', 'DragonBoardVR', 'TutorialScreen.nif'),
             '-Replacement', 'RmlUI3.dds'
         })
+        os.vrunv('powershell', {
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', path.join(os.projectdir(), 'Tools', 'GenerateStatusScreen.ps1'),
+            '-Source', screenNif,
+            '-Destination', path.join(
+                installRoot, 'meshes', 'DragonBoardVR', 'WidgetLabelScreen.nif'),
+            '-Replacement', 'RmlUI4.dds'
+        })
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
         os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI0.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI1.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI2.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI3.dds'))
+        os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI4.dds'))
         os.cp(spellWheelTextures, path.join(installRoot, 'textures'))
         os.cp(categoryMarkerTextures, path.join(installRoot, 'textures'))
         local rmlUiDir = path.join(os.projectdir(), 'Assets', 'ui', 'rml')
