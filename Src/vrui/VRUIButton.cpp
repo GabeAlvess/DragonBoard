@@ -319,6 +319,9 @@ namespace vrui
             }
 
             VRUIWidget::sanitizeModel(overlay.get(), overlayUiMesh && !overlayWorldItem);
+            if (overlayUiMesh && !overlayWorldItem) {
+                VRUIWidget::normalizePhysicalMaterialLighting(overlay.get(), false);
+            }
             VRUIModelHelper::normalizeAndCenterModel(overlay.get());
 
             float overlayTargetSize = ((_width < _height) ? _width : _height) * 0.8f;
@@ -355,6 +358,9 @@ namespace vrui
                 // 1. Strip unsafe runtime data while preserving hidden child
                 // geometry on external world-item NIFs.
                 VRUIWidget::sanitizeModel(loaded.get(), applyUIShaderTweaks);
+                if (isInternalUiMesh && !likelyWorldItemPath) {
+                    VRUIWidget::normalizePhysicalMaterialLighting(loaded.get(), false);
+                }
 
                 std::string pathLower = _nifPath;
                 std::transform(pathLower.begin(), pathLower.end(), pathLower.begin(), 
@@ -568,6 +574,7 @@ namespace vrui
                     auto* cloned = meshNode->Clone();
                     if (cloned && _node) {
                         VRUIWidget::sanitizeModel(cloned, true);
+                        VRUIWidget::normalizePhysicalMaterialLighting(cloned, false);
                         VRUIModelHelper::normalizeAndCenterModel(cloned);
 
                         float buttonTargetSize = (_width < _height) ? _width : _height;
@@ -688,6 +695,7 @@ namespace vrui
                             }
                         }
                         sanitizeModel(fallbackModel.get(), true);
+                        normalizePhysicalMaterialLighting(fallbackModel.get(), false);
                         VRUIModelHelper::normalizeAndCenterModel(fallbackModel.get());
                         
                         float buttonTargetSize = (_width < _height) ? _width : _height;

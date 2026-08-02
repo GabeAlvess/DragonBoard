@@ -93,10 +93,8 @@ namespace dragonboard::ui::input
         if (!dominantHand) return;
 
         auto& settings = vrui::VRUISettings::get();
-        RE::NiPoint3 rayOrigin = dominantHand->world.translate;
-
-        RE::NiMatrix3& rot = dominantHand->world.rotate;
-        RE::NiPoint3 rayDir(rot.entry[0][2], rot.entry[1][2], rot.entry[2][2]);
+        const RE::NiPoint3 rayOrigin = manager.getLaserOrigin();
+        const RE::NiPoint3 rayDir = manager.getLaserDirection();
 
         const float maxInteractDist = manager._boardPinState.IsPinned() ? 500.0f : 50.0f;
         auto raycastResult = vrui::VRUIRaycaster::performRaycast(

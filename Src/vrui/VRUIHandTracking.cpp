@@ -21,7 +21,19 @@ namespace vrui
                 return nullptr;
             }
 
-            if (auto* obj = root->GetObjectByName(magicNodeName)) {
+            auto* handObject = root->GetObjectByName(handBoneName);
+            auto* handNode = handObject ? handObject->AsNode() : nullptr;
+
+            // VRIK and equipped weapon meshes can add nodes to the player tree.
+            // Only accept the MagicNode that belongs to the expected hand subtree;
+            // a root-wide name match can otherwise select an attachment on the weapon.
+            if (handNode) {
+                if (auto* obj = handNode->GetObjectByName(magicNodeName)) {
+                    if (auto* node = obj->AsNode()) {
+                        return node;
+                    }
+                }
+            } else if (auto* obj = root->GetObjectByName(magicNodeName)) {
                 if (auto* node = obj->AsNode()) {
                     return node;
                 }
@@ -33,8 +45,8 @@ namespace vrui
                 }
             }
 
-            if (auto* obj = root->GetObjectByName(handBoneName)) {
-                return obj->AsNode();
+            if (handNode) {
+                return handNode;
             }
 
             return nullptr;
@@ -241,6 +253,22 @@ namespace vrui
         const char* handBone = settings.useLeftHandAsMenu ? "NPC R Hand [RHnd]" : "NPC L Hand [LHnd]";
         const char* wandNodeName = settings.useLeftHandAsMenu ? "Right Wand Node" : "Left Wand Node";
         return resolveHandAnchorNode(root, magicNodeName, wandNodeName, handBone);
+    }
+
+    RE::NiNode* VRUIHandTracking::getDominantHandBoneNode(bool isVRIKInstalled)
+    {
+        auto& settings = VRUISettings::get();
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return nullptr;
+
+        auto* rootObj = player->Get3D(!isVRIKInstalled);
+        auto* root = rootObj ? rootObj->AsNode() : nullptr;
+        if (!root) return nullptr;
+
+        const char* handBone = settings.useLeftHandAsMenu ?
+            "NPC R Hand [RHnd]" : "NPC L Hand [LHnd]";
+        auto* object = root->GetObjectByName(handBone);
+        return object ? object->AsNode() : nullptr;
     }
 
     RE::NiNode* VRUIHandTracking::getNonDominantHandNode(bool isVRIKInstalled)

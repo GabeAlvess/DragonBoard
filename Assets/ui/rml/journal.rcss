@@ -516,6 +516,12 @@
     border: 0px transparent;
 }
 
+.journal-quest-list scrollbarvertical {
+    position: relative;
+    left: -486px;
+    z-index: 4;
+}
+
 .journal-quest-list scrollbarvertical sliderarrowdec,
 .journal-quest-list scrollbarvertical sliderarrowinc,
 .journal-summary-row scrollbarvertical sliderarrowdec,
@@ -536,6 +542,7 @@
     margin-left: 8px;
     background-color: rgba(50, 54, 58, 82);
     border: 1px rgba(106, 112, 118, 72);
+    border-radius: 6px;
 }
 
 .journal-quest-list scrollbarvertical sliderbar,
@@ -547,6 +554,7 @@
     margin-left: 10px;
     background-color: rgba(128, 142, 151, 138);
     border: 1px rgba(166, 178, 185, 118);
+    border-radius: 5px;
 }
 
 /* Journal layout aligned to the final Developer grid. */

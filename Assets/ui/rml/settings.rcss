@@ -5,10 +5,10 @@
 
 /* Large, draggable scrollbars for controller rays and long VR lists. */
 scrollbarvertical {
-    width: 30px;
-    background-color: rgba(26, 27, 27, 220);
-    border: 2px #555757;
-    border-radius: 5px;
+    width: 42px;
+    background-color: transparent;
+    border: 0px transparent;
+    border-radius: 6px;
 }
 
 scrollbarvertical sliderarrowdec,
@@ -18,19 +18,19 @@ scrollbarvertical sliderarrowinc {
 }
 
 scrollbarvertical slidertrack {
-    width: 18px;
-    margin-left: 4px;
-    background-color: #303232;
-    border: 1px #555757;
-    border-radius: 5px;
+    width: 26px;
+    margin-left: 8px;
+    background-color: rgba(50, 54, 58, 82);
+    border: 1px rgba(106, 112, 118, 72);
+    border-radius: 6px;
 }
 
 scrollbarvertical sliderbar {
-    width: 18px;
-    min-height: 96px;
-    margin-left: 4px;
-    background-color: #b58a35;
-    border: 2px #e0ba5b;
+    width: 22px;
+    min-height: 116px;
+    margin-left: 10px;
+    background-color: rgba(128, 142, 151, 138);
+    border: 1px rgba(166, 178, 185, 118);
     border-radius: 5px;
 }
 
@@ -1719,6 +1719,7 @@ main scrollbarvertical slidertrack {
     margin-left: 8px;
     background-color: rgba(50, 54, 58, 82);
     border: 1px rgba(106, 112, 118, 72);
+    border-radius: 6px;
 }
 
 main scrollbarvertical sliderbar {
@@ -1727,4 +1728,5 @@ main scrollbarvertical sliderbar {
     margin-left: 10px;
     background-color: rgba(128, 142, 151, 138);
     border: 1px rgba(166, 178, 185, 118);
+    border-radius: 5px;
 }

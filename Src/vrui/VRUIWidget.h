@@ -116,6 +116,8 @@ namespace vrui
 
         /// Recursive helper to strip physics/animations and ensure visibility
         static void sanitizeModel(RE::NiAVObject* a_obj, bool applyUIShaderTweaks = true);
+        static void normalizePhysicalMaterialLighting(
+            RE::NiAVObject* a_obj, bool allowCastShadows = true);
 
     protected:
         /// Creates the base NiNode. NOT virtual - safe to call from base constructor.

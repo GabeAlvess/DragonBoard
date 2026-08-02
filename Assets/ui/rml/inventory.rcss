@@ -146,7 +146,7 @@ body {
     position: absolute;
     left: 0;
     top: 0;
-    width: 30px;
+    width: 42px;
     height: 600px;
     display: block;
     flex-shrink: 0;
@@ -155,24 +155,24 @@ body {
 
 .inventory-scroll-track {
     position: absolute;
-    left: 7px;
+    left: 8px;
     top: 0;
-    width: 14px;
+    width: 26px;
     height: 600px;
     background-color: rgba(50, 54, 58, 82);
     border: 1px rgba(106, 112, 118, 72);
-    border-radius: 4px;
+    border-radius: 6px;
 }
 
 .inventory-scroll-thumb {
     position: absolute;
-    left: 1px;
+    left: 2px;
     top: 0;
-    width: 12px;
+    width: 22px;
     height: 104px;
     background-color: rgba(128, 142, 151, 138);
     border: 1px rgba(166, 178, 185, 118);
-    border-radius: 4px;
+    border-radius: 5px;
 }
 
 .inventory-item-list {

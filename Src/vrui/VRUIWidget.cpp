@@ -555,26 +555,14 @@ namespace vrui
             return RE::BSVisit::BSVisitControl::kContinue;
         });
 
-        // 2. Shader/property sanitization.
-        // Always disable shadow participation for UI-attached assets, even when we keep
-        // their original material behavior. World-pinned tablets otherwise get pulled
-        // into the normal scene shadow/light cost path.
+        // 2. Shader/property sanitization. Preserve each NIF's original shadow
+        // participation so physical meshes remain part of the local lighting scene.
+        // Dedicated screen NIFs can still opt out through their authored shader flags.
         RE::BSVisit::TraverseScenegraphGeometries(a_obj, [applyUIShaderTweaks](RE::BSGeometry* geom) -> RE::BSVisit::BSVisitControl {
             if (geom) {
                 auto* prop = geom->lightingShaderProp_cast();
-                if (prop) {
-                    prop->flags.reset(RE::BSShaderProperty::EShaderPropertyFlag::kCastShadows);
-                    prop->flags.reset(RE::BSShaderProperty::EShaderPropertyFlag::kReceiveShadows);
-                }
-
-                auto* effect = geom->GetGeometryRuntimeData().properties[RE::BSGeometry::States::kEffect].get();
-                if (auto* shaderProp = netimmerse_cast<RE::BSShaderProperty*>(effect); shaderProp) {
-                    shaderProp->flags.reset(RE::BSShaderProperty::EShaderPropertyFlag::kCastShadows);
-                    shaderProp->flags.reset(RE::BSShaderProperty::EShaderPropertyFlag::kReceiveShadows);
-                }
-
                 if (applyUIShaderTweaks && prop) {
-                    prop->flags.set(RE::BSShaderProperty::EShaderPropertyFlag::kMenuScreen);
+                    prop->flags.reset(RE::BSShaderProperty::EShaderPropertyFlag::kMenuScreen);
                     prop->flags.set(RE::BSShaderProperty::EShaderPropertyFlag::kNoFade);
                     prop->flags.set(RE::BSShaderProperty::EShaderPropertyFlag::kZBufferWrite);
                     prop->flags.set(RE::BSShaderProperty::EShaderPropertyFlag::kZBufferTest);
@@ -583,5 +571,43 @@ namespace vrui
             }
             return RE::BSVisit::BSVisitControl::kContinue;
         });
+    }
+
+    void VRUIWidget::normalizePhysicalMaterialLighting(
+        RE::NiAVObject* a_obj, bool allowCastShadows)
+    {
+        if (!a_obj) return;
+
+        RE::BSVisit::TraverseScenegraphGeometries(
+            a_obj,
+            [allowCastShadows](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                auto* property = geometry ? geometry->lightingShaderProp_cast() : nullptr;
+                if (!property) {
+                    return RE::BSVisit::BSVisitControl::kContinue;
+                }
+
+                if (!allowCastShadows) {
+                    property->flags.reset(
+                        RE::BSShaderProperty::EShaderPropertyFlag::kCastShadows);
+                }
+                property->flags.reset(RE::BSShaderProperty::EShaderPropertyFlag::kOwnEmit);
+                property->flags.reset(
+                    RE::BSShaderProperty::EShaderPropertyFlag::kExternalEmittance);
+                property->flags.reset(RE::BSShaderProperty::EShaderPropertyFlag::kSpecular);
+                property->emissiveMult = 0.0f;
+                if (property->emissiveColor) {
+                    *property->emissiveColor = RE::NiColor(0.0f, 0.0f, 0.0f);
+                }
+
+                auto* material = static_cast<RE::BSLightingShaderMaterialBase*>(
+                    property->GetBaseMaterial());
+                if (material) {
+                    material->specularColor = RE::NiColor(0.0f, 0.0f, 0.0f);
+                    material->specularColorScale = 0.0f;
+                }
+
+                property->DoClearRenderPasses();
+                return RE::BSVisit::BSVisitControl::kContinue;
+            });
     }
 }

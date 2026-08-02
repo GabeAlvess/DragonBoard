@@ -432,6 +432,7 @@ namespace vrui
                     if (_backgroundNode) {
                         // Basic sanitization only (no UI shader flag mutations).
                         VRUIWidget::sanitizeModel(_backgroundNode.get(), false);
+                        VRUIWidget::normalizePhysicalMaterialLighting(_backgroundNode.get());
 
                         _node->AttachChild(_backgroundNode.get());
                         _backgroundLoadFailed = false;

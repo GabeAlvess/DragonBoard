@@ -16,6 +16,81 @@
 
 namespace vrui
 {
+    namespace
+    {
+        struct PointerOffsetCache
+        {
+            RE::NiTransform offsets[2]{};
+            bool valid[2]{ false, false };
+        };
+
+        PointerOffsetCache g_pointerOffsetCache;
+
+        bool IsRangedWeaponPoseActive()
+        {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (!player) {
+                return false;
+            }
+
+            for (bool leftHand : { false, true }) {
+                auto* equipped = player->GetEquippedObject(leftHand);
+                auto* weapon = equipped ? equipped->As<RE::TESObjectWEAP>() : nullptr;
+                if (weapon && (weapon->IsCrossbow() || weapon->IsBow())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        RE::NiTransform DefaultMagicNodeOffset(bool isLeft)
+        {
+            RE::NiTransform offset;
+            offset.translate = { isLeft ? -0.5f : 0.5f, -4.2878f, 8.7484f };
+            offset.rotate = RE::NiMatrix3{};
+            offset.scale = 1.0f;
+            return offset;
+        }
+
+        RE::NiTransform ComposeTransform(
+            const RE::NiTransform& parent,
+            const RE::NiTransform& local)
+        {
+            RE::NiTransform result;
+            result.scale = parent.scale * local.scale;
+            result.rotate = parent.rotate * local.rotate;
+            result.translate = parent.translate +
+                parent.rotate * (local.translate * parent.scale);
+            return result;
+        }
+
+        RE::NiTransform ResolveLaserTransform(const VRMenuManager& manager)
+        {
+            auto* magicNode = manager.getDominantHandNode();
+            if (!magicNode) {
+                return {};
+            }
+
+            const bool isLeft = !VRUISettings::get().useLeftHandAsMenu;
+            const std::size_t cacheIndex = isLeft ? 0 : 1;
+            if (!IsRangedWeaponPoseActive()) {
+                g_pointerOffsetCache.offsets[cacheIndex] = magicNode->local;
+                g_pointerOffsetCache.valid[cacheIndex] = true;
+                return magicNode->world;
+            }
+
+            auto* handNode = VRUIHandTracking::getDominantHandBoneNode(
+                manager.isVRIKInstalled());
+            if (!handNode) {
+                return magicNode->world;
+            }
+
+            const RE::NiTransform offset = g_pointerOffsetCache.valid[cacheIndex] ?
+                g_pointerOffsetCache.offsets[cacheIndex] : DefaultMagicNodeOffset(isLeft);
+            return ComposeTransform(handNode->world, offset);
+        }
+    }
+
     VRMenuManager& VRMenuManager::get()
     {
         static VRMenuManager instance;
@@ -360,16 +435,13 @@ namespace vrui
 
     RE::NiPoint3 VRMenuManager::getLaserOrigin() const
     {
-        auto* dominantHand = getDominantHandNode();
-        return dominantHand ? dominantHand->world.translate : RE::NiPoint3();
+        return ResolveLaserTransform(*this).translate;
     }
 
     RE::NiPoint3 VRMenuManager::getLaserDirection() const
     {
-        auto* dominantHand = getDominantHandNode();
-        if (!dominantHand) return RE::NiPoint3(0, 0, 1);
-
-        RE::NiMatrix3& rot = dominantHand->world.rotate;
+        const RE::NiTransform transform = ResolveLaserTransform(*this);
+        const RE::NiMatrix3& rot = transform.rotate;
         return RE::NiPoint3(rot.entry[0][2], rot.entry[1][2], rot.entry[2][2]);
     }
 

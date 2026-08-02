@@ -101,6 +101,9 @@ target('DragonBoardVR')
     add_installfiles('Assets/meshes/DragonBoardVR/dragonboard.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
+    add_installfiles('Assets/meshes/DragonBoardVR/iconplane.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
     add_installfiles('Assets/meshes/DragonBoardVR/DBMarker*.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
@@ -135,6 +138,7 @@ target('DragonBoardVR')
         os.cp(targetFile, installFile)
         local screenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif')
         local spellWheelNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard.nif')
+        local iconPlaneNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'iconplane.nif')
         local categoryMarkerNifs = path.join(
             os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'DBMarker*.nif')
         local screenTexture = path.join(os.projectdir(), 'Assets', 'textures', 'RmlUI0.dds')
@@ -178,6 +182,7 @@ target('DragonBoardVR')
             '-Replacement', 'RmlUI4.dds'
         })
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
+        os.cp(iconPlaneNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'iconplane.nif'))
         os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI0.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI1.dds'))
