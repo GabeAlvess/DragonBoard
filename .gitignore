@@ -33,4 +33,7 @@
 # Local investigation artifacts, third-party source snapshots, and visual QA.
 /Backups/
 /External/
+/artifacts/
 /design-preview/
+/nif_tests/
+/RMLUI_VR_SURFACE_TEST.md
