@@ -6,16 +6,21 @@
 - Python 3 for the INI scanner tests
 - Skyrim VR and SKSE VR
 
-The build expects these local dependencies:
+CommonLibVR is pinned as a Git submodule. The remaining C++ dependencies,
+including SimpleIni and RmlUi, are downloaded and resolved by xmake.
 
-```text
-lib/commonlibsse-ng/
-ClibUtil/include/
-simpleini/
-xbyak/
+Clone with submodules:
+
+```powershell
+git clone --recursive https://github.com/GabeAlvess/DragonBoard.git
+cd DragonBoard
 ```
 
-RmlUi and the packages in `xmake-requires.lock` are resolved by xmake.
+For an existing clone:
+
+```powershell
+git submodule update --init --recursive
+```
 
 ## Build
 

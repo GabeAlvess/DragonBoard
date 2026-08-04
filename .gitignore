@@ -8,10 +8,9 @@
 /stable_before_*/
 /stable_full_reload/
 
-# Local junctions into DB 0.7 Nightly. These are build dependencies, not
-# DragonBoardVR source, and Git must not traverse or snapshot the other project.
+# Local junctions into DB 0.7 Nightly. These are optional local directories,
+# and Git must not traverse or snapshot the other project.
 /ClibUtil/
-/lib/
 /simpleini/
 /xbyak/
 

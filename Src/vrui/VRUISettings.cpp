@@ -1,6 +1,6 @@
 #include "VRUISettings.h"
 
-#include <CLIBUtil/simpleINI.hpp>
+#include <SimpleIni.h>
 #include <algorithm>
 #include <cctype>
 #include <cmath>

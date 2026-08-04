@@ -12,6 +12,7 @@ set_toolset('msvc', 'ninja')
 
 add_rules('mode.debug', 'mode.releasedbg', 'mode.release')
 
+add_requires('simpleini v4.25')
 add_requires('rmlui 6.2', { configs = { shared = false, lua = false, svg = false, lottie = false } })
 add_requires('nlohmann_json')
 
@@ -20,22 +21,22 @@ add_requires('nlohmann_json')
 -- ABI for this VR-only plugin.
 option('skyrim_se')
     set_default(false)
-    set_showmenu(false)
 option_end()
 
 option('skyrim_ae')
     set_default(false)
-    set_showmenu(false)
 option_end()
 
 option('skyrim_vr')
     set_default(true)
-    set_showmenu(false)
 option_end()
 
 target('DragonBoardVR')
+    set_kind('shared')
+    set_arch('x64')
     add_deps('commonlibsse-ng')
-    add_packages('rmlui', 'nlohmann_json')
+    add_options('skyrim_se', 'skyrim_ae', 'skyrim_vr')
+    add_packages('simpleini', 'rmlui', 'nlohmann_json')
     add_syslinks('d3d11', 'd3dcompiler', 'windowscodecs', 'ole32', 'bcrypt')
 
     on_config(function ()
@@ -44,14 +45,8 @@ target('DragonBoardVR')
         end
     end)
 
-    add_rules('commonlibsse-ng.plugin', {
-        name        = 'DragonBoardVR',
-        author      = 'GabeAlvz',
-        description = 'VR Menu Framework - Interactive menus on non-dominant hand with raycast activation.',
-        runtime     = 'vr'
-    })
-
     add_files('Src/**.cpp')
+    add_files('Resources/DragonBoardVR.rc')
     add_headerfiles('Src/**.h')
     add_installfiles('Assets/ui/rml/*.rml', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui'
@@ -128,11 +123,7 @@ target('DragonBoardVR')
     })
     add_includedirs(
         'Src',
-        '$(projectdir)',
-        '$(projectdir)/ClibUtil/include',
-        '$(projectdir)/xbyak',
-        '$(projectdir)/simpleini',
-        '$(projectdir)/lib'
+        '$(projectdir)'
     )
 
     set_pcxxheader('Src/pch.h')
@@ -333,11 +324,7 @@ target('LocalizationManagerTests')
     )
     add_includedirs(
         'Src',
-        '$(projectdir)',
-        '$(projectdir)/ClibUtil/include',
-        '$(projectdir)/xbyak',
-        '$(projectdir)/simpleini',
-        '$(projectdir)/lib'
+        '$(projectdir)'
     )
     set_pcxxheader('Src/pch.h')
     add_defines('ENABLE_SKYRIM_VR')
@@ -350,5 +337,5 @@ target('IniEditorTests')
         'Src/ui/mods/IniCatalog.cpp',
         'Src/ui/mods/IniFileWriter.cpp'
     )
-    add_includedirs('Src', 'lib')
+    add_includedirs('Src')
     add_syslinks('bcrypt')

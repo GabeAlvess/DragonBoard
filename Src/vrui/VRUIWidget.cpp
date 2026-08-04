@@ -2,7 +2,6 @@
 #include "VRUIWidget.h"
 #include "VRUISettings.h"
 #include <RE/Skyrim.h>
-#include <CLIBUtil/numeric.hpp>
 #include <RE/B/BSEffectShaderProperty.h>
 #include <RE/B/BSEffectShaderMaterial.h>
 #include <RE/B/BSShaderProperty.h>
