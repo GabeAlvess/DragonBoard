@@ -34,8 +34,13 @@ Then verify both hands separately:
 4. Drop the item and confirm every DragonBoard panel closes.
 5. Grab it again and stash it over the shoulder; confirm the UI closes and the item enters inventory.
 
-Physical UI alignment can be tuned under `[PhysicalBoard]` in
-`SKSE/Plugins/DragonBoardVR.ini`.
+Physical board size can be tuned under `[PhysicalBoard]` in
+`SKSE/Plugins/DragonBoardVR.ini`. The NIF contains the former `1.55` baseline, so
+`fScale = 1.0` is the authored physical size. The setting scales the visual,
+collision, and attached UI together, independently from `[Background]`. The UI
+keeps its authored `1.55` baseline internally, so `fScale = 1.0` preserves the
+previous panel size. It uses the physical reference root directly, without
+separate offset or rotation keys.
 
 ## VRIK holster proxy
 

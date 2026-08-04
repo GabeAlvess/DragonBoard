@@ -54,22 +54,7 @@ target('DragonBoardVR')
     add_installfiles('Assets/ui/rml/*.rcss', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui'
     })
-    add_installfiles('Assets/ui/rml/assets/*.png', {
-        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
-    })
-    add_installfiles('Assets/ui/rml/assets/*.jpeg', {
-        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
-    })
-    add_installfiles('Assets/ui/rml/assets/*.jpg', {
-        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
-    })
-    add_installfiles('Assets/ui/rml/assets/*.ttf', {
-        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
-    })
-    add_installfiles('Assets/ui/rml/assets/*.otf', {
-        prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
-    })
-    add_installfiles('Assets/ui/rml/assets/OFL-NotoSansCJK.txt', {
+    add_installfiles('Assets/ui/rml/assets/(**)', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
     })
     add_installfiles('Assets/ui/translations/*.json', {
@@ -211,14 +196,15 @@ target('DragonBoardVR')
         end
         copyMatchingFiles(path.join(rmlUiDir, '*.rml'), installedRmlUiDir)
         copyMatchingFiles(path.join(rmlUiDir, '*.rcss'), installedRmlUiDir)
+        local rmlUiAssetsDir = path.join(rmlUiDir, 'assets')
         local installedRmlUiAssetsDir = path.join(installedRmlUiDir, 'assets')
+        if os.isdir(installedRmlUiAssetsDir) then
+            os.rm(installedRmlUiAssetsDir)
+        end
         os.mkdir(installedRmlUiAssetsDir)
-        copyMatchingFiles(path.join(rmlUiDir, 'assets', '*.png'), installedRmlUiAssetsDir)
-        copyMatchingFiles(path.join(rmlUiDir, 'assets', '*.jpeg'), installedRmlUiAssetsDir)
-        copyMatchingFiles(path.join(rmlUiDir, 'assets', '*.jpg'), installedRmlUiAssetsDir)
-        copyMatchingFiles(path.join(rmlUiDir, 'assets', '*.ttf'), installedRmlUiAssetsDir)
-        copyMatchingFiles(path.join(rmlUiDir, 'assets', '*.otf'), installedRmlUiAssetsDir)
-        os.cp(path.join(rmlUiDir, 'assets', 'OFL-NotoSansCJK.txt'), installedRmlUiAssetsDir)
+        os.cp(path.join(rmlUiAssetsDir, '**'), installedRmlUiAssetsDir, {
+            rootdir = rmlUiAssetsDir
+        })
         local translationDir = path.join(os.projectdir(), 'Assets', 'ui', 'translations')
         local installedTranslationDir = path.join(outputDir, 'DragonBoardVR', 'translations')
         os.mkdir(installedTranslationDir)
@@ -257,11 +243,15 @@ target('DragonBoardVR')
             'SKSE',
             'Plugins',
             'SpellWheelVR_CustomConsoleCommand_DragonBoardVR.ini'))
-        for _, configName in ipairs({
+        local configNames = {
             'DragonBoardVR.ini',
             'DragonBoardVR_Layout.ini',
-            'DragonBoardVR_State.ini'
-        }) do
+            'DragonBoardVR_State.ini',
+            'DragonBoardVR_Layout.json'
+        }
+        local defaultsDir = path.join(installRoot, 'SKSE', 'Plugins', 'DragonBoardVR', 'Defaults')
+        os.mkdir(defaultsDir)
+        for _, configName in ipairs(configNames) do
             local configSource = path.join(os.projectdir(), 'Assets', 'config', configName)
             local configDestination = path.join(outputDir, configName)
             if not os.isfile(configDestination) then
@@ -270,6 +260,7 @@ target('DragonBoardVR')
             else
                 cprint('${yellow}preserved existing config:${clear} %s', configDestination)
             end
+            os.cp(configSource, path.join(defaultsDir, configName))
         end
         cprint('${green}synced install_output:${clear} %s', installFile)
     end)

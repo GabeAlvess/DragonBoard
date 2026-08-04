@@ -3,13 +3,45 @@
 #include "higgsinterface001.h"
 #include "runtime/vr/GameMenuActions.h"
 #include "integrations/vrik/VrikBoardProxyController.h"
+#include "vrui/VRUILayoutManager.h"
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUISettings.h"
+
+#include <vector>
 
 namespace dragonboard::integrations::higgs
 {
     namespace
     {
+        struct PhysicalModelPart
+        {
+            RE::BSGeometry* geometry = nullptr;
+            RE::NiTransform authoredTransform{};
+        };
+
+        struct PhysicalModelTransformCache
+        {
+            RE::NiPointer<RE::NiNode> root;
+            std::vector<PhysicalModelPart> geometryParts;
+            RE::NiAVObject* collisionNode = nullptr;
+            RE::NiTransform authoredCollisionTransform{};
+            RE::NiPoint3 appliedOffset{};
+            float appliedSharedScale = 0.0f;
+            float appliedMeshScale = 0.0f;
+            bool hasAppliedTransform = false;
+        };
+
+        PhysicalModelTransformCache& GetPhysicalModelTransformCache()
+        {
+            static PhysicalModelTransformCache cache;
+            return cache;
+        }
+
+        bool NearlyEqual(float left, float right)
+        {
+            return std::abs(left - right) <= 1.0e-4f;
+        }
+
         void ApplyConfiguredObjectTransform(RE::NiNode* rootNode)
         {
             if (!rootNode) {
@@ -17,23 +49,87 @@ namespace dragonboard::integrations::higgs
             }
 
             const auto& settings = vrui::VRUISettings::get();
-            const RE::NiPoint3 offset{
+            RE::NiPoint3 offset{
                 settings.backgroundOffsetX,
                 settings.backgroundOffsetY,
                 settings.backgroundOffsetZ
             };
-            const float scale = (std::max)(0.001f, settings.backgroundScale);
+            if (const auto layout = vrui::VRUILayoutManager::getContainer("MainTablet")) {
+                offset = {
+                    layout->transform.px,
+                    layout->transform.py,
+                    layout->transform.pz
+                };
+            }
+            const float sharedScale =
+                (std::max)(0.001f, settings.physicalBoardScale);
+            const float meshScale =
+                (std::max)(0.001f, settings.physicalBoardMeshScale);
 
-            for (const auto* name : { "DragonBoard", "DragonBoardCollision" }) {
-                if (auto* object = rootNode->GetObjectByName(name)) {
-                    object->local.translate = offset;
-                    object->local.scale = scale;
+            auto& cache = GetPhysicalModelTransformCache();
+            if (cache.root.get() != rootNode) {
+                cache = {};
+                cache.root.reset(rootNode);
+                RE::BSVisit::TraverseScenegraphGeometries(
+                    rootNode,
+                    [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                        if (geometry) {
+                            cache.geometryParts.push_back(
+                                { geometry, geometry->local });
+                        }
+                        return RE::BSVisit::BSVisitControl::kContinue;
+                    });
+                cache.collisionNode =
+                    rootNode->GetObjectByName("DragonBoardCollision");
+                if (cache.collisionNode) {
+                    cache.authoredCollisionTransform =
+                        cache.collisionNode->local;
                 }
             }
+
+            if (cache.hasAppliedTransform &&
+                NearlyEqual(cache.appliedOffset.x, offset.x) &&
+                NearlyEqual(cache.appliedOffset.y, offset.y) &&
+                NearlyEqual(cache.appliedOffset.z, offset.z) &&
+                NearlyEqual(cache.appliedSharedScale, sharedScale) &&
+                NearlyEqual(cache.appliedMeshScale, meshScale)) {
+                return;
+            }
+
+            const float combinedMeshScale = sharedScale * meshScale;
+            for (const auto& part : cache.geometryParts) {
+                if (!part.geometry) continue;
+                part.geometry->local = part.authoredTransform;
+                part.geometry->local.translate =
+                    part.authoredTransform.translate * combinedMeshScale +
+                    offset * sharedScale;
+                part.geometry->local.scale =
+                    part.authoredTransform.scale * combinedMeshScale;
+            }
+
+            if (cache.collisionNode) {
+                cache.collisionNode->local = cache.authoredCollisionTransform;
+                cache.collisionNode->local.translate =
+                    cache.authoredCollisionTransform.translate * combinedMeshScale +
+                    offset * sharedScale;
+                cache.collisionNode->local.scale =
+                    cache.authoredCollisionTransform.scale * combinedMeshScale;
+            }
+
+            cache.appliedOffset = offset;
+            cache.appliedSharedScale = sharedScale;
+            cache.appliedMeshScale = meshScale;
+            cache.hasAppliedTransform = true;
 
             RE::NiUpdateData updateData;
             updateData.flags = RE::NiUpdateData::Flag::kDirty;
             rootNode->Update(updateData);
+            logger::info(
+                "DragonBoardVR: physical model transform applied "
+                "(geometryParts={}, sharedScale={:.3f}, meshScale={:.3f}).",
+                cache.geometryParts.size(),
+                sharedScale,
+                meshScale);
         }
     }
 
@@ -235,11 +331,12 @@ namespace dragonboard::integrations::higgs
         const bool handChanged =
             !manager.isPhysicalBoardActive() ||
             manager.isPhysicalBoardHeldLeft() != heldLeft;
+
+        ApplyConfiguredObjectTransform(rootNode);
         if (!referenceChanged && !anchorChanged && !handChanged) {
             return;
         }
 
-        ApplyConfiguredObjectTransform(rootNode);
         _heldReference = currentHandle;
         _heldLeft = heldLeft;
         manager.setPhysicalBoardAnchor(

@@ -7,13 +7,13 @@
 <body>
     <div id="app" class="inventory-app">
         <div class="category-strip">
-            <button id="inventory-filter-favorites" class="inventory-filter active" title="Favorites"><img src="assets/favoriteIcon.png" /></button>
-            <button id="inventory-filter-weapons" class="inventory-filter" title="Weapons"><img src="assets/weaponicon.png" /></button>
-            <button id="inventory-filter-armor" class="inventory-filter" title="Armor"><img src="assets/armoricon.png" /></button>
-            <button id="inventory-filter-consumables" class="inventory-filter" title="Consumables"><img src="assets/consumiblesicon.png" /></button>
-            <button id="inventory-filter-quest" class="inventory-filter" title="Quest Items"><img src="assets/questicon.png" /></button>
-            <button id="inventory-filter-books" class="inventory-filter" title="Books"><img src="assets/booksicon.png" /></button>
-            <button id="inventory-filter-misc" class="inventory-filter" title="Miscellaneous"><img src="assets/miscicon.png" /></button>
+            <button id="inventory-filter-favorites" class="inventory-filter active" title="Favorites"><img src="assets/Icons/favoriteIcon.png" /></button>
+            <button id="inventory-filter-weapons" class="inventory-filter" title="Weapons"><img src="assets/Icons/weaponicon.png" /></button>
+            <button id="inventory-filter-armor" class="inventory-filter" title="Armor"><img src="assets/Icons/armoricon.png" /></button>
+            <button id="inventory-filter-consumables" class="inventory-filter" title="Consumables"><img src="assets/Icons/consumiblesicon.png" /></button>
+            <button id="inventory-filter-quest" class="inventory-filter" title="Quest Items"><img src="assets/Icons/questicon.png" /></button>
+            <button id="inventory-filter-books" class="inventory-filter" title="Books"><img src="assets/Icons/booksicon.png" /></button>
+            <button id="inventory-filter-misc" class="inventory-filter" title="Miscellaneous"><img src="assets/Icons/miscicon.png" /></button>
         </div>
 
         <div class="mod-title-banner">
@@ -39,10 +39,10 @@
 
         <section class="inventory-preview-panel">
             <div id="inventory-left-hand-state" class="hand-state left-hand-state">
-                <img class="equipped-hand-icon" src="assets/LHand.png" />
+                <img class="equipped-hand-icon" src="assets/Icons/LHand.png" />
             </div>
             <div id="inventory-right-hand-state" class="hand-state right-hand-state">
-                <img class="equipped-hand-icon" src="assets/RHand.png" />
+                <img class="equipped-hand-icon" src="assets/Icons/RHand.png" />
             </div>
             <div class="preview-reticle"></div>
             <div id="inventory-preview-hit-zone" class="preview-interaction-zone"></div>

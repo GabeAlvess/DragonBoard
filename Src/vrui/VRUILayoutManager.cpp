@@ -90,6 +90,42 @@ namespace vrui {
             runtimeEulerToEditorEuler(elementId, runtimeRotX, runtimeRotY, runtimeRotZ,
                                       transform.rx, transform.ry, transform.rz);
         }
+
+        bool RestorePackagedLayoutIfMissing(const std::string& targetPath)
+        {
+            const auto target = std::filesystem::path(targetPath);
+            if (std::filesystem::exists(target)) {
+                return true;
+            }
+
+            const auto packagedDefault = target.parent_path() /
+                "DragonBoardVR" / "Defaults" / "DragonBoardVR_Layout.json";
+            if (!std::filesystem::exists(packagedDefault)) {
+                return false;
+            }
+
+            std::error_code error;
+            std::filesystem::create_directories(target.parent_path(), error);
+            error.clear();
+            std::filesystem::copy_file(
+                packagedDefault,
+                target,
+                std::filesystem::copy_options::overwrite_existing,
+                error);
+            if (error) {
+                logger::warn(
+                    "DragonBoardVR: Failed to restore layout '{}' from packaged default '{}': {}",
+                    target.string(),
+                    packagedDefault.string(),
+                    error.message());
+                return false;
+            }
+
+            logger::info(
+                "DragonBoardVR: Restored missing layout '{}' from packaged defaults.",
+                target.string());
+            return true;
+        }
     }
 
     std::vector<UIJSONContainer> VRUILayoutManager::_containers;
@@ -100,7 +136,7 @@ namespace vrui {
 
         logger::trace("DragonBoardVR: Loading layout from '{}'", _filePath);
 
-        if (!std::filesystem::exists(_filePath)) {
+        if (!RestorePackagedLayoutIfMissing(_filePath)) {
             logger::warn("DragonBoardVR: Layout JSON not found at '{}'. Using defaults.", _filePath);
             return;
         }

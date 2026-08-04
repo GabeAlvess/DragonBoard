@@ -238,15 +238,15 @@ namespace dragonboard::ui::rml
         };
 
         constexpr std::array<const char*, 3> kFontCandidates{
-            "Data/SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf",
-            "SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf",
-            "Assets/ui/rml/assets/DragonBoardVR_Font.ttf"
+            "Data/SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/DragonBoardVR_Font.ttf",
+            "SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/DragonBoardVR_Font.ttf",
+            "Assets/ui/rml/assets/Fonts/DragonBoardVR_Font.ttf"
         };
 
         constexpr std::array<const char*, 3> kFallbackFontCandidates{
-            "Data/SKSE/Plugins/DragonBoardVR/ui/assets/NotoSansCJKsc-Regular.otf",
-            "SKSE/Plugins/DragonBoardVR/ui/assets/NotoSansCJKsc-Regular.otf",
-            "Assets/ui/rml/assets/NotoSansCJKsc-Regular.otf"
+            "Data/SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/NotoSansCJKsc-Regular.otf",
+            "SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/NotoSansCJKsc-Regular.otf",
+            "Assets/ui/rml/assets/Fonts/NotoSansCJKsc-Regular.otf"
         };
 
         constexpr std::array<const char*, 3> kPages{
@@ -3426,7 +3426,7 @@ namespace dragonboard::ui::rml
         if (auto* icon = _magicDocument->GetElementById("magic-preview-icon")) {
             icon->SetAttribute(
                 "src",
-                selected.iconPath.empty() ? "assets/passiveicon.png" : selected.iconPath);
+                selected.iconPath.empty() ? "assets/Icons/passiveicon.png" : selected.iconPath);
             icon->SetProperty("display", selected.hasModelPreview ? "none" : "block");
         }
         if (auto* menu = _magicDocument->GetElementById("magic-pin-menu")) {

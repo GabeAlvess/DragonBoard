@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 from pathlib import Path
-from shutil import copy2
 
 
 def find_pynifly_root(explicit: str | None) -> Path:
@@ -56,6 +56,15 @@ def main() -> None:
         type=float,
         default=0.05,
         help="Havok convex radius in DragonBoard visual units (default: 0.05)")
+    parser.add_argument(
+        "--baked-scale",
+        type=float,
+        default=1.55,
+        help="Scale baked into visual vertices and generated collision (default: 1.55)")
+    parser.add_argument("--inventory-rotate-x", type=float, default=0.0)
+    parser.add_argument("--inventory-rotate-y", type=float, default=0.0)
+    parser.add_argument("--inventory-rotate-z", type=float, default=0.0)
+    parser.add_argument("--inventory-zoom", type=float, default=1.0)
     parser.add_argument("--pynifly-root")
     args = parser.parse_args()
 
@@ -63,14 +72,64 @@ def main() -> None:
     sys.path.insert(0, str(pynifly_root))
 
     from pyn.pynifly import BSInvMarker, BSXFlags, NifFile
-    from pyn.nifdefs import PynBufferTypes, bhkBoxShapeProps
+    from pyn.nifdefs import NODEID_NONE, PynBufferTypes, bhkBoxShapeProps
     from pyn.structs import TransformBuf
 
     visual_path = Path(args.visual).resolve()
     collision_template_path = Path(args.collision_template).resolve()
     output_path = Path(args.output).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    copy2(visual_path, output_path)
+    if args.baked_scale <= 0.0 or args.inventory_zoom <= 0.0:
+        raise ValueError("--baked-scale and --inventory-zoom must be greater than zero")
+
+    visual = NifFile(str(visual_path))
+    source = visual.shapes[0]
+    scaled_vertices = [
+        tuple(component * args.baked_scale for component in vertex)
+        for vertex in source.verts
+    ]
+
+    destination = NifFile()
+    destination.initialize(
+        visual.game,
+        str(output_path),
+        type(visual.rootNode).__name__,
+        visual.rootNode.name)
+    destination.rootNode.flags = visual.rootNode.flags
+
+    properties = source.properties.copy()
+    for attribute in (
+        "nameID",
+        "controllerID",
+        "collisionID",
+        "skinInstanceID",
+        "shaderPropertyID",
+        "alphaPropertyID",
+    ):
+        setattr(properties, attribute, NODEID_NONE)
+
+    board = destination.createShapeFromData(
+        "DragonBoard",
+        scaled_vertices,
+        source.tris,
+        source.uvs,
+        source.normals,
+        props=properties,
+        use_type=source.properties.bufType,
+        parent=destination.rootNode)
+    board.flags = source.flags
+    board.transform = source.transform
+    board.shader.name = source.shader.name
+    board.shader._properties = source.shader.properties.copy()
+    board.save_shader_attributes()
+    for slot, texture_path in source.textures.items():
+        if texture_path:
+            board.set_texture(slot, texture_path)
+
+    if source.has_alpha_property:
+        board.has_alpha_property = True
+        board.alpha_property._properties = source.alpha_property.properties.copy()
+        board.save_alpha_property()
 
     template = NifFile(str(collision_template_path))
     template_node = next(
@@ -79,7 +138,6 @@ def main() -> None:
     template_body = template_collision.body
     template_shape = template_body.shape
 
-    destination = NifFile(str(output_path))
     template_root = template.rootNode
     template_bsx = template_root.get_extra_data(blockname="BSXFlags")
     if template_bsx:
@@ -90,20 +148,30 @@ def main() -> None:
             parent=destination.rootNode)
 
     template_marker = template_root.get_extra_data(blockname="BSInvMarker")
-    if template_marker:
-        BSInvMarker.New(
-            destination,
-            name=template_marker.name,
-            rotation=template_marker.rotation,
-            zoom=template_marker.zoom,
-            parent=destination.rootNode)
+    full_turn = round(2.0 * math.pi * 1000.0)
+    inventory_rotation = [
+        round(math.radians(angle) * 1000.0) % full_turn
+        for angle in (
+            args.inventory_rotate_x,
+            args.inventory_rotate_y,
+            args.inventory_rotate_z,
+        )
+    ]
+    BSInvMarker.New(
+        destination,
+        name=template_marker.name if template_marker else "INV",
+        rotation=inventory_rotation,
+        zoom=args.inventory_zoom,
+        parent=destination.rootNode)
 
     minimum, maximum = transformed_bounds(destination.shapes[0])
     center_units = [(minimum[i] + maximum[i]) * 0.5 for i in range(3)]
     half_units = [(maximum[i] - minimum[i]) * 0.5 for i in range(3)]
     half_units[1] = min(
         half_units[1],
-        max(0.02, args.collision_half_depth))
+        max(
+            0.02 * args.baked_scale,
+            args.collision_half_depth * args.baked_scale))
     havok_scale = 69.99125
     center_havok = [value / havok_scale for value in center_units]
     half_havok = [max(0.0005, value / havok_scale) for value in half_units]
@@ -141,7 +209,8 @@ def main() -> None:
     body = collision.add_body(body_properties)
     box_properties = bhkBoxShapeProps()
     box_properties.bhkMaterial = template_shape.properties.bhkMaterial
-    requested_margin_havok = max(0.01, args.collision_margin) / havok_scale
+    requested_margin_havok = (
+        max(0.01, args.collision_margin) * args.baked_scale / havok_scale)
     box_properties.bhkRadius = min(
         template_shape.properties.bhkRadius,
         requested_margin_havok,
@@ -152,6 +221,7 @@ def main() -> None:
     destination.save()
 
     print(f"Generated {output_path}")
+    print(f"Baked visual scale: {args.baked_scale}")
     print(f"Visual bounds: {minimum} to {maximum}")
     print(f"Havok half extents: {half_havok}")
     print(f"Collision margin: {box_properties.bhkRadius} Havok units")

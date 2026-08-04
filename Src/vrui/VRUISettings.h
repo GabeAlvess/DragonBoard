@@ -128,13 +128,15 @@ namespace vrui
         std::string physicalBoardPlugin = "DragonBoardVR.esp";
         std::uint32_t physicalBoardLocalFormID = 0x000800;
         std::uint32_t physicalBoardVrikProxyLocalFormID = 0x000801;
-        float physicalBoardUiOffsetX = 0.0f;
-        float physicalBoardUiOffsetY = 0.0f;
-        float physicalBoardUiOffsetZ = 0.0f;
-        float physicalBoardUiRotX = 0.0f;
-        float physicalBoardUiRotY = 0.0f;
-        float physicalBoardUiRotZ = 0.0f;
-        float physicalBoardUiScale = 1.0f;
+        float physicalBoardScale = 1.0f;
+        float physicalBoardMeshScale = 1.0f;
+        float physicalRmlSurfaceOffsetX = 0.0f;
+        float physicalRmlSurfaceOffsetY = 0.0f;
+        float physicalRmlSurfaceOffsetZ = 0.0f;
+        float physicalRmlSurfaceRotX = 0.0f;
+        float physicalRmlSurfaceRotY = 0.0f;
+        float physicalRmlSurfaceRotZ = 0.0f;
+        float physicalRmlSurfaceScale = 1.0f;
         // [Visual]  — ALL panels share these values
         // -----------------------------------------------------------------------
         float menuScale     = 1.12f;
@@ -178,6 +180,13 @@ namespace vrui
         float backgroundRotX    =  0.0f;
         float backgroundRotY    =  0.0f;
         float backgroundRotZ    =  0.0f;
+        float rmlSurfaceOffsetX  =  0.0f;
+        float rmlSurfaceOffsetY  =  0.0f;
+        float rmlSurfaceOffsetZ  =  0.0f;
+        float rmlSurfaceRotX     =  0.0f;
+        float rmlSurfaceRotY     =  0.0f;
+        float rmlSurfaceRotZ     =  0.0f;
+        float rmlSurfaceScale    =  1.0f;
 
         // -----------------------------------------------------------------------
         // [Interaction]

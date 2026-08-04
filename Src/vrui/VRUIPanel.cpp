@@ -12,7 +12,6 @@ namespace vrui
     namespace
     {
         constexpr float kPanelFaceCorrectionDegrees = 180.0f;
-
         RE::NiTransform MakeRelativeTransform(
             const RE::NiTransform& parentWorld,
             const RE::NiTransform& childWorld)
@@ -171,18 +170,11 @@ namespace vrui
         }
 
         const auto& settings = VRUISettings::get();
-        _node->local.translate = {
-            settings.physicalBoardUiOffsetX,
-            settings.physicalBoardUiOffsetY,
-            settings.physicalBoardUiOffsetZ
-        };
+        _node->local.translate = {};
         RE::NiMatrix3 rotation;
-        rotation.SetEulerAnglesXYZ(
-            settings.physicalBoardUiRotX * kDegToRad,
-            settings.physicalBoardUiRotY * kDegToRad,
-            settings.physicalBoardUiRotZ * kDegToRad);
+        rotation.SetEulerAnglesXYZ(0.0f, 0.0f, 0.0f);
         _node->local.rotate = rotation;
-        _node->local.scale = settings.physicalBoardUiScale;
+        _node->local.scale = settings.physicalBoardScale;
     }
     bool VRUIPanel::parkAtWorldNode(RE::NiNode* worldRoot, RE::NiNode* trackingAnchor)
     {

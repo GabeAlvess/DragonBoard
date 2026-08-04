@@ -22,7 +22,7 @@ body {
     overflow: hidden;
     color: #d8d8d8;
     background-color: #070808;
-    decorator: image("assets/Inventory.png" fill);
+    decorator: image("assets/Background/Inventory.png" fill);
 }
 
 .category-strip {

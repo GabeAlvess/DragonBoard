@@ -8,10 +8,13 @@ python Tools/PhysicalBoardMeshGenerator/generate_physical_board.py `
   --visual Assets/meshes/DragonBoardVR/dragonboard.nif `
   --collision-template Tools/PhysicalBoardMeshGenerator/dragon_tablet_collision_template.nif `
   --output Assets/meshes/DragonBoardVR/dragonboard_physical.nif `
+  --baked-scale 1.55 `
   --collision-half-depth 0.15 `
   --collision-margin 0.05
 ```
 
+`--baked-scale` multiplies the visual vertices before collision bounds are generated,
+so runtime `PhysicalBoard.fScale = 1.0` represents the authored physical size.
 `--collision-template` only supplies proven Skyrim rigid-body/material settings.
 The default collision is inset behind the visible face so the HIGGS hand can
 reach touch targets without losing the board's rigid-body collision.

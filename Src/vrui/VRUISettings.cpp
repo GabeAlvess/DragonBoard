@@ -17,6 +17,44 @@ namespace vrui
             return (parent / fileName).string();
         }
 
+        bool RestorePackagedDefaultIfMissing(
+            const std::string& targetPath,
+            const char* fileName)
+        {
+            const auto target = std::filesystem::path(targetPath);
+            if (std::filesystem::exists(target)) {
+                return true;
+            }
+
+            const auto packagedDefault =
+                target.parent_path() / "DragonBoardVR" / "Defaults" / fileName;
+            if (!std::filesystem::exists(packagedDefault)) {
+                return false;
+            }
+
+            std::error_code error;
+            std::filesystem::create_directories(target.parent_path(), error);
+            error.clear();
+            std::filesystem::copy_file(
+                packagedDefault,
+                target,
+                std::filesystem::copy_options::overwrite_existing,
+                error);
+            if (error) {
+                logger::warn(
+                    "DragonBoardVR: Failed to restore '{}' from packaged default '{}': {}",
+                    target.string(),
+                    packagedDefault.string(),
+                    error.message());
+                return false;
+            }
+
+            logger::info(
+                "DragonBoardVR: Restored missing configuration '{}' from packaged defaults.",
+                target.string());
+            return true;
+        }
+
         void CopyIniKey(
             const CSimpleIniA& source,
             CSimpleIniA& destination,
@@ -207,6 +245,9 @@ namespace vrui
 
         const auto layoutPath = GetSiblingIniPath(iniPath, "DragonBoardVR_Layout.ini");
         const auto statePath = GetSiblingIniPath(iniPath, "DragonBoardVR_State.ini");
+        RestorePackagedDefaultIfMissing(iniPath, "DragonBoardVR.ini");
+        RestorePackagedDefaultIfMissing(layoutPath, "DragonBoardVR_Layout.ini");
+        RestorePackagedDefaultIfMissing(statePath, "DragonBoardVR_State.ini");
         CSimpleIniA layoutIni;
         CSimpleIniA stateIni;
         layoutIni.SetUnicode();
@@ -310,6 +351,26 @@ namespace vrui
         // [PhysicalBoard]
         const bool physicalBoardConfigMissing =
             !ini.KeyExists("PhysicalBoard", "bEnabled");
+        const bool physicalBoardScaleMissing =
+            !ini.KeyExists("PhysicalBoard", "fScale");
+        const bool physicalBoardMeshScaleMissing =
+            !ini.KeyExists("PhysicalBoard", "fMeshScale");
+        const bool physicalRmlSurfaceTransformMissing =
+            !ini.KeyExists("PhysicalBoard", "fRmlSurfaceOffsetX") ||
+            !ini.KeyExists("PhysicalBoard", "fRmlSurfaceOffsetY") ||
+            !ini.KeyExists("PhysicalBoard", "fRmlSurfaceOffsetZ") ||
+            !ini.KeyExists("PhysicalBoard", "fRmlSurfaceRotX") ||
+            !ini.KeyExists("PhysicalBoard", "fRmlSurfaceRotY") ||
+            !ini.KeyExists("PhysicalBoard", "fRmlSurfaceRotZ") ||
+            !ini.KeyExists("PhysicalBoard", "fRmlSurfaceScale");
+        const bool legacyPhysicalBoardUiTransformPresent =
+            ini.KeyExists("PhysicalBoard", "fUiOffsetX") ||
+            ini.KeyExists("PhysicalBoard", "fUiOffsetY") ||
+            ini.KeyExists("PhysicalBoard", "fUiOffsetZ") ||
+            ini.KeyExists("PhysicalBoard", "fUiRotX") ||
+            ini.KeyExists("PhysicalBoard", "fUiRotY") ||
+            ini.KeyExists("PhysicalBoard", "fUiRotZ") ||
+            ini.KeyExists("PhysicalBoard", "fUiScale");
         physicalBoardEnabled = ini.GetBoolValue(
             "PhysicalBoard", "bEnabled", physicalBoardEnabled);
         physicalBoardPlugin = ini.GetValue(
@@ -318,21 +379,37 @@ namespace vrui
             "PhysicalBoard", "iLocalFormID", physicalBoardLocalFormID));
         physicalBoardVrikProxyLocalFormID = static_cast<std::uint32_t>(ini.GetLongValue(
             "PhysicalBoard", "iVrikProxyLocalFormID", physicalBoardVrikProxyLocalFormID));
-        physicalBoardUiOffsetX = static_cast<float>(ini.GetDoubleValue(
-            "PhysicalBoard", "fUiOffsetX", physicalBoardUiOffsetX));
-        physicalBoardUiOffsetY = static_cast<float>(ini.GetDoubleValue(
-            "PhysicalBoard", "fUiOffsetY", physicalBoardUiOffsetY));
-        physicalBoardUiOffsetZ = static_cast<float>(ini.GetDoubleValue(
-            "PhysicalBoard", "fUiOffsetZ", physicalBoardUiOffsetZ));
-        physicalBoardUiRotX = static_cast<float>(ini.GetDoubleValue(
-            "PhysicalBoard", "fUiRotX", physicalBoardUiRotX));
-        physicalBoardUiRotY = static_cast<float>(ini.GetDoubleValue(
-            "PhysicalBoard", "fUiRotY", physicalBoardUiRotY));
-        physicalBoardUiRotZ = static_cast<float>(ini.GetDoubleValue(
-            "PhysicalBoard", "fUiRotZ", physicalBoardUiRotZ));
-        physicalBoardUiScale = static_cast<float>(ini.GetDoubleValue(
-            "PhysicalBoard", "fUiScale", physicalBoardUiScale));
-        if (physicalBoardConfigMissing) {
+        physicalBoardScale = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "PhysicalBoard", "fScale", physicalBoardScale)),
+            0.01f,
+            10.0f);
+        physicalBoardMeshScale = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "PhysicalBoard", "fMeshScale", physicalBoardMeshScale)),
+            0.01f,
+            10.0f);
+        physicalRmlSurfaceOffsetX = (float)ini.GetDoubleValue(
+            "PhysicalBoard", "fRmlSurfaceOffsetX", physicalRmlSurfaceOffsetX);
+        physicalRmlSurfaceOffsetY = (float)ini.GetDoubleValue(
+            "PhysicalBoard", "fRmlSurfaceOffsetY", physicalRmlSurfaceOffsetY);
+        physicalRmlSurfaceOffsetZ = (float)ini.GetDoubleValue(
+            "PhysicalBoard", "fRmlSurfaceOffsetZ", physicalRmlSurfaceOffsetZ);
+        physicalRmlSurfaceRotX = (float)ini.GetDoubleValue(
+            "PhysicalBoard", "fRmlSurfaceRotX", physicalRmlSurfaceRotX);
+        physicalRmlSurfaceRotY = (float)ini.GetDoubleValue(
+            "PhysicalBoard", "fRmlSurfaceRotY", physicalRmlSurfaceRotY);
+        physicalRmlSurfaceRotZ = (float)ini.GetDoubleValue(
+            "PhysicalBoard", "fRmlSurfaceRotZ", physicalRmlSurfaceRotZ);
+        physicalRmlSurfaceScale = std::clamp(
+            (float)ini.GetDoubleValue(
+                "PhysicalBoard", "fRmlSurfaceScale", physicalRmlSurfaceScale),
+            0.01f,
+            10.0f);
+        if (physicalBoardConfigMissing || physicalBoardScaleMissing ||
+            physicalBoardMeshScaleMissing ||
+            physicalRmlSurfaceTransformMissing ||
+            legacyPhysicalBoardUiTransformPresent) {
             ini.SetBoolValue("PhysicalBoard", "bEnabled", physicalBoardEnabled);
             ini.SetValue("PhysicalBoard", "sPlugin", physicalBoardPlugin.c_str());
             ini.SetLongValue(
@@ -340,19 +417,28 @@ namespace vrui
             ini.SetLongValue(
                 "PhysicalBoard", "iVrikProxyLocalFormID", physicalBoardVrikProxyLocalFormID);
             ini.SetDoubleValue(
-                "PhysicalBoard", "fUiOffsetX", physicalBoardUiOffsetX);
+                "PhysicalBoard", "fScale", physicalBoardScale);
             ini.SetDoubleValue(
-                "PhysicalBoard", "fUiOffsetY", physicalBoardUiOffsetY);
+                "PhysicalBoard", "fMeshScale", physicalBoardMeshScale);
             ini.SetDoubleValue(
-                "PhysicalBoard", "fUiOffsetZ", physicalBoardUiOffsetZ);
+                "PhysicalBoard", "fRmlSurfaceOffsetX", physicalRmlSurfaceOffsetX);
             ini.SetDoubleValue(
-                "PhysicalBoard", "fUiRotX", physicalBoardUiRotX);
+                "PhysicalBoard", "fRmlSurfaceOffsetY", physicalRmlSurfaceOffsetY);
             ini.SetDoubleValue(
-                "PhysicalBoard", "fUiRotY", physicalBoardUiRotY);
+                "PhysicalBoard", "fRmlSurfaceOffsetZ", physicalRmlSurfaceOffsetZ);
             ini.SetDoubleValue(
-                "PhysicalBoard", "fUiRotZ", physicalBoardUiRotZ);
+                "PhysicalBoard", "fRmlSurfaceRotX", physicalRmlSurfaceRotX);
             ini.SetDoubleValue(
-                "PhysicalBoard", "fUiScale", physicalBoardUiScale);
+                "PhysicalBoard", "fRmlSurfaceRotY", physicalRmlSurfaceRotY);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fRmlSurfaceRotZ", physicalRmlSurfaceRotZ);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fRmlSurfaceScale", physicalRmlSurfaceScale);
+            for (const auto* legacyKey : {
+                "fUiOffsetX", "fUiOffsetY", "fUiOffsetZ",
+                "fUiRotX", "fUiRotY", "fUiRotZ", "fUiScale" }) {
+                ini.Delete("PhysicalBoard", legacyKey);
+            }
             if (ini.SaveFile(iniPath.c_str()) < 0) {
                 logger::warn(
                     "DragonBoardVR: Failed to restore missing [PhysicalBoard] settings in '{}'.",
@@ -429,6 +515,16 @@ namespace vrui
         backgroundRotX    = (float)ini.GetDoubleValue("Background", "fRotX",    backgroundRotX);
         backgroundRotY    = (float)ini.GetDoubleValue("Background", "fRotY",    backgroundRotY);
         backgroundRotZ    = (float)ini.GetDoubleValue("Background", "fRotZ",    backgroundRotZ);
+        rmlSurfaceOffsetX  = (float)ini.GetDoubleValue("Background", "fRmlSurfaceOffsetX", rmlSurfaceOffsetX);
+        rmlSurfaceOffsetY  = (float)ini.GetDoubleValue("Background", "fRmlSurfaceOffsetY", rmlSurfaceOffsetY);
+        rmlSurfaceOffsetZ  = (float)ini.GetDoubleValue("Background", "fRmlSurfaceOffsetZ", rmlSurfaceOffsetZ);
+        rmlSurfaceRotX     = (float)ini.GetDoubleValue("Background", "fRmlSurfaceRotX", rmlSurfaceRotX);
+        rmlSurfaceRotY     = (float)ini.GetDoubleValue("Background", "fRmlSurfaceRotY", rmlSurfaceRotY);
+        rmlSurfaceRotZ     = (float)ini.GetDoubleValue("Background", "fRmlSurfaceRotZ", rmlSurfaceRotZ);
+        rmlSurfaceScale    = std::clamp(
+            (float)ini.GetDoubleValue("Background", "fRmlSurfaceScale", rmlSurfaceScale),
+            0.01f,
+            10.0f);
 
         // [Interaction]
         raycastMaxDistance = (float)ini.GetDoubleValue("Interaction", "fRaycastMaxDistance", raycastMaxDistance);
@@ -808,6 +904,23 @@ namespace vrui
                 "Background", "fRotY", backgroundRotY);
             backgroundRotZ = (float)layoutIni.GetDoubleValue(
                 "Background", "fRotZ", backgroundRotZ);
+            rmlSurfaceOffsetX = (float)layoutIni.GetDoubleValue(
+                "Background", "fRmlSurfaceOffsetX", rmlSurfaceOffsetX);
+            rmlSurfaceOffsetY = (float)layoutIni.GetDoubleValue(
+                "Background", "fRmlSurfaceOffsetY", rmlSurfaceOffsetY);
+            rmlSurfaceOffsetZ = (float)layoutIni.GetDoubleValue(
+                "Background", "fRmlSurfaceOffsetZ", rmlSurfaceOffsetZ);
+            rmlSurfaceRotX = (float)layoutIni.GetDoubleValue(
+                "Background", "fRmlSurfaceRotX", rmlSurfaceRotX);
+            rmlSurfaceRotY = (float)layoutIni.GetDoubleValue(
+                "Background", "fRmlSurfaceRotY", rmlSurfaceRotY);
+            rmlSurfaceRotZ = (float)layoutIni.GetDoubleValue(
+                "Background", "fRmlSurfaceRotZ", rmlSurfaceRotZ);
+            rmlSurfaceScale = std::clamp(
+                (float)layoutIni.GetDoubleValue(
+                    "Background", "fRmlSurfaceScale", rmlSurfaceScale),
+                0.01f,
+                10.0f);
 
             reticleScaleX = (float)layoutIni.GetDoubleValue(
                 "LaserPointer", "fReticleScaleX", reticleScaleX);
@@ -1142,14 +1255,29 @@ namespace vrui
             "; Local FormID for the physical MISC (default 2048 = 0x000800)");
         ini.SetLongValue("PhysicalBoard", "iVrikProxyLocalFormID", physicalBoardVrikProxyLocalFormID,
             "; Local FormID for the internal VRIK WEAP proxy (default 2049 = 0x000801)");
-        ini.SetDoubleValue("PhysicalBoard", "fUiOffsetX", physicalBoardUiOffsetX);
-        ini.SetDoubleValue("PhysicalBoard", "fUiOffsetY", physicalBoardUiOffsetY);
-        ini.SetDoubleValue("PhysicalBoard", "fUiOffsetZ", physicalBoardUiOffsetZ);
-        ini.SetDoubleValue("PhysicalBoard", "fUiRotX", physicalBoardUiRotX);
-        ini.SetDoubleValue("PhysicalBoard", "fUiRotY", physicalBoardUiRotY);
-        ini.SetDoubleValue("PhysicalBoard", "fUiRotZ", physicalBoardUiRotZ);
-        ini.SetDoubleValue("PhysicalBoard", "fUiScale", physicalBoardUiScale,
-            "; Multiplier applied on top of fMenuScale while held");
+        ini.SetDoubleValue("PhysicalBoard", "fScale", physicalBoardScale,
+            "; Shared physical board visual, collision, and attached UI scale (0.01 to 10.0)");
+        ini.SetDoubleValue("PhysicalBoard", "fMeshScale", physicalBoardMeshScale,
+            "; Additional physical mesh and collision scale; does not affect buttons or RmlUi");
+        ini.SetDoubleValue("PhysicalBoard", "fRmlSurfaceOffsetX", physicalRmlSurfaceOffsetX,
+            "; Physical-board RmlUi X offset");
+        ini.SetDoubleValue("PhysicalBoard", "fRmlSurfaceOffsetY", physicalRmlSurfaceOffsetY,
+            "; Physical-board RmlUi Y offset");
+        ini.SetDoubleValue("PhysicalBoard", "fRmlSurfaceOffsetZ", physicalRmlSurfaceOffsetZ,
+            "; Physical-board RmlUi Z offset");
+        ini.SetDoubleValue("PhysicalBoard", "fRmlSurfaceRotX", physicalRmlSurfaceRotX,
+            "; Physical-board RmlUi rotation X");
+        ini.SetDoubleValue("PhysicalBoard", "fRmlSurfaceRotY", physicalRmlSurfaceRotY,
+            "; Physical-board RmlUi rotation Y");
+        ini.SetDoubleValue("PhysicalBoard", "fRmlSurfaceRotZ", physicalRmlSurfaceRotZ,
+            "; Physical-board RmlUi rotation Z");
+        ini.SetDoubleValue("PhysicalBoard", "fRmlSurfaceScale", physicalRmlSurfaceScale,
+            "; Physical-board RmlUi scale multiplier (0.01 to 10.0)");
+        for (const auto* legacyKey : {
+            "fUiOffsetX", "fUiOffsetY", "fUiOffsetZ",
+            "fUiRotX", "fUiRotY", "fUiRotZ", "fUiScale" }) {
+            ini.Delete("PhysicalBoard", legacyKey);
+        }
         // [Visual]
         ini.SetDoubleValue("Visual", "fMenuScale", (double)menuScale, "; Overall scale of ALL panels");
         
@@ -1198,6 +1326,13 @@ namespace vrui
         ini.SetDoubleValue("Background", "fRotX",           backgroundRotX,    "; Tablet rotation X");
         ini.SetDoubleValue("Background", "fRotY",           backgroundRotY,    "; Tablet rotation Y");
         ini.SetDoubleValue("Background", "fRotZ",           backgroundRotZ,    "; Tablet rotation Z");
+        ini.SetDoubleValue("Background", "fRmlSurfaceOffsetX", rmlSurfaceOffsetX, "; Non-physical RmlUi X offset");
+        ini.SetDoubleValue("Background", "fRmlSurfaceOffsetY", rmlSurfaceOffsetY, "; Non-physical RmlUi Y offset");
+        ini.SetDoubleValue("Background", "fRmlSurfaceOffsetZ", rmlSurfaceOffsetZ, "; Non-physical RmlUi Z offset");
+        ini.SetDoubleValue("Background", "fRmlSurfaceRotX", rmlSurfaceRotX,     "; Non-physical RmlUi rotation X");
+        ini.SetDoubleValue("Background", "fRmlSurfaceRotY", rmlSurfaceRotY,     "; Non-physical RmlUi rotation Y");
+        ini.SetDoubleValue("Background", "fRmlSurfaceRotZ", rmlSurfaceRotZ,     "; Non-physical RmlUi rotation Z");
+        ini.SetDoubleValue("Background", "fRmlSurfaceScale", rmlSurfaceScale,   "; Non-physical RmlUi scale multiplier (0.01 to 10.0)");
 
         // [LaserPointer]
         ini.SetDoubleValue("LaserPointer", "fReticleScaleX",  reticleScaleX,  "; Reticle scale X");
@@ -1472,6 +1607,13 @@ namespace vrui
             "fHoldTimeThumbstick", "fHoldTime", "bUseLeftHandAsMenu",
             "bLastSavedLeftHand"
         });
+        copyKeys(mainOut, "PhysicalBoard", {
+            "bEnabled", "sPlugin", "iLocalFormID",
+            "iVrikProxyLocalFormID", "fScale", "fMeshScale",
+            "fRmlSurfaceOffsetX", "fRmlSurfaceOffsetY", "fRmlSurfaceOffsetZ",
+            "fRmlSurfaceRotX", "fRmlSurfaceRotY", "fRmlSurfaceRotZ",
+            "fRmlSurfaceScale"
+        });
         CopyIniSection(ini, mainOut, "Combat");
         copyKeys(mainOut, "Interaction", {
             "fRaycastMaxDistance", "bEnableFingerTouch",
@@ -1499,7 +1641,10 @@ namespace vrui
         });
         copyKeys(layoutOut, "Background", {
             "fScale", "fOffsetX", "fOffsetY", "fOffsetZ",
-            "fRotX", "fRotY", "fRotZ"
+            "fRotX", "fRotY", "fRotZ",
+            "fRmlSurfaceOffsetX", "fRmlSurfaceOffsetY", "fRmlSurfaceOffsetZ",
+            "fRmlSurfaceRotX", "fRmlSurfaceRotY", "fRmlSurfaceRotZ",
+            "fRmlSurfaceScale"
         });
         copyKeys(layoutOut, "LaserPointer", {
             "fReticleScaleX", "fReticleScaleY", "fReticleScaleZ"

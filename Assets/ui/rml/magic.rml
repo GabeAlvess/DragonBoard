@@ -7,14 +7,14 @@
 <body>
     <div id="app" class="magic-app">
         <div class="magic-filter-strip">
-            <button id="magic-filter-favorites" class="magic-filter active" title="Favorites"><img src="assets/favoriteIcon.png" /></button>
-            <button id="magic-filter-destruction" class="magic-filter" title="Destruction"><img src="assets/destructionicon.png" /></button>
-            <button id="magic-filter-conjuration" class="magic-filter" title="Conjuration"><img src="assets/conjurationicon.png" /></button>
-            <button id="magic-filter-restoration" class="magic-filter" title="Restoration"><img src="assets/restorationicon.png" /></button>
-            <button id="magic-filter-illusion" class="magic-filter" title="Illusion"><img src="assets/illusionicon.png" /></button>
-            <button id="magic-filter-alteration" class="magic-filter" title="Alteration"><img src="assets/alterationicon.png" /></button>
-            <button id="magic-filter-powers" class="magic-filter" title="Powers"><img src="assets/powericon.png" /></button>
-            <button id="magic-filter-passive" class="magic-filter" title="Passive Effects"><img src="assets/passiveicon.png" /></button>
+            <button id="magic-filter-favorites" class="magic-filter active" title="Favorites"><img src="assets/Icons/favoriteIcon.png" /></button>
+            <button id="magic-filter-destruction" class="magic-filter" title="Destruction"><img src="assets/Icons/destructionicon.png" /></button>
+            <button id="magic-filter-conjuration" class="magic-filter" title="Conjuration"><img src="assets/Icons/conjurationicon.png" /></button>
+            <button id="magic-filter-restoration" class="magic-filter" title="Restoration"><img src="assets/Icons/restorationicon.png" /></button>
+            <button id="magic-filter-illusion" class="magic-filter" title="Illusion"><img src="assets/Icons/illusionicon.png" /></button>
+            <button id="magic-filter-alteration" class="magic-filter" title="Alteration"><img src="assets/Icons/alterationicon.png" /></button>
+            <button id="magic-filter-powers" class="magic-filter" title="Powers"><img src="assets/Icons/powericon.png" /></button>
+            <button id="magic-filter-passive" class="magic-filter" title="Passive Effects"><img src="assets/Icons/passiveicon.png" /></button>
         </div>
 
         <div class="spell-title-banner">
@@ -40,12 +40,12 @@
 
         <section class="magic-preview-panel">
             <div id="magic-left-hand-state" class="hand-state left-hand-state">
-                <img class="equipped-hand-icon" src="assets/LHand.png" />
+                <img class="equipped-hand-icon" src="assets/Icons/LHand.png" />
             </div>
             <div id="magic-right-hand-state" class="hand-state right-hand-state">
-                <img class="equipped-hand-icon" src="assets/RHand.png" />
+                <img class="equipped-hand-icon" src="assets/Icons/RHand.png" />
             </div>
-            <img id="magic-preview-icon" class="preview-icon" src="assets/destructionicon.png" />
+            <img id="magic-preview-icon" class="preview-icon" src="assets/Icons/destructionicon.png" />
             <div class="preview-reticle"></div>
             <div id="magic-preview-hit-zone" class="preview-interaction-zone"></div>
         </section>

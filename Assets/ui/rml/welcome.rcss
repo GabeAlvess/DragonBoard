@@ -34,19 +34,19 @@ body {
 }
 
 .welcome-page-one {
-    decorator: image("assets/welcome_Tutorial.jpg" fill);
+    decorator: image("assets/Tutorials/welcome_Tutorial.jpg" fill);
 }
 
 .welcome-page-two {
-    decorator: image("assets/Welcome2_tutorial.jpg" fill);
+    decorator: image("assets/Tutorials/Welcome2_tutorial.jpg" fill);
 }
 
 .welcome-page-three {
-    decorator: image("assets/Welcome3_tutorial.jpg" fill);
+    decorator: image("assets/Tutorials/Welcome3_tutorial.jpg" fill);
 }
 
 .pin-tutorial-page {
-    decorator: image("assets/welcome_Tutorial.jpg" fill);
+    decorator: image("assets/Tutorials/welcome_Tutorial.jpg" fill);
 }
 
 .welcome-copy {

@@ -40,6 +40,46 @@ namespace dragonboard::ui::rml
         constexpr float kSceneScreenSizeScale = 0.85f;
         constexpr float kScenePlaneExtent = 170.666656f;
         constexpr float kSceneScreenSurfaceDepth = 0.50f;
+        constexpr float kPhysicalBoardAuthoredScale = 1.55f;
+
+        bool TryGetConfiguredRmlSurfaceTransform(RE::NiTransform& transform)
+        {
+            const auto& settings = vrui::VRUISettings::get();
+            const bool physicalBoard =
+                vrui::VRMenuManager::get().isPhysicalBoardActive();
+            const float offsetX = physicalBoard ?
+                settings.physicalRmlSurfaceOffsetX : settings.rmlSurfaceOffsetX;
+            const float offsetY = physicalBoard ?
+                settings.physicalRmlSurfaceOffsetY : settings.rmlSurfaceOffsetY;
+            const float offsetZ = physicalBoard ?
+                settings.physicalRmlSurfaceOffsetZ : settings.rmlSurfaceOffsetZ;
+            const float rotationX = physicalBoard ?
+                settings.physicalRmlSurfaceRotX : settings.rmlSurfaceRotX;
+            const float rotationY = physicalBoard ?
+                settings.physicalRmlSurfaceRotY : settings.rmlSurfaceRotY;
+            const float rotationZ = physicalBoard ?
+                settings.physicalRmlSurfaceRotZ : settings.rmlSurfaceRotZ;
+            const float scale = physicalBoard ?
+                settings.physicalRmlSurfaceScale : settings.rmlSurfaceScale;
+            if (std::abs(offsetX) <= 1.0e-4f &&
+                std::abs(offsetY) <= 1.0e-4f &&
+                std::abs(offsetZ) <= 1.0e-4f &&
+                std::abs(rotationX) <= 1.0e-4f &&
+                std::abs(rotationY) <= 1.0e-4f &&
+                std::abs(rotationZ) <= 1.0e-4f &&
+                std::abs(scale - 1.0f) <= 1.0e-4f) {
+                return false;
+            }
+
+            constexpr float kDegreesToRadians = 0.017453292519943295f;
+            transform.translate = { offsetX, offsetY, offsetZ };
+            transform.scale = scale;
+            transform.rotate.SetEulerAnglesXYZ(
+                rotationX * kDegreesToRadians,
+                rotationY * kDegreesToRadians,
+                rotationZ * kDegreesToRadians);
+            return true;
+        }
         // Keep CSS layout and pointer coordinates stable while allowing the
         // backing texture to render at a lower physical resolution.
         constexpr int kPanelLogicalWidth = 1920;
@@ -2759,13 +2799,26 @@ namespace dragonboard::ui::rml
             }
             hasBoardRelativeTransform = ancestor == backgroundNode;
         }
+        if (!hasBoardRelativeTransform) {
+            hasBoardRelativeTransform =
+                TryGetConfiguredRmlSurfaceTransform(boardRelative);
+        }
 
-        const RE::NiPoint3 screenSurfaceOffset{ 0.0f, 0.0f, kSceneScreenSurfaceDepth };
+        const float physicalBoardAuthoredScale =
+            vrui::VRMenuManager::get().isPhysicalBoardActive() ?
+                kPhysicalBoardAuthoredScale :
+                1.0f;
+        const RE::NiPoint3 screenSurfaceOffset{
+            0.0f,
+            0.0f,
+            kSceneScreenSurfaceDepth * physicalBoardAuthoredScale
+        };
         if (hasBoardRelativeTransform) {
             surface.node->local.translate = boardRelative.translate +
                 (boardRelative.rotate * screenSurfaceOffset) * boardRelative.scale;
             surface.node->local.rotate = boardRelative.rotate * screenFit;
-            surface.node->local.scale = boardRelative.scale;
+            surface.node->local.scale =
+                boardRelative.scale * physicalBoardAuthoredScale;
         } else {
             surface.node->local.translate = screenSurfaceOffset;
             surface.node->local.rotate = screenFit;
@@ -2824,6 +2877,61 @@ namespace dragonboard::ui::rml
 
     bool RmlPanelHost::UpdateStatusSceneSurfaceGameThread(RE::NiNode* backgroundNode)
     {
+        const auto resolveBoardRelative = [](RE::NiNode* rootNode)
+            -> std::optional<RE::NiTransform> {
+            if (!rootNode) return std::nullopt;
+
+            RE::BSGeometry* boardGeometry = nullptr;
+            RE::BSVisit::TraverseScenegraphGeometries(
+                rootNode,
+                [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                    if (geometry && geometry->name == "DragonBoard") {
+                        boardGeometry = geometry;
+                        return RE::BSVisit::BSVisitControl::kStop;
+                    }
+                    return RE::BSVisit::BSVisitControl::kContinue;
+                });
+            if (!boardGeometry) return std::nullopt;
+
+            RE::NiTransform relative = boardGeometry->local;
+            auto* ancestor = boardGeometry->parent;
+            while (ancestor && ancestor != rootNode) {
+                relative.translate = ancestor->local.translate +
+                    (ancestor->local.rotate * relative.translate) *
+                        ancestor->local.scale;
+                relative.rotate = ancestor->local.rotate * relative.rotate;
+                relative.scale *= ancestor->local.scale;
+                ancestor = ancestor->parent;
+            }
+            if (ancestor != rootNode) return std::nullopt;
+
+            if (rootNode->GetObjectByName("DragonBoardCollision")) {
+                relative.scale *= kPhysicalBoardAuthoredScale;
+            }
+            return relative;
+        };
+        const auto composeTransform = [](const RE::NiTransform& parent,
+                                         const RE::NiTransform& child) {
+            RE::NiTransform result;
+            result.translate = parent.translate +
+                (parent.rotate * child.translate) * parent.scale;
+            result.rotate = parent.rotate * child.rotate;
+            result.scale = parent.scale * child.scale;
+            return result;
+        };
+        const auto makeRelativeTransform = [](const RE::NiTransform& parent,
+                                              const RE::NiTransform& child) {
+            const float parentScale = std::abs(parent.scale) > 1.0e-5f ?
+                parent.scale : 1.0f;
+            const auto inverseRotation = parent.rotate.Transpose();
+            RE::NiTransform result;
+            result.translate = inverseRotation *
+                (child.translate - parent.translate) / parentScale;
+            result.rotate = inverseRotation * child.rotate;
+            result.scale = child.scale / parentScale;
+            return result;
+        };
+
         auto& surface = StatusSceneSurface();
         if (!backgroundNode ||
             !_statusSurfaceHomeVisible.load(std::memory_order_acquire) ||
@@ -2833,29 +2941,12 @@ namespace dragonboard::ui::rml
         }
 
         if (!surface.node) {
-            RE::BSGeometry* boardGeometry = nullptr;
-            RE::BSVisit::TraverseScenegraphGeometries(
-                backgroundNode,
-                [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
-                    if (geometry && geometry->name == "DragonBoard") {
-                        boardGeometry = geometry;
-                        return RE::BSVisit::BSVisitControl::kStop;
-                    }
-                    return RE::BSVisit::BSVisitControl::kContinue;
-                });
-            RE::NiTransform boardRelative{};
-            bool hasBoardRelativeTransform = false;
-            if (boardGeometry) {
-                boardRelative = boardGeometry->local;
-                auto* ancestor = boardGeometry->parent;
-                while (ancestor && ancestor != backgroundNode) {
-                    boardRelative.translate = ancestor->local.translate +
-                        (ancestor->local.rotate * boardRelative.translate) * ancestor->local.scale;
-                    boardRelative.rotate = ancestor->local.rotate * boardRelative.rotate;
-                    boardRelative.scale *= ancestor->local.scale;
-                    ancestor = ancestor->parent;
+            auto boardRelative = resolveBoardRelative(backgroundNode);
+            if (!boardRelative) {
+                RE::NiTransform configuredTransform{};
+                if (TryGetConfiguredRmlSurfaceTransform(configuredTransform)) {
+                    boardRelative = configuredTransform;
                 }
-                hasBoardRelativeTransform = ancestor == backgroundNode;
             }
             surface.node = RE::NiPointer<RE::NiNode>(RE::NiNode::Create(1));
             surface.visualNode = vrui::VRUIWidget::loadModelFromNif(
@@ -2932,11 +3023,12 @@ namespace dragonboard::ui::rml
             surface.node->AttachChild(surface.visualNode.get());
 
             const RE::NiPoint3 offset{ 12.5f, 0.0f, 0.82f };
-            if (hasBoardRelativeTransform) {
-                surface.node->local.translate = boardRelative.translate +
-                    (boardRelative.rotate * offset) * boardRelative.scale;
-                surface.node->local.rotate = boardRelative.rotate;
-                surface.node->local.scale = boardRelative.scale;
+            if (boardRelative) {
+                RE::NiTransform boardOffset;
+                boardOffset.translate = offset;
+                boardOffset.rotate = RE::NiMatrix3{};
+                boardOffset.scale = 1.0f;
+                surface.node->local = composeTransform(*boardRelative, boardOffset);
             } else {
                 surface.node->local.translate = offset;
                 surface.node->local.rotate = RE::NiMatrix3{};
@@ -2947,7 +3039,20 @@ namespace dragonboard::ui::rml
             logger::trace("DragonBoardVR: independent status surface attached.");
         } else if (surface.node->parent != backgroundNode &&
                    !surface.grabController.IsGrabbed()) {
-            if (surface.node->parent) surface.node->parent->DetachChild(surface.node.get());
+            const auto previousBoardRelative =
+                resolveBoardRelative(surface.node->parent);
+            const auto nextBoardRelative = resolveBoardRelative(backgroundNode);
+            if (previousBoardRelative && nextBoardRelative) {
+                const auto boardLocal = makeRelativeTransform(
+                    *previousBoardRelative,
+                    surface.node->local);
+                surface.node->local = composeTransform(
+                    *nextBoardRelative,
+                    boardLocal);
+            }
+            if (surface.node->parent) {
+                surface.node->parent->DetachChild(surface.node.get());
+            }
             backgroundNode->AttachChild(surface.node.get());
         }
 
@@ -3000,6 +3105,10 @@ namespace dragonboard::ui::rml
                     ancestor = ancestor->parent;
                 }
                 hasBoardRelativeTransform = ancestor == backgroundNode;
+            }
+            if (!hasBoardRelativeTransform) {
+                hasBoardRelativeTransform =
+                    TryGetConfiguredRmlSurfaceTransform(boardRelative);
             }
 
             surface.node = RE::NiPointer<RE::NiNode>(RE::NiNode::Create(1));
@@ -3150,6 +3259,10 @@ namespace dragonboard::ui::rml
                     ancestor = ancestor->parent;
                 }
                 hasBoardRelativeTransform = ancestor == backgroundNode;
+            }
+            if (!hasBoardRelativeTransform) {
+                hasBoardRelativeTransform =
+                    TryGetConfiguredRmlSurfaceTransform(boardRelative);
             }
 
             surface.node = RE::NiPointer<RE::NiNode>(RE::NiNode::Create(1));

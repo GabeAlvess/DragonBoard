@@ -7,7 +7,7 @@
 </head>
 <body>
     <div id="app" class="dev-app journal-app">
-        <img class="journal-background" src="assets/Journal.jpg" />
+        <img class="journal-background" src="assets/Background/Journal.jpg" />
         <aside class="dev-sidebar journal-sidebar">
             <div class="brand">
                 <div class="brand-copy">

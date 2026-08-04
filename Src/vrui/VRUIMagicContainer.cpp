@@ -255,13 +255,13 @@ namespace vrui
         std::string resolveIconPath(const RE::SpellItem* spell)
         {
             const auto category = resolveCategory(spell);
-            if (category == "DESTRUCTION") return "assets/destructionicon.png";
-            if (category == "CONJURATION") return "assets/conjurationicon.png";
-            if (category == "RESTORATION") return "assets/restorationicon.png";
-            if (category == "ILLUSION") return "assets/illusionicon.png";
-            if (category == "ALTERATION") return "assets/alterationicon.png";
-            if (category == "POWER") return "assets/powericon.png";
-            return "assets/passiveicon.png";
+            if (category == "DESTRUCTION") return "assets/Icons/destructionicon.png";
+            if (category == "CONJURATION") return "assets/Icons/conjurationicon.png";
+            if (category == "RESTORATION") return "assets/Icons/restorationicon.png";
+            if (category == "ILLUSION") return "assets/Icons/illusionicon.png";
+            if (category == "ALTERATION") return "assets/Icons/alterationicon.png";
+            if (category == "POWER") return "assets/Icons/powericon.png";
+            return "assets/Icons/passiveicon.png";
         }
 
         std::string resolveCastingType(const RE::SpellItem* spell)

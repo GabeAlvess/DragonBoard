@@ -12,7 +12,7 @@ body {
     opacity: 1;
     color: #f2f2f2;
     background-color: #0b0c0c;
-    decorator: image("assets/keyboard.jpg" fill);
+    decorator: image("assets/Background/keyboard.jpg" fill);
 }
 
 .keyboard-frame {

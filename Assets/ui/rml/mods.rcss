@@ -1,4 +1,4 @@
-#app.mods-app { color: #d8d8d8; background-color: #070808; border-color: transparent; decorator: image("assets/mods_nordic_bg.png" fill); }
+#app.mods-app { color: #d8d8d8; background-color: #070808; border-color: transparent; decorator: image("assets/Background/mods_nordic_bg.png" fill); }
 .mods-sidebar { width: 468px; height: 1076px; padding: 0; background-color: transparent; border-right-color: transparent; }
 .mods-sidebar .brand { width: 468px; height: 118px; display: flex; align-items: center; justify-content: center; margin-left: 0; padding: 0; }
 .mods-sidebar .brand-copy { width: 468px; margin-left: 0; }

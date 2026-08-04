@@ -1,0 +1,738 @@
+{
+    "containers": [
+        {
+            "elements": [
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Status",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                0.9396926164627075,
+                                -0.3420201241970062,
+                                0.0
+                            ],
+                            [
+                                0.3420201241970062,
+                                0.9396926164627075,
+                                0.0
+                            ],
+                            [
+                                -0.0,
+                                0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": 14.0,
+                            "y": 0.25,
+                            "z": -7.0
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": 20.000606536865234
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Inventory",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                0.9396926164627075,
+                                -0.3420201241970062,
+                                0.0
+                            ],
+                            [
+                                0.3420201241970062,
+                                0.9396926164627075,
+                                0.0
+                            ],
+                            [
+                                -0.0,
+                                0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": 14.0,
+                            "y": 0.25,
+                            "z": 0.0
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": 20.000606536865234
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Magic",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                0.9396926164627075,
+                                -0.3420201241970062,
+                                0.0
+                            ],
+                            [
+                                0.3420201241970062,
+                                0.9396926164627075,
+                                0.0
+                            ],
+                            [
+                                -0.0,
+                                0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": 14.0,
+                            "y": 0.25,
+                            "z": -3.5
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": 20.000606536865234
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_System",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                1.0,
+                                0.0,
+                                0.0
+                            ],
+                            [
+                                -0.0,
+                                1.0,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                -0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": -12.0,
+                            "y": 0.0,
+                            "z": -10.0
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": -0.0
+                        },
+                        "scale": 0.800000011920929
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Save",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                0.9396926164627075,
+                                -0.3420201241970062,
+                                0.0
+                            ],
+                            [
+                                0.3420201241970062,
+                                0.9396926164627075,
+                                -0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": 14.0,
+                            "y": 0.25,
+                            "z": 7.0
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": 20.000606536865234
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Mods",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                0.9396926164627075,
+                                0.3420201241970062,
+                                0.0
+                            ],
+                            [
+                                -0.3420201241970062,
+                                0.9396926164627075,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                -0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": -14.0,
+                            "y": 0.25,
+                            "z": 7.0
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": -20.000606536865234
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Favorites",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                0.9396926164627075,
+                                0.3420201241970062,
+                                0.0
+                            ],
+                            [
+                                -0.3420201241970062,
+                                0.9396926164627075,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                -0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": -14.0,
+                            "y": 0.25,
+                            "z": 3.5
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": -20.000606536865234
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Map",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                0.9396926164627075,
+                                -0.3420201241970062,
+                                0.0
+                            ],
+                            [
+                                0.3420201241970062,
+                                0.9396926164627075,
+                                0.0
+                            ],
+                            [
+                                -0.0,
+                                0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": 14.0,
+                            "y": 0.25,
+                            "z": 3.5
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": 20.000606536865234
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Dev",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                1.0,
+                                0.0,
+                                0.0
+                            ],
+                            [
+                                -0.0,
+                                1.0,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                -0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": -16.0,
+                            "y": 0.0,
+                            "z": -3.0
+                        },
+                        "rotation": {
+                            "x": -0.0,
+                            "y": 0.0,
+                            "z": -0.0
+                        },
+                        "scale": 0.800000011920929
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "Btn_Home",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                1.0,
+                                0.0,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.9396926164627075,
+                                -0.3420201241970062
+                            ],
+                            [
+                                -0.0,
+                                0.3420201241970062,
+                                0.9396926164627075
+                            ]
+                        ],
+                        "position": {
+                            "x": 12.0,
+                            "y": 0.25,
+                            "z": -10.0
+                        },
+                        "rotation": {
+                            "x": 20.000606536865234,
+                            "y": 0.0,
+                            "z": -0.0
+                        },
+                        "scale": 0.800000011920929
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                }
+            ],
+            "id": "TopTabs",
+            "transform": {
+                "hasMatrix": false,
+                "matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ],
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotation": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": 1.0
+            },
+            "type": "Free"
+        },
+        {
+            "elements": [],
+            "id": "IndependentSlots",
+            "transform": {
+                "hasMatrix": false,
+                "matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ],
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotation": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": 1.0
+            },
+            "type": "Free"
+        },
+        {
+            "elements": [],
+            "id": "MainTablet",
+            "transform": {
+                "hasMatrix": true,
+                "matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        -0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ],
+                "position": {
+                    "x": 0.0,
+                    "y": -1.0,
+                    "z": 0.0
+                },
+                "rotation": {
+                    "x": -0.0,
+                    "y": -0.0,
+                    "z": -0.0
+                },
+                "scale": 1.0
+            },
+            "type": "Background"
+        },
+        {
+            "elements": [
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "DragonBoardVR.WelcomeTutorial",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                -0.9999841451644897,
+                                0.004111058544367552,
+                                0.0038532521575689316
+                            ],
+                            [
+                                0.0045900833792984486,
+                                0.19772908091545105,
+                                0.9802459478378296
+                            ],
+                            [
+                                0.003267948515713215,
+                                0.9802480936050415,
+                                -0.19774481654167175
+                            ]
+                        ],
+                        "position": {
+                            "x": 0.3507717549800873,
+                            "y": 1.6823238134384155,
+                            "z": 15.706233978271484
+                        },
+                        "rotation": {
+                            "x": 101.40473937988281,
+                            "y": 0.22077561914920807,
+                            "z": 180.2355194091797
+                        },
+                        "scale": 1.3188453912734985
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
+                    "id": "DragonBoardVR.Status",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": true,
+                        "matrix": [
+                            [
+                                -0.9999945163726807,
+                                0.0032566054724156857,
+                                -0.0005428582662716508
+                            ],
+                            [
+                                -0.0006393565563485026,
+                                -0.029704099521040916,
+                                0.9995586276054382
+                            ],
+                            [
+                                0.0032390421256422997,
+                                0.9995535612106323,
+                                0.029706019908189774
+                            ]
+                        ],
+                        "position": {
+                            "x": -0.09508806467056274,
+                            "y": -0.07579066604375839,
+                            "z": -9.039316177368164
+                        },
+                        "rotation": {
+                            "x": 88.29794311523438,
+                            "y": -0.031103486195206642,
+                            "z": 180.18655395507813
+                        },
+                        "scale": 2.715855360031128
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                }
+            ],
+            "id": "RmlUiSurfaces",
+            "transform": {
+                "hasMatrix": false,
+                "matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ],
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotation": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": 1.0
+            },
+            "type": "Free"
+        },
+        {
+            "elements": [],
+            "id": "Dashboard",
+            "transform": {
+                "hasMatrix": false,
+                "matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ],
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotation": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": 1.0
+            },
+            "type": "Free"
+        }
+    ]
+}

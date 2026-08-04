@@ -715,10 +715,10 @@ namespace
         bool LoadFont()
         {
             const std::array<std::filesystem::path, 4> candidates{
-                _assetsDirectory / "assets" / "DragonBoardVR_Font.ttf",
-                std::filesystem::path("Data/SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf"),
-                std::filesystem::path("SKSE/Plugins/DragonBoardVR/ui/assets/DragonBoardVR_Font.ttf"),
-                std::filesystem::path("Assets/ui/rml/assets/DragonBoardVR_Font.ttf")
+                _assetsDirectory / "assets" / "Fonts" / "DragonBoardVR_Font.ttf",
+                std::filesystem::path("Data/SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/DragonBoardVR_Font.ttf"),
+                std::filesystem::path("SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/DragonBoardVR_Font.ttf"),
+                std::filesystem::path("Assets/ui/rml/assets/Fonts/DragonBoardVR_Font.ttf")
             };
             bool primaryLoaded = false;
             for (const auto& path : candidates) {
@@ -739,10 +739,10 @@ namespace
             }
             if (primaryLoaded) {
                 const std::array<std::filesystem::path, 4> fallbackCandidates{
-                    _assetsDirectory / "assets" / "NotoSansCJKsc-Regular.otf",
-                    std::filesystem::path("Data/SKSE/Plugins/DragonBoardVR/ui/assets/NotoSansCJKsc-Regular.otf"),
-                    std::filesystem::path("SKSE/Plugins/DragonBoardVR/ui/assets/NotoSansCJKsc-Regular.otf"),
-                    std::filesystem::path("Assets/ui/rml/assets/NotoSansCJKsc-Regular.otf")
+                    _assetsDirectory / "assets" / "Fonts" / "NotoSansCJKsc-Regular.otf",
+                    std::filesystem::path("Data/SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/NotoSansCJKsc-Regular.otf"),
+                    std::filesystem::path("SKSE/Plugins/DragonBoardVR/ui/assets/Fonts/NotoSansCJKsc-Regular.otf"),
+                    std::filesystem::path("Assets/ui/rml/assets/Fonts/NotoSansCJKsc-Regular.otf")
                 };
                 for (const auto& path : fallbackCandidates) {
                     std::ifstream stream(path, std::ios::binary | std::ios::ate);
@@ -1539,7 +1539,7 @@ namespace
                 right->SetClass("active", true);
             }
             if (auto* icon = _document->GetElementById("magic-preview-icon")) {
-                icon->SetAttribute("src", "assets/conjurationicon.png");
+                icon->SetAttribute("src", "assets/Icons/conjurationicon.png");
                 icon->SetProperty("display", "block");
             }
             if (auto* edit = _document->GetElementById("magic-edit")) {

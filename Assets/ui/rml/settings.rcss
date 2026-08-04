@@ -1371,7 +1371,7 @@ h1 {
     color: #d8d8d8;
     background-color: #070808;
     border-color: transparent;
-    decorator: image("assets/mods_nordic_bg.png" fill);
+    decorator: image("assets/Background/mods_nordic_bg.png" fill);
 }
 
 aside,

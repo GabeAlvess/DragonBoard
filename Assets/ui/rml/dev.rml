@@ -96,7 +96,7 @@
                             <button id="dev-calibration-reset" class="calibration-reset"><span>Reset calibration</span></button>
                         </div>
                         <div class="calibration-map-frame">
-                            <img class="calibration-map-image" src="assets/map_calibration.png" />
+                            <img class="calibration-map-image" src="assets/Calibration/map_calibration.png" />
                         </div>
                     </div>
                 </section>
