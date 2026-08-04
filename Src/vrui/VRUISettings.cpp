@@ -307,6 +307,62 @@ namespace vrui
         activationHoldTime = (float)ini.GetDoubleValue("Activation", "fHoldTime", activationHoldTime);
         useLeftHandAsMenu = ini.GetBoolValue("Activation", "bUseLeftHandAsMenu", useLeftHandAsMenu);
         
+        // [PhysicalBoard]
+        const bool physicalBoardConfigMissing =
+            !ini.KeyExists("PhysicalBoard", "bEnabled");
+        physicalBoardEnabled = ini.GetBoolValue(
+            "PhysicalBoard", "bEnabled", physicalBoardEnabled);
+        physicalBoardPlugin = ini.GetValue(
+            "PhysicalBoard", "sPlugin", physicalBoardPlugin.c_str());
+        physicalBoardLocalFormID = static_cast<std::uint32_t>(ini.GetLongValue(
+            "PhysicalBoard", "iLocalFormID", physicalBoardLocalFormID));
+        physicalBoardVrikProxyLocalFormID = static_cast<std::uint32_t>(ini.GetLongValue(
+            "PhysicalBoard", "iVrikProxyLocalFormID", physicalBoardVrikProxyLocalFormID));
+        physicalBoardUiOffsetX = static_cast<float>(ini.GetDoubleValue(
+            "PhysicalBoard", "fUiOffsetX", physicalBoardUiOffsetX));
+        physicalBoardUiOffsetY = static_cast<float>(ini.GetDoubleValue(
+            "PhysicalBoard", "fUiOffsetY", physicalBoardUiOffsetY));
+        physicalBoardUiOffsetZ = static_cast<float>(ini.GetDoubleValue(
+            "PhysicalBoard", "fUiOffsetZ", physicalBoardUiOffsetZ));
+        physicalBoardUiRotX = static_cast<float>(ini.GetDoubleValue(
+            "PhysicalBoard", "fUiRotX", physicalBoardUiRotX));
+        physicalBoardUiRotY = static_cast<float>(ini.GetDoubleValue(
+            "PhysicalBoard", "fUiRotY", physicalBoardUiRotY));
+        physicalBoardUiRotZ = static_cast<float>(ini.GetDoubleValue(
+            "PhysicalBoard", "fUiRotZ", physicalBoardUiRotZ));
+        physicalBoardUiScale = static_cast<float>(ini.GetDoubleValue(
+            "PhysicalBoard", "fUiScale", physicalBoardUiScale));
+        if (physicalBoardConfigMissing) {
+            ini.SetBoolValue("PhysicalBoard", "bEnabled", physicalBoardEnabled);
+            ini.SetValue("PhysicalBoard", "sPlugin", physicalBoardPlugin.c_str());
+            ini.SetLongValue(
+                "PhysicalBoard", "iLocalFormID", physicalBoardLocalFormID);
+            ini.SetLongValue(
+                "PhysicalBoard", "iVrikProxyLocalFormID", physicalBoardVrikProxyLocalFormID);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fUiOffsetX", physicalBoardUiOffsetX);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fUiOffsetY", physicalBoardUiOffsetY);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fUiOffsetZ", physicalBoardUiOffsetZ);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fUiRotX", physicalBoardUiRotX);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fUiRotY", physicalBoardUiRotY);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fUiRotZ", physicalBoardUiRotZ);
+            ini.SetDoubleValue(
+                "PhysicalBoard", "fUiScale", physicalBoardUiScale);
+            if (ini.SaveFile(iniPath.c_str()) < 0) {
+                logger::warn(
+                    "DragonBoardVR: Failed to restore missing [PhysicalBoard] settings in '{}'.",
+                    iniPath);
+            } else {
+                logger::info(
+                    "DragonBoardVR: Restored missing [PhysicalBoard] settings in '{}'.",
+                    iniPath);
+            }
+        }
         // [Visual]
         if (layoutExists) {
             // Split configs store the complete hand-relative board transform in
@@ -434,6 +490,12 @@ namespace vrui
             static_cast<float>(ini.GetDoubleValue(
                 "Interaction", "fFingerTouchScrollDeadzone", fingerTouchScrollDeadzone)),
             10.0f,
+            200.0f);
+        fingerTouchMaxActivationSpeed = std::clamp(
+            static_cast<float>(ini.GetDoubleValue(
+                "Interaction", "fFingerTouchMaxActivationSpeed",
+                fingerTouchMaxActivationSpeed)),
+            1.0f,
             200.0f);
         laserNifPath       = ini.GetValue("Interaction", "sLaserNifPath",      laserNifPath.c_str());
         backgroundNifPath  = ini.GetValue("Interaction", "sBackgroundNifPath", backgroundNifPath.c_str());
@@ -1072,6 +1134,22 @@ namespace vrui
             "; true = menu on left hand, false = right hand");
         ini.SetBoolValue  ("Activation", "bLastSavedLeftHand", useLeftHandAsMenu);
 
+        ini.SetBoolValue("PhysicalBoard", "bEnabled", physicalBoardEnabled,
+            "; Enable the HIGGS-held physical DragonBoard prototype");
+        ini.SetValue("PhysicalBoard", "sPlugin", physicalBoardPlugin.c_str(),
+            "; Plugin containing the physical board MISC record");
+        ini.SetLongValue("PhysicalBoard", "iLocalFormID", physicalBoardLocalFormID,
+            "; Local FormID for the physical MISC (default 2048 = 0x000800)");
+        ini.SetLongValue("PhysicalBoard", "iVrikProxyLocalFormID", physicalBoardVrikProxyLocalFormID,
+            "; Local FormID for the internal VRIK WEAP proxy (default 2049 = 0x000801)");
+        ini.SetDoubleValue("PhysicalBoard", "fUiOffsetX", physicalBoardUiOffsetX);
+        ini.SetDoubleValue("PhysicalBoard", "fUiOffsetY", physicalBoardUiOffsetY);
+        ini.SetDoubleValue("PhysicalBoard", "fUiOffsetZ", physicalBoardUiOffsetZ);
+        ini.SetDoubleValue("PhysicalBoard", "fUiRotX", physicalBoardUiRotX);
+        ini.SetDoubleValue("PhysicalBoard", "fUiRotY", physicalBoardUiRotY);
+        ini.SetDoubleValue("PhysicalBoard", "fUiRotZ", physicalBoardUiRotZ);
+        ini.SetDoubleValue("PhysicalBoard", "fUiScale", physicalBoardUiScale,
+            "; Multiplier applied on top of fMenuScale while held");
         // [Visual]
         ini.SetDoubleValue("Visual", "fMenuScale", (double)menuScale, "; Overall scale of ALL panels");
         
@@ -1173,6 +1251,9 @@ namespace vrui
                            "; Withdrawal distance required to release a touch");
         ini.SetDoubleValue("Interaction", "fFingerTouchScrollDeadzone", fingerTouchScrollDeadzone,
                            "; Vertical touch movement in RmlUi pixels before a tap becomes scroll");
+        ini.SetDoubleValue("Interaction", "fFingerTouchMaxActivationSpeed",
+                           fingerTouchMaxActivationSpeed,
+                           "; Maximum relative finger-to-board speed allowed to begin a touch");
         ini.SetValue      ("Interaction", "sLaserNifPath",      laserNifPath.c_str(),      "; Custom laser NIF path");
         ini.SetValue      ("Interaction", "sBackgroundNifPath", backgroundNifPath.c_str(), "; Custom tablet NIF path");
         ini.SetValue      ("Interaction", "sMapNifPath",         mapNifPath.c_str(),         "; NIF used for Map button");

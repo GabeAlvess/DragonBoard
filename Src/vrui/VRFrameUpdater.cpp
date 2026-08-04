@@ -2,6 +2,7 @@
 #include "VRFrameUpdater.h"
 #include "VRMenuManager.h"
 #include "VRUISettings.h"
+#include "VRUIButton.h"
 #include "ModActionManager.h"
 #include <RE/B/BSInputDeviceManager.h>
 #include <RE/U/UserEvents.h>
@@ -15,6 +16,8 @@
 #include <SKSE/SKSE.h>
 #include <atomic>
 #include <windows.h> // for GetModuleHandleA
+#include "integrations/higgs/PhysicalBoardController.h"
+#include "integrations/vrik/VrikBoardProxyController.h"
 #include "ui/menu/MenuComposition.h"
 #include "ui/rml/RmlPanelHost.h"
 
@@ -33,7 +36,7 @@ namespace vrui
 
         auto* inputMgr = RE::BSInputDeviceManager::GetSingleton();
         if (inputMgr) {
-            inputMgr->AddEventSink(GetSingleton());
+            inputMgr->PrependEventSink(GetSingleton());
             registered = true;
             logger::info("DragonBoardVR: VRFrameUpdater input sink registered.");
         } else {
@@ -105,6 +108,7 @@ namespace vrui
         }
 
         // --- Process VR controller events ---
+        bool stopInputPropagation = false;
         if (a_eventList) {
             for (auto* event = *a_eventList; event; event = event->next) {
                 if (event->eventType == RE::INPUT_EVENT_TYPE::kThumbstick) {
@@ -119,11 +123,27 @@ namespace vrui
                             device == RE::INPUT_DEVICE::kVivePrimary ||
                             device == RE::INPUT_DEVICE::kOculusPrimary ||
                             device == RE::INPUT_DEVICE::kWMRPrimary;
-                        const bool menuOnLeft = VRUISettings::get().useLeftHandAsMenu;
+                        auto& menuManager = VRMenuManager::get();
+                        const bool menuOnLeft = menuManager.isMenuHandLeft();
                         const bool isDominant = menuOnLeft ? isRightHand : isLeftHand;
                         if (isDominant) {
-                            VRMenuManager::get().onDominantThumbstickChanged(
+                            menuManager.onDominantThumbstickChanged(
                                 thumbEvent->xValue, thumbEvent->yValue);
+                        }
+
+                        const auto grabbedWidget = menuManager.getGrabbedWidget();
+                        const auto* grabbedButton = grabbedWidget ?
+                            dynamic_cast<VRUIButton*>(grabbedWidget.get()) : nullptr;
+                        const bool grabbedWidgetOwnsVerticalAxis =
+                            grabbedButton &&
+                            grabbedButton->isGrabbed() &&
+                            grabbedButton->isGrabHandLeft() == isLeftHand;
+                        const bool grabbedSurfaceOwnsVerticalAxis =
+                            dragonboard::ui::rml::RmlPanelHost::GetSingleton()
+                                .IsGripThumbScaleInputCaptured(isLeftHand);
+                        if (grabbedWidgetOwnsVerticalAxis ||
+                            grabbedSurfaceOwnsVerticalAxis) {
+                            thumbEvent->yValue = 0.0f;
                         }
                     }
                     continue;
@@ -163,10 +183,11 @@ namespace vrui
                 if (isVRController) {
                     auto* controlMap = RE::ControlMap::GetSingleton();
                     auto* userEvents = RE::UserEvents::GetSingleton();
-                    auto& settings = VRUISettings::get();
+                    auto& manager = VRMenuManager::get();
+                    const bool menuOnLeft = manager.isMenuHandLeft();
 
-                    bool isMenuHand = settings.useLeftHandAsMenu ? isLeftHand : isRightHand;
-                    bool isDominantHand = settings.useLeftHandAsMenu ? isRightHand : isLeftHand;
+                    bool isMenuHand = menuOnLeft ? isLeftHand : isRightHand;
+                    bool isDominantHand = menuOnLeft ? isRightHand : isLeftHand;
 
                     // 1. Triggers are always fixed: Left Trigger -> Left Equip, Right Trigger -> Right Equip
                     uint32_t triggerKey = 33;
@@ -216,19 +237,35 @@ namespace vrui
                         }
                     }
                     const bool isGripButton = keyCode == gripKey || keyCode == 2 || keyCode == 7;
+                    auto& rmlHost =
+                        dragonboard::ui::rml::RmlPanelHost::GetSingleton();
+                    const bool rmlOwnsGrip =
+                        isDominantHand &&
+                        isGripButton &&
+                        manager.isPhysicalBoardActive() &&
+                        rmlHost.ShouldCaptureGripInput();
                     if (isGripButton) {
+                        dragonboard::integrations::vrik::VrikBoardProxyController::
+                            GetSingleton().NotifyGripInput(
+                                isLeftHand, btnEvent->IsPressed());
                         if (isMenuHand) VRMenuManager::get().onGripButtonChanged(btnEvent->IsPressed());
                         if (isDominantHand) VRMenuManager::get().onDominantGripButtonChanged(btnEvent->IsPressed());
                         if (!isDominantHand) VRMenuManager::get().onOffhandGripButtonChanged(btnEvent->IsPressed());
                     }
 
                     if (isTriggerButton || (isDominantHand && isGripButton)) {
-                        dragonboard::ui::rml::RmlPanelHost::GetSingleton()
-                            .OnVrButtonEvent(
-                                isLeftHand,
-                                isTriggerButton,
-                                isGripButton,
-                                btnEvent->IsPressed());
+                        rmlHost.OnVrButtonEvent(
+                            isLeftHand,
+                            isTriggerButton,
+                            isGripButton,
+                            btnEvent->IsPressed());
+                    }
+                    if (rmlOwnsGrip) {
+                        stopInputPropagation = true;
+                        if (btnEvent->IsPressed()) {
+                            logger::trace(
+                                "DragonBoardVR: RML panel captured physical-board grip before VRIK holster processing.");
+                        }
                     }
                 }
             }
@@ -241,6 +278,8 @@ namespace vrui
             logger::trace("DragonBoardVR: First frame - update loop ACTIVE!");
         }
 
-        return RE::BSEventNotifyControl::kContinue;
+        return stopInputPropagation ?
+            RE::BSEventNotifyControl::kStop :
+            RE::BSEventNotifyControl::kContinue;
     }
 }

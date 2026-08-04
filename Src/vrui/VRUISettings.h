@@ -121,6 +121,20 @@ namespace vrui
         bool  useLeftHandAsMenu           = true;    
 
         // -----------------------------------------------------------------------
+        // -----------------------------------------------------------------------
+        // [PhysicalBoard]
+        // -----------------------------------------------------------------------
+        bool physicalBoardEnabled = true;
+        std::string physicalBoardPlugin = "DragonBoardVR.esp";
+        std::uint32_t physicalBoardLocalFormID = 0x000800;
+        std::uint32_t physicalBoardVrikProxyLocalFormID = 0x000801;
+        float physicalBoardUiOffsetX = 0.0f;
+        float physicalBoardUiOffsetY = 0.0f;
+        float physicalBoardUiOffsetZ = 0.0f;
+        float physicalBoardUiRotX = 0.0f;
+        float physicalBoardUiRotY = 0.0f;
+        float physicalBoardUiRotZ = 0.0f;
+        float physicalBoardUiScale = 1.0f;
         // [Visual]  — ALL panels share these values
         // -----------------------------------------------------------------------
         float menuScale     = 1.12f;
@@ -187,6 +201,7 @@ namespace vrui
         float fingerTouchPressDistance = 0.45f;
         float fingerTouchReleaseDistance = 1.0f;
         float fingerTouchScrollDeadzone = 55.0f;
+        float fingerTouchMaxActivationSpeed = 50.0f;
 
         std::string laserNifPath      = "DragonBoardVR/IconPlane.nif"; // laser.nif crashes SkyrimVR parser (Outfit Studio export incompatibility)
         std::string backgroundNifPath = "DragonBoardVR/dragonboard.nif";

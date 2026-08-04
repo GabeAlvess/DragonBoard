@@ -19,6 +19,7 @@ namespace dragonboard::ui::rml
             bool requireHover = true;
             float grabHoldSeconds = 1.0f;
             bool updateSceneGraph = true;
+            float thumbstickY = 0.0f;
         };
 
         struct UpdateResult
@@ -41,10 +42,8 @@ namespace dragonboard::ui::rml
 
         bool _enabled = false;
         bool _grabbed = false;
-        bool _twoHandScaling = false;
+        bool _thumbScaling = false;
         float _holdSeconds = 0.0f;
-        float _twoHandInitialDistance = 1.0f;
-        float _twoHandInitialScale = 1.0f;
         RE::NiPoint3 _grabOffsetLocalHand{};
         RE::NiMatrix3 _grabInitialHandRotation{};
         RE::NiMatrix3 _grabInitialSurfaceWorldRotation{};

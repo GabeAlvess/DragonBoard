@@ -101,6 +101,16 @@ target('DragonBoardVR')
     add_installfiles('Assets/meshes/DragonBoardVR/dragonboard.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
+    add_installfiles('Assets/meshes/DragonBoardVR/dragonboard_physical.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
+    add_installfiles('Assets/meshes/DragonBoardVR/dragonboard_vrik_proxy.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
+    add_installfiles('Assets/meshes/DragonBoardVR/dragonboard_vrik_proxy_hidden.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
+    add_installfiles('Assets/DragonBoardVR.esp')
     add_installfiles('Assets/meshes/DragonBoardVR/iconplane.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
@@ -138,6 +148,10 @@ target('DragonBoardVR')
         os.cp(targetFile, installFile)
         local screenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif')
         local spellWheelNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard.nif')
+        local physicalBoardNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard_physical.nif')
+        local vrikProxyNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy.nif')
+        local vrikProxyHiddenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy_hidden.nif')
+        local physicalBoardPlugin = path.join(os.projectdir(), 'Assets', 'DragonBoardVR.esp')
         local iconPlaneNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'iconplane.nif')
         local categoryMarkerNifs = path.join(
             os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'DBMarker*.nif')
@@ -145,6 +159,7 @@ target('DragonBoardVR')
         local spellWheelTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DragonBoardMat_*.dds')
         local categoryMarkerTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DBMarker*.dds')
         os.mkdir(path.join(installRoot, 'meshes', 'DragonBoardVR'))
+        os.mkdir(path.join(installRoot, 'meshes', 'Magic'))
         os.mkdir(path.join(installRoot, 'textures'))
         os.cp(screenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif'))
         os.vrunv('powershell', {
@@ -182,6 +197,10 @@ target('DragonBoardVR')
             '-Replacement', 'RmlUI4.dds'
         })
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
+        os.cp(physicalBoardNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard_physical.nif'))
+        os.cp(vrikProxyNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy.nif'))
+        os.cp(vrikProxyHiddenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy_hidden.nif'))
+        os.cp(physicalBoardPlugin, path.join(installRoot, 'DragonBoardVR.esp'))
         os.cp(iconPlaneNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'iconplane.nif'))
         os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI0.dds'))

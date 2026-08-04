@@ -22,6 +22,7 @@ namespace vrui
 
         /// Attach this panel to a specific NiNode in the player skeleton
         void attachToHandNode(RE::NiNode* handNode, const RE::NiPoint3& offset = {0, 5, 10});
+        void attachToPhysicalNode(RE::NiNode* physicalNode);
         void setHandFollowBasis(HandFollowBasis basis) { _handFollowBasis = basis; }
         bool parkAtWorldNode(RE::NiNode* worldRoot, RE::NiNode* trackingAnchor);
         bool updateParkedTracking(RE::NiNode* trackingAnchor);

@@ -71,7 +71,7 @@ namespace vrui
                 return {};
             }
 
-            const bool isLeft = !VRUISettings::get().useLeftHandAsMenu;
+            const bool isLeft = manager.isDominantHandLeft();
             const std::size_t cacheIndex = isLeft ? 0 : 1;
             if (!IsRangedWeaponPoseActive()) {
                 g_pointerOffsetCache.offsets[cacheIndex] = magicNode->local;
@@ -105,6 +105,35 @@ namespace vrui
     void VRMenuManager::onFrameUpdate(float deltaTime)
     {
         dragonboard::ui::frame::FrameUpdateController::Update(*this, deltaTime);
+    }
+
+    void VRMenuManager::setPhysicalBoardAnchor(
+        RE::NiNode* anchor,
+        bool heldInLeftHand,
+        RE::FormID referenceFormID)
+    {
+        _physicalBoardAnchor.reset(anchor);
+        _physicalBoardHeldLeft = heldInLeftHand;
+        _physicalBoardReferenceFormID = referenceFormID;
+        _boardPinState.SetPinned(false);
+        _refreshCoordinator.RequestTransforms();
+    }
+
+    void VRMenuManager::clearPhysicalBoardAnchor()
+    {
+        _physicalBoardAnchor.reset();
+        _physicalBoardHeldLeft = false;
+        _physicalBoardReferenceFormID = 0;
+        _refreshCoordinator.RequestTransforms();
+    }
+
+    void VRMenuManager::openMenuForPhysicalBoard()
+    {
+        if (!_menuSession.IsOpen()) {
+            dragonboard::ui::menu::MenuLifecycleController::ApplyToggle(*this, true);
+        } else {
+            _refreshCoordinator.RequestTransforms();
+        }
     }
 
     void VRMenuManager::registerPanel(std::shared_ptr<VRUIPanel> panel)
@@ -276,6 +305,10 @@ namespace vrui
 
     void VRMenuManager::toggleMenu(bool suppressToggleHaptic)
     {
+        if (isPhysicalBoardActive() && _menuSession.IsOpen()) {
+            return;
+        }
+
         // Debounce: prevent multiple triggers from same gesture/frame
         if (!_menuToggleCooldown.TryConsume(0.5f)) return;
 
@@ -372,21 +405,33 @@ namespace vrui
 
     RE::NiNode* VRMenuManager::getMenuHandNode() const
     {
+        if (isPhysicalBoardActive()) {
+            return isMenuHandLeft() ? getLeftHandNode() : getRightHandNode();
+        }
         return VRUIHandTracking::getMenuHandNode(_isVRIKInstalled);
     }
 
     RE::NiNode* VRMenuManager::getMenuControllerNode() const
     {
+        if (isPhysicalBoardActive()) {
+            return _physicalBoardAnchor.get();
+        }
         return VRUIHandTracking::getMenuControllerNode(_isVRIKInstalled);
     }
 
     RE::NiNode* VRMenuManager::getDominantHandNode() const
     {
+        if (isPhysicalBoardActive()) {
+            return isDominantHandLeft() ? getLeftHandNode() : getRightHandNode();
+        }
         return VRUIHandTracking::getDominantHandNode(_isVRIKInstalled);
     }
 
     RE::NiNode* VRMenuManager::getNonDominantHandNode() const
     {
+        if (isPhysicalBoardActive()) {
+            return isMenuHandLeft() ? getLeftHandNode() : getRightHandNode();
+        }
         return VRUIHandTracking::getNonDominantHandNode(_isVRIKInstalled);
     }
 
@@ -427,7 +472,7 @@ namespace vrui
         const auto& settings = VRUISettings::get();
         dragonboard::runtime::vr::TriggerHaptic(
             isDominantHand,
-            settings.useLeftHandAsMenu,
+            isMenuHandLeft(),
             settings.isNativeLeftHandedMode(),
             intensity,
             duration);

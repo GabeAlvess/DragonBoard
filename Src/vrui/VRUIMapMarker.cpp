@@ -252,9 +252,12 @@ namespace vrui
             return;
         }
 
-        auto surfacePanel = VRMenuManager::get().findPanelByName("Background_Panel");
+        auto& manager = VRMenuManager::get();
+        auto surfacePanel = manager.findPanelByName("Background_Panel");
         auto* panelNode = surfacePanel ? surfacePanel->getNode() : nullptr;
-        auto* backgroundNode = surfacePanel ? surfacePanel->getBackgroundNode() : nullptr;
+        auto* backgroundNode = manager.isPhysicalBoardActive() ?
+            manager.getPhysicalBoardAnchorNode() :
+            (surfacePanel ? surfacePanel->getBackgroundNode() : nullptr);
         if (!panelNode || !backgroundNode) {
             setVisible(false);
             return;

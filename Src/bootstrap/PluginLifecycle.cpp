@@ -3,7 +3,9 @@
 #include "bootstrap/HotkeyResolver.h"
 #include "gameplay/CombatSlowTime.h"
 #include "higgsinterface001.h"
+#include "integrations/higgs/PhysicalBoardController.h"
 #include "integrations/spellwheel/SpellWheelIntegration.h"
+#include "integrations/vrik/VrikBoardProxyController.h"
 #include "integrations/vrik/VrikFingerPose.h"
 #include "keyhandler/keyhandler.h"
 #include "plugin.h"
@@ -63,6 +65,8 @@ namespace dragonboard::bootstrap
                 logger::info(
                     "DragonBoardVR: HIGGS interface obtained successfully. Build: {}",
                     g_higgsInterface->GetBuildNumber());
+                dragonboard::integrations::vrik::InitializeHiggsHandCollisionSuppression();
+                dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton().Initialize();
             } else {
                 logger::warn("DragonBoardVR: HIGGS interface not found. Direct grabbing will be disabled.");
             }
@@ -84,7 +88,10 @@ namespace dragonboard::bootstrap
         case SKSE::MessagingInterface::kDataLoaded: {
             logger::trace("DragonBoardVR: ===== kDataLoaded =====");
             ModActionManager::get().initialize();
+            dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton().Initialize();
             dragonboard::integrations::spellwheel::RegisterPlayerEventSink();
+            dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton().RefreshConfiguredForm();
+            dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton().RefreshConfiguredForms();
 
             if (auto* modEventSource = SKSE::GetModCallbackEventSource()) {
                 modEventSource->AddEventSink(ModCallbackEventHandler::GetSingleton());
@@ -125,6 +132,8 @@ namespace dragonboard::bootstrap
         }
 
         case SKSE::MessagingInterface::kPreLoadGame:
+            dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton().Reset();
+            dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton().Reset();
             dragonboard::integrations::vrik::RestoreTouchHandPose();
             dragonboard::gameplay::CombatSlowTime::GetSingleton().Close();
             dragonboard::papyrus::ResetPapyrusPanels();

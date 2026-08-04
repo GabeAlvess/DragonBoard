@@ -24,6 +24,11 @@
 /Tools/IniScanner/.build/
 /Tools/IniScanner/__pycache__/
 /Tools/IniScanner/tests/__pycache__/
+/Tools/PhysicalBoardPluginGenerator/bin/
+/Tools/PhysicalBoardPluginGenerator/obj/
+
+# Local mesh snapshots created during physical-board iteration.
+/Assets/meshes/DragonBoardVR/*.bak
 
 # Local investigation artifacts, third-party source snapshots, and visual QA.
 /Backups/

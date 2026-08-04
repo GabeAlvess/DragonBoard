@@ -12,6 +12,7 @@ namespace dragonboard::ui::panels
 
     void PanelTransformUpdater::Update(
         const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
+        RE::NiNode* physicalAnchor,
         RE::NiNode* handNode,
         RE::NiNode* pinnedAttachNode,
         RE::NiNode* leftHandNode,
@@ -38,7 +39,9 @@ namespace dragonboard::ui::panels
                 continue;
             }
 
-            if (worldPinned && pinnedAttachNode) {
+            if (physicalAnchor) {
+                panel->attachToPhysicalNode(physicalAnchor);
+            } else if (worldPinned && pinnedAttachNode) {
                 panel->attachToNode(pinnedAttachNode);
             } else if (handNode) {
                 panel->attachToHandNode(handNode, handOffset);

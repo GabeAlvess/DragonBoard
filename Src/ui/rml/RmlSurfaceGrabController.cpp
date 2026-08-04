@@ -2,6 +2,8 @@
 
 #include "ui/rml/RmlSurfaceGrabController.h"
 
+#include "ui/input/GripThumbScale.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -59,7 +61,7 @@ namespace dragonboard::ui::rml
     void RmlSurfaceGrabController::Reset()
     {
         _grabbed = false;
-        _twoHandScaling = false;
+        _thumbScaling = false;
         _holdSeconds = 0.0f;
     }
 
@@ -103,7 +105,7 @@ namespace dragonboard::ui::rml
 
         if (!input.dominantGripDown || !input.dominantHand) {
             _grabbed = false;
-            _twoHandScaling = false;
+            _thumbScaling = false;
             result.grabEnded = true;
             return result;
         }
@@ -136,22 +138,15 @@ namespace dragonboard::ui::rml
         }
         surfaceNode->local.rotate = Orthonormalize(surfaceNode->local.rotate);
 
-        if (input.offHandGripDown && input.offHand) {
-            const float distance =
-                (input.dominantHand->world.translate - input.offHand->world.translate).Length();
-            if (!_twoHandScaling) {
-                _twoHandScaling = true;
-                _twoHandInitialDistance = std::max(distance, 1.0f);
-                _twoHandInitialScale = std::max(surfaceNode->local.scale, 1.0e-4f);
-            } else {
-                const float ratio = distance / _twoHandInitialDistance;
-                surfaceNode->local.scale = std::clamp(
-                    _twoHandInitialScale * ratio,
-                    std::max(input.minimumScale, 1.0e-4f),
-                    std::max(input.maximumScale, input.minimumScale));
-            }
-        } else {
-            _twoHandScaling = false;
+        const auto scaleResult = dragonboard::ui::input::ApplyGripThumbScale(
+            surfaceNode->local.scale,
+            input.thumbstickY,
+            deltaTime,
+            input.minimumScale,
+            input.maximumScale);
+        _thumbScaling = scaleResult.active;
+        if (scaleResult.changed) {
+            surfaceNode->local.scale = scaleResult.scale;
         }
 
         if (input.updateSceneGraph) {

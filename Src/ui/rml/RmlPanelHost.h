@@ -83,6 +83,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] std::shared_ptr<vrui::VRUIWidget> GetPreviewInteractionTarget();
         void UpdateGameThread(float deltaTime);
         void RenderPresentThread(float deltaTime);
+        [[nodiscard]] bool IsGripThumbScaleInputCaptured(bool leftHand) const;
 
         DragonBoardVR_API::PanelHandle RegisterExternalPanel(
             const DragonBoardVR_API::PanelDescriptor& descriptor) noexcept;
@@ -125,6 +126,15 @@ namespace dragonboard::ui::rml
             bool leftHand);
 
         [[nodiscard]] bool IsOpen() const { return _visible.load(); }
+        [[nodiscard]] bool IsPointerOnPanel() const
+        {
+            return _inputBridge.IsPointerOnPanel();
+        }
+        [[nodiscard]] bool ShouldCaptureGripInput() const
+        {
+            return IsOpen() &&
+                (_inputBridge.IsPointerOnPanel() || _inputBridge.IsScrollActive());
+        }
         [[nodiscard]] bool IsSettingsOpen() const;
         [[nodiscard]] bool IsDeveloperOpen() const;
         [[nodiscard]] bool IsInventoryOpen() const;
@@ -556,6 +566,8 @@ namespace dragonboard::ui::rml
         SettingsDraft _positionAdjustmentStartDraft;
         bool _positionAdjustmentStartedWorldPinned = false;
         RmlSurfaceGrabController _boardGrabController;
+        std::atomic<bool> _boardGripThumbScaleCaptured{ false };
+        std::atomic<bool> _surfaceGripThumbScaleCaptured{ false };
         std::mutex _devMutex;
         std::vector<DevCommandEntry> _devCommands;
         DevGameInfoSnapshot _devGameInfo;

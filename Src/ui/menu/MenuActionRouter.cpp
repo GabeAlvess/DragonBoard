@@ -1,5 +1,6 @@
 #include "MenuActionRouter.h"
 
+#include "integrations/higgs/PhysicalBoardController.h"
 #include "runtime/vr/GameMenuActions.h"
 #include "ui/rml/RmlPanelHost.h"
 #include "vrui/VRMenuManager.h"
@@ -131,6 +132,10 @@ namespace dragonboard::ui::menu
             return OpenNativeMenu(manager, "MagicMenu");
         }
         if (normalized == "mapmenu" || normalized == "map") {
+            if (dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton()
+                    .StoreHeldBoardBeforeOpeningMap()) {
+                return true;
+            }
             return OpenNativeMenu(manager, "MapMenu");
         }
         if (normalized == "tweenmenu") {

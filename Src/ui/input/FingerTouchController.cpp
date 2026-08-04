@@ -193,7 +193,9 @@ namespace dragonboard::ui::input
         bool SampleBoardDistance(
             const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
             const RE::NiPoint3& worldPoint,
-            float& distance)
+            float& distance,
+            RE::NiPoint3* relativePosition = nullptr,
+            float* worldScale = nullptr)
         {
             constexpr std::array<std::string_view, 3> preferredPanels{
                 "Background_Panel", "Persistent_Panel", "MainPanel" };
@@ -214,6 +216,12 @@ namespace dragonboard::ui::input
                     const RE::NiPoint3 local =
                         transform.rotate.Transpose() *
                         (worldPoint - transform.translate) / scale;
+                    if (relativePosition) {
+                        *relativePosition = local;
+                    }
+                    if (worldScale) {
+                        *worldScale = scale;
+                    }
                     const float outsideX =
                         std::max(std::abs(local.x) - kBoardHalfWidth, 0.0f) *
                         scale;
@@ -319,7 +327,7 @@ namespace dragonboard::ui::input
         FingerTipPose finger;
         if (!ResolveDominantFingerTip(
                 manager.getPlayerSkeletonRoot(),
-                settings.useLeftHandAsMenu,
+                manager.isMenuHandLeft(),
                 settings.isNativeLeftHandedMode(),
                 settings.fingerTouchTipExtension,
                 RE::NiPoint3{
@@ -343,8 +351,37 @@ namespace dragonboard::ui::input
         const auto& panels = manager._panelRegistry.GetPanels();
 
         float boardDistance = std::numeric_limits<float>::max();
-        const bool hasBoardSurface =
-            SampleBoardDistance(panels, finger.physicalPosition, boardDistance);
+        RE::NiPoint3 relativeTouchPosition{};
+        float boardWorldScale = 1.0f;
+        const bool hasBoardSurface = SampleBoardDistance(
+            panels,
+            finger.physicalPosition,
+            boardDistance,
+            &relativeTouchPosition,
+            &boardWorldScale);
+        bool touchActivationSpeedAllowed = false;
+        if (hasBoardSurface) {
+            if (_hasRelativeTouchSample) {
+                const float frameTime = std::clamp(
+                    deltaTime, 1.0f / 240.0f, 0.05f);
+                _relativeTouchSpeed =
+                    (relativeTouchPosition - _previousRelativeTouchPosition).Length() *
+                    boardWorldScale / frameTime;
+                touchActivationSpeedAllowed =
+                    std::isfinite(_relativeTouchSpeed) &&
+                    _relativeTouchSpeed <= settings.fingerTouchMaxActivationSpeed;
+            } else {
+                _relativeTouchSpeed = 0.0f;
+            }
+            _previousRelativeTouchPosition = relativeTouchPosition;
+            _hasRelativeTouchSample = true;
+        } else {
+            _hasRelativeTouchSample = false;
+            _relativeTouchSpeed = 0.0f;
+        }
+        if (_contactLatched && !touchActivationSpeedAllowed) {
+            _contactVelocityInvalidated = true;
+        }
         const bool boardWithinEntry =
             hasBoardSurface &&
             boardDistance <= settings.fingerTouchEnterDistance;
@@ -409,7 +446,8 @@ namespace dragonboard::ui::input
                 "DragonBoardVR: finger touch sample physicalHand={}, "
                 "skeletonHand={}, boardDistance={:.2f}, "
                 "rmlInBounds={}, rmlOnFront={}, u={:.3f}, v={:.3f}, "
-                "signedDistance={:.2f}, frontSign={:.0f}, button={}.",
+                "signedDistance={:.2f}, frontSign={:.0f}, button={}, "
+                "relativeSpeed={:.2f}/{:.2f}, speedAllowed={}.",
                 finger.leftHand ? "left" : "right",
                 finger.skeletonLeftHand ? "left" : "right",
                 boardDistance,
@@ -419,7 +457,10 @@ namespace dragonboard::ui::input
                 rmlV,
                 rmlSignedDistance,
                 rmlFrontSign,
-                button.widget != nullptr);
+                button.widget != nullptr,
+                _relativeTouchSpeed,
+                settings.fingerTouchMaxActivationSpeed,
+                touchActivationSpeedAllowed);
         }
 
         const bool boardWithinExit =
@@ -448,7 +489,7 @@ namespace dragonboard::ui::input
         const auto processClassicButton = [&](WidgetPointSample candidate) {
             if (_contactLatched) {
                 candidate.widget.reset();
-            } else if (!candidate.widget) {
+            } else if (!touchActivationSpeedAllowed || !candidate.widget) {
                 _frontApproachArmedWidget.reset();
             } else {
                 const float orientedDistance =
@@ -470,12 +511,13 @@ namespace dragonboard::ui::input
             }
 
             const auto armedWidget = _frontApproachArmedWidget.lock();
-            if (!_contactLatched && candidate.widget &&
-                armedWidget == candidate.widget &&
+            if (!_contactLatched && touchActivationSpeedAllowed &&
+                candidate.widget && armedWidget == candidate.widget &&
                 candidate.absoluteDistance <= settings.fingerTouchPressDistance) {
                 _frontSign = candidate.frontSign;
                 _contactLatched = true;
                 _contactIsRml = false;
+                _contactVelocityInvalidated = false;
                 _frontApproachArmedWidget.reset();
                 _pressedWidget = candidate.widget;
                 _pressedLeftHand = finger.leftHand;
@@ -567,27 +609,34 @@ namespace dragonboard::ui::input
                     settings.fingerTouchHoverDistance;
             if (hover && !_contactLatched) _frontSign = rmlFrontSign;
             const float orientedDistance = rmlSignedDistance * _frontSign;
-            if (!_contactLatched && !rmlOnFront) {
+            if (!_contactLatched &&
+                (!rmlOnFront || !touchActivationSpeedAllowed)) {
                 _rmlFrontApproachArmed = false;
             } else if (!_contactLatched && hover &&
                        orientedDistance > settings.fingerTouchPressDistance) {
                 _rmlFrontApproachArmed = true;
             }
-            if (!_contactLatched && _rmlFrontApproachArmed && hover &&
+            if (!_contactLatched && touchActivationSpeedAllowed &&
+                _rmlFrontApproachArmed && hover &&
                 orientedDistance <= settings.fingerTouchPressDistance) {
                 _contactLatched = true;
                 _contactIsRml = true;
+                _contactVelocityInvalidated = false;
                 _rmlFrontApproachArmed = false;
                 _rmlTouchScrolling = false;
                 _rmlTouchStartU = rmlU;
                 _rmlTouchStartV = rmlV;
             } else if (_contactLatched &&
                        (!rmlInBounds || orientedDistance >= settings.fingerTouchReleaseDistance)) {
-                const bool commitTap = !_rmlTouchScrolling && rmlInBounds;
+                const bool commitTap =
+                    !_rmlTouchScrolling &&
+                    !_contactVelocityInvalidated &&
+                    rmlInBounds;
                 _contactLatched = false;
                 _contactIsRml = false;
                 _rmlFrontApproachArmed = false;
                 _rmlTouchScrolling = false;
+                _contactVelocityInvalidated = false;
                 if (commitTap) {
                     _rmlTapU = rmlU;
                     _rmlTapV = rmlV;
@@ -639,6 +688,9 @@ namespace dragonboard::ui::input
 
     void FingerTouchController::Deactivate(vrui::VRMenuManager& manager)
     {
+        _hasRelativeTouchSample = false;
+        _relativeTouchSpeed = 0.0f;
+        _contactVelocityInvalidated = false;
         if (!_active) return;
         ReleasePressedWidget();
         _contactLatched = false;

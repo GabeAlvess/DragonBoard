@@ -23,6 +23,7 @@ namespace dragonboard::ui::menu
         static void PresentOpen(
             const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
             bool worldPinned,
+            RE::NiNode* physicalAnchor,
             RE::NiNode* menuHand,
             RE::NiNode* leftHandNode,
             RE::NiNode* rightHandNode,
@@ -31,6 +32,7 @@ namespace dragonboard::ui::menu
         static void PresentClosed(
             const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
             bool worldPinned,
+            RE::NiNode* physicalAnchor,
             RE::NiNode* menuHand,
             RE::NiNode* pinnedAttachNode,
             RE::NiNode* leftHandNode,

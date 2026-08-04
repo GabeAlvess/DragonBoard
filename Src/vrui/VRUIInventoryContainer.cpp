@@ -1,5 +1,6 @@
 #include "VRUIInventoryContainer.h"
 #include "ui/equipment/EquipInteractionController.h"
+#include "integrations/higgs/PhysicalBoardController.h"
 #include "runtime/vr/ReferencePlacement.h"
 #include "VRUIItemUtils.h"
 #include "VRUIItemEditPanel.h"
@@ -1211,6 +1212,8 @@ namespace vrui
                     if (!reference || !g_higgsInterface) return;
 
                     auto* rawReference = reference.get();
+                    dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton()
+                        .PrepareHandForPinnedItemGrab(isLeft);
                     if (g_higgsInterface->CanGrabObject(rawReference, isLeft)) {
                         g_higgsInterface->GrabObject(rawReference, isLeft);
                         logger::info(

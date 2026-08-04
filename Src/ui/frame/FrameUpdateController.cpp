@@ -3,6 +3,8 @@
 #include "diagnostics/FingerTrackingProbe.h"
 #include "gameplay/CombatSlowTime.h"
 #include "integrations/spellwheel/SpellWheelIntegration.h"
+#include "integrations/higgs/PhysicalBoardController.h"
+#include "integrations/vrik/VrikBoardProxyController.h"
 #include "ui/panels/BoardPinWatchdog.h"
 #include "ui/equipment/EquipInteractionController.h"
 #include "ui/input/InteractionInputController.h"
@@ -40,6 +42,8 @@ namespace dragonboard::ui::frame
         vrui::VRUIButton::resetFrameLoadCounter();
         dragonboard::ui::runtime::DeferredActionController::Process(manager, deltaTime);
         dragonboard::integrations::spellwheel::Update(deltaTime);
+        dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton().Update();
+        dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton().Update();
 
         manager._menuToggleCooldown.Advance(deltaTime);
         dragonboard::ui::equipment::EquipInteractionController::Update(manager, deltaTime);

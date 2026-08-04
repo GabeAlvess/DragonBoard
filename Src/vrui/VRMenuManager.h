@@ -121,6 +121,25 @@ namespace vrui
         /// Check if any menu is currently visible
         bool isMenuOpen() const { return _menuSession.IsOpen(); }
 
+        void setPhysicalBoardAnchor(
+            RE::NiNode* anchor,
+            bool heldInLeftHand,
+            RE::FormID referenceFormID);
+        void clearPhysicalBoardAnchor();
+        void openMenuForPhysicalBoard();
+        bool isPhysicalBoardActive() const { return _physicalBoardAnchor != nullptr; }
+        bool isPhysicalBoardHeldLeft() const { return _physicalBoardHeldLeft; }
+        bool isMenuHandLeft() const
+        {
+            return isPhysicalBoardActive() ?
+                _physicalBoardHeldLeft : VRUISettings::get().useLeftHandAsMenu;
+        }
+        bool isDominantHandLeft() const { return !isMenuHandLeft(); }
+        RE::NiNode* getPhysicalBoardAnchorNode() const
+        {
+            return _physicalBoardAnchor.get();
+        }
+
         // --- Active container home navigation ---
 
         /// Set the container whose first page is restored by Home
@@ -151,7 +170,7 @@ namespace vrui
         void onTriggerButtonChanged(bool pressed);
         bool isDominantTriggerButtonDown() const
         {
-            return VRUISettings::get().useLeftHandAsMenu ?
+            return isMenuHandLeft() ?
                 _inputButtons.Trigger() :
                 _inputButtons.OffhandTrigger();
         }
@@ -195,7 +214,7 @@ namespace vrui
         /// Notify that the grip button state changed on the off-hand
         void onOffhandGripButtonChanged(bool pressed);
 
-        /// Get current off-hand grip state for polling (e.g., two-hand scale)
+        /// Get current off-hand grip state for polling secondary interactions.
         bool isOffhandGripButtonDown() const { return _inputButtons.OffhandGrip(); }
 
         /// While active, grip input is reserved for moving/scaling the whole
@@ -296,6 +315,9 @@ namespace vrui
 
         bool _initialized = false;
         bool _rebuildOnNextOpen = false;
+        RE::NiPointer<RE::NiNode> _physicalBoardAnchor;
+        bool _physicalBoardHeldLeft = false;
+        RE::FormID _physicalBoardReferenceFormID = 0;
         bool _positionAdjustmentActive = false;
         bool _hasPositionAdjustmentWorldTransform = false;
         RE::NiTransform _positionAdjustmentWorldTransform{};

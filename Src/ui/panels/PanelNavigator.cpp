@@ -25,6 +25,7 @@ namespace dragonboard::ui::panels
         const std::string& panelName,
         bool menuOpen,
         bool worldPinned,
+        RE::NiNode* physicalAnchor,
         RE::NiNode* handNode,
         RE::NiNode* pinnedAttachNode,
         const RE::NiPoint3& panelOffset)
@@ -54,7 +55,9 @@ namespace dragonboard::ui::panels
             return result;
         }
 
-        if (worldPinned && pinnedAttachNode) {
+        if (physicalAnchor) {
+            targetPanel->attachToPhysicalNode(physicalAnchor);
+        } else if (worldPinned && pinnedAttachNode) {
             targetPanel->attachToNode(pinnedAttachNode);
         } else if (handNode) {
             targetPanel->attachToHandNode(handNode, panelOffset);

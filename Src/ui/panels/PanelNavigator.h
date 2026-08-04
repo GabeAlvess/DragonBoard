@@ -33,6 +33,7 @@ namespace dragonboard::ui::panels
             const std::string& panelName,
             bool menuOpen,
             bool worldPinned,
+            RE::NiNode* physicalAnchor,
             RE::NiNode* handNode,
             RE::NiNode* pinnedAttachNode,
             const RE::NiPoint3& panelOffset);

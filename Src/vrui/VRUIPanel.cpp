@@ -152,6 +152,38 @@ namespace vrui
         }
     }
 
+    void VRUIPanel::attachToPhysicalNode(RE::NiNode* physicalNode)
+    {
+        if (!physicalNode) {
+            logger::error("DragonBoardVR: Cannot attach panel '{}' - physical board node is missing", getName());
+            return;
+        }
+
+        _trackingHandNode.reset();
+        _hasParkedTrackingOffset = false;
+        _preserveWorldOnNextHandAttach = false;
+        _hasTargetTransform = false;
+        _smoothHandoffPosition = false;
+        _handoffElapsed = 0.0f;
+
+        if (!_node || _node->parent != physicalNode) {
+            attachToNode(physicalNode);
+        }
+
+        const auto& settings = VRUISettings::get();
+        _node->local.translate = {
+            settings.physicalBoardUiOffsetX,
+            settings.physicalBoardUiOffsetY,
+            settings.physicalBoardUiOffsetZ
+        };
+        RE::NiMatrix3 rotation;
+        rotation.SetEulerAnglesXYZ(
+            settings.physicalBoardUiRotX * kDegToRad,
+            settings.physicalBoardUiRotY * kDegToRad,
+            settings.physicalBoardUiRotZ * kDegToRad);
+        _node->local.rotate = rotation;
+        _node->local.scale = settings.physicalBoardUiScale;
+    }
     bool VRUIPanel::parkAtWorldNode(RE::NiNode* worldRoot, RE::NiNode* trackingAnchor)
     {
         if (!worldRoot || !_node || !_node->parent) {
@@ -261,7 +293,10 @@ namespace vrui
             auto& settings = VRUISettings::get();
             auto& manager = VRMenuManager::get();
 
-            if (manager.isPositionAdjustmentActive() &&
+            if (manager.isPhysicalBoardActive() &&
+                _handFollowBasis == HandFollowBasis::kMenu) {
+                attachToPhysicalNode(manager.getPhysicalBoardAnchorNode());
+            } else if (manager.isPositionAdjustmentActive() &&
                 manager.hasPositionAdjustmentWorldTransform() &&
                 _handFollowBasis == HandFollowBasis::kMenu) {
                 // During a whole-board grab every board-following panel uses
@@ -423,7 +458,7 @@ namespace vrui
             }
 
             // --- Update Background ---
-            if (settings.showBackground && _drawsBackground) {
+            if (settings.showBackground && _drawsBackground && !manager.isPhysicalBoardActive()) {
                 if (!_backgroundNode && !_backgroundLoadFailed) {
                     logger::trace("DragonBoardVR: Loading background NIF '{}'", settings.backgroundNifPath);
                     // Background can come from complex/custom NIFs. Keep original shader behavior
@@ -456,7 +491,9 @@ namespace vrui
                     auto bgLayout = VRUILayoutManager::getContainer("MainTablet");
                     if (bgLayout) {
                         _backgroundNode->local.translate = { bgLayout->transform.px, bgLayout->transform.py, bgLayout->transform.pz };
-                        _backgroundNode->local.scale = bgLayout->transform.scale;
+                        // [Background] fScale is authoritative for both this node
+                        // and the physical MISC mesh/collision.
+                        _backgroundNode->local.scale = settings.backgroundScale;
                         RE::NiMatrix3 jsonRot;
                         VRUILayoutManager::setMatrixEuler(jsonRot, 
                             bgLayout->transform.rx * kDegToRad,

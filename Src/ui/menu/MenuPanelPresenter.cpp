@@ -20,11 +20,14 @@ namespace dragonboard::ui::menu
         void AttachToBoard(
             const std::shared_ptr<vrui::VRUIPanel>& panel,
             bool worldPinned,
+            RE::NiNode* physicalAnchor,
             RE::NiNode* menuHand,
             RE::NiNode* pinnedAttachNode,
             const RE::NiPoint3& panelOffset)
         {
-            if (worldPinned && pinnedAttachNode) {
+            if (physicalAnchor) {
+                panel->attachToPhysicalNode(physicalAnchor);
+            } else if (worldPinned && pinnedAttachNode) {
                 panel->attachToNode(pinnedAttachNode);
             } else if (menuHand) {
                 panel->attachToHandNode(menuHand, panelOffset);
@@ -35,6 +38,7 @@ namespace dragonboard::ui::menu
     void MenuPanelPresenter::PresentOpen(
         const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
         bool worldPinned,
+        RE::NiNode* physicalAnchor,
         RE::NiNode* menuHand,
         RE::NiNode* leftHandNode,
         RE::NiNode* rightHandNode,
@@ -61,7 +65,7 @@ namespace dragonboard::ui::menu
                     panel->attachToHandNode(rightHandNode, panelOffset);
                 }
             } else {
-                AttachToBoard(panel, worldPinned, menuHand, pinnedAttachNode, panelOffset);
+                AttachToBoard(panel, worldPinned, physicalAnchor, menuHand, pinnedAttachNode, panelOffset);
             }
             panel->show();
         }
@@ -70,6 +74,7 @@ namespace dragonboard::ui::menu
     void MenuPanelPresenter::PresentClosed(
         const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
         bool worldPinned,
+        RE::NiNode* physicalAnchor,
         RE::NiNode* menuHand,
         RE::NiNode* pinnedAttachNode,
         RE::NiNode* leftHandNode,

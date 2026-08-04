@@ -11,6 +11,12 @@ namespace dragonboard::ui::input
     {
         auto& settings = vrui::VRUISettings::get();
 
+        if (manager.isPhysicalBoardActive()) {
+            manager._activationHoldTracker.Update(
+                settings.activationMode, {}, {}, deltaTime);
+            return;
+        }
+
         if (manager.isPositionAdjustmentActive()) {
             // Feed a released state so a partially accumulated activation hold
             // cannot close the board while grip is reserved for adjustment.
@@ -98,7 +104,7 @@ namespace dragonboard::ui::input
             manager._menuSession.IsOpen());
         auto& rmlHost = dragonboard::ui::rml::RmlPanelHost::GetSingleton();
         const bool modsRmlActive = rmlHost.IsModsOpen();
-        const bool secondaryOnRightHand = settings.useLeftHandAsMenu;
+        const bool secondaryOnRightHand = manager.isMenuHandLeft();
         const auto& panelSecondaryEvents = modsRmlActive ?
             dominantSecondaryEvents : secondaryEvents;
         if (panelSecondaryEvents.longPress) {

@@ -22,6 +22,7 @@ namespace dragonboard::ui::panels
     public:
         static void Update(
             const std::vector<std::shared_ptr<vrui::VRUIPanel>>& panels,
+            RE::NiNode* physicalAnchor,
             RE::NiNode* handNode,
             RE::NiNode* pinnedAttachNode,
             RE::NiNode* leftHandNode,

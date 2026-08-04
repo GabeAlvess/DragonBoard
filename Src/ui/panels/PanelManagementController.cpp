@@ -69,6 +69,7 @@ namespace dragonboard::ui::panels
             panelName,
             manager._menuSession.IsOpen(),
             manager._boardPinState.IsPinned(),
+            manager.getPhysicalBoardAnchorNode(),
             manager.getMenuHandNode(),
             ResolvePinnedAttachNode(manager, manager.getPlayerSkeletonRoot()),
             GetPanelOffset());

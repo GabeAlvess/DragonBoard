@@ -185,6 +185,7 @@ namespace dragonboard::ui::rml
         }
 
         _boardGrabController.Reset();
+        _boardGripThumbScaleCaptured.store(false, std::memory_order_release);
         _boardGrabController.SetEnabled(true);
         manager.setPositionAdjustmentActive(true);
         manager.setPositionAdjustmentWorldTransform(visibleWorldAtEntry);
@@ -207,6 +208,7 @@ namespace dragonboard::ui::rml
 
         auto& manager = vrui::VRMenuManager::get();
         _boardGrabController.SetEnabled(false);
+        _boardGripThumbScaleCaptured.store(false, std::memory_order_release);
         manager.setPositionAdjustmentActive(false);
         {
             std::scoped_lock lock(_draftMutex);
@@ -231,6 +233,7 @@ namespace dragonboard::ui::rml
         }
 
         _boardGrabController.SetEnabled(false);
+        _boardGripThumbScaleCaptured.store(false, std::memory_order_release);
         vrui::VRMenuManager::get().setPositionAdjustmentActive(false);
         _rmlSettingsSyncPending.store(true, std::memory_order_release);
         logger::info(
@@ -260,6 +263,9 @@ namespace dragonboard::ui::rml
             return;
         }
 
+        float thumbX = 0.0f;
+        float thumbY = 0.0f;
+        manager.getDominantThumbstick(thumbX, thumbY);
         const auto result = _boardGrabController.Update(
             boardNode,
             RmlSurfaceGrabController::Input{
@@ -272,8 +278,12 @@ namespace dragonboard::ui::rml
                 kBoardMaximumScale,
                 false,
                 0.0f,
-                false },
+                false,
+                thumbY },
             deltaTime);
+        _boardGripThumbScaleCaptured.store(
+            _boardGrabController.IsGrabbed(),
+            std::memory_order_release);
         if (result.grabStarted) {
             manager.setPositionAdjustmentWorldTransform(boardNode->world);
             manager.triggerHaptic(true, 0.55f, 0.08f);

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "VRUIButton.h"
+#include "ui/input/GripThumbScale.h"
 #include <algorithm>
 #include <sstream>
 #include <cctype>
@@ -15,6 +16,7 @@
 #include <RE/B/BSGeometry.h>
 #include <RE/N/NiNode.h>
 #include "VRUISettings.h"
+#include "integrations/higgs/PhysicalBoardController.h"
 #include "VRMenuManager.h"
 #include "VRUILayoutManager.h"
 #include <format>
@@ -221,6 +223,12 @@ namespace vrui
         if (!deferInit) {
             initializeVisuals();
         }
+    }
+
+    VRUIButton::~VRUIButton()
+    {
+        dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton()
+            .UpdatePinnedItemGrabPriority(this, false, false);
     }
 
     void VRUIButton::initializeVisuals()
@@ -936,8 +944,8 @@ namespace vrui
         VRUIWidget::update(deltaTime);
 
         // If grabbed, force the target and current scale to be the base scale so hover effect is suppressed.
-        // We skip this if two-hand scaling is active, as it has its own logic to drive the scale.
-        if (_isGrabbed && !_isTwoHandScaling) {
+        // Thumb scaling drives the grabbed node scale directly.
+        if (_isGrabbed && !_isThumbScaling) {
             _targetScale = _baseScale;
             _currentScale = _baseScale;
         }
@@ -987,7 +995,7 @@ namespace vrui
                 _node->UpdateWorldBound();
             }
             _isGrabbed = false;
-            _isTwoHandScaling = false;
+            _isThumbScaling = false;
             _grabTimer = 0.0f;
             VRMenuManager::get().clearGrabbedWidget(this);
             logger::trace(
@@ -1063,50 +1071,46 @@ namespace vrui
                             }
                         }
 
-                        // 4. Two-hand scale logic
-                        auto* offHand = VRMenuManager::get().getNonDominantHandNode();
-                        bool  offGrip = VRMenuManager::get().isOffhandGripButtonDown();
+                        // 4. Scale every grabbed scalable item/widget with the
+                        // vertical thumbstick axis from the same grip hand.
+                        auto& menuManager = VRMenuManager::get();
+                        float thumbX = 0.0f;
+                        float thumbY = 0.0f;
+                        menuManager.getDominantThumbstick(thumbX, thumbY);
 
-                        if (offGrip && offHand && hand) {
-                            float dist = (hand->world.translate - offHand->world.translate).Length();
+                        constexpr float kMinScale = 0.05f;
+                        constexpr float kMaxScale = 20.0f;
+                        const auto scaleResult =
+                            dragonboard::ui::input::ApplyGripThumbScale(
+                                editableNode->local.scale,
+                                thumbY,
+                                deltaTime,
+                                kMinScale,
+                                kMaxScale);
+                        const bool scaleStarted =
+                            scaleResult.active && !_isThumbScaling;
+                        _isThumbScaling = scaleResult.active;
 
-                            if (!_isTwoHandScaling) {
-                                // Start scaling session
-                                _isTwoHandScaling = true;
-                                _twoHandInitialDist = dist > 1.0f ? dist : 1.0f;
-                                _twoHandInitialScale = editableNode->local.scale;
-                                VRMenuManager::get().triggerHaptic(false, 0.5f, 0.1f);  // Micro-haptic on start
-                                RE::DebugNotification("Scaling: Start");
-                            } else {
-                                // Drive scale from distance ratio
-                                float ratio = dist / _twoHandInitialDist;
-                                constexpr float kMinScale = 0.05f;
-                                constexpr float kMaxScale = 20.0f;
-                                float newScale = std::clamp(_twoHandInitialScale * ratio, kMinScale, kMaxScale);
-                                
-                                editableNode->local.scale = newScale;
-                                
-                                // Sync internal lerp variables to prevent reset in lines 538-555
-                                if (editableNode == _node.get()) {
-                                    _currentScale = newScale;
-                                    _targetScale = (_state == ButtonState::Hovered) ? newScale * 1.1f : 
-                                                   ((_state == ButtonState::Pressed) ? newScale * 0.9f : newScale);
-                                    _baseScale = newScale;
-                                }
-                                
-                                // Subtle haptic pulse while scaling
-                                static float hapticTimer = 0.0f;
-                                hapticTimer += deltaTime;
-                                if (hapticTimer > 0.1f) {
-                                    VRMenuManager::get().triggerHaptic(false, 0.2f, 0.03f); // Vibration on dominant hand
-                                    hapticTimer = 0.0f;
-                                }
+                        if (scaleResult.changed) {
+                            editableNode->local.scale = scaleResult.scale;
+                            if (editableNode == _node.get()) {
+                                _currentScale = scaleResult.scale;
+                                _targetScale = scaleResult.scale;
+                                _baseScale = scaleResult.scale;
+                            }
+                        }
+
+                        if (scaleStarted) {
+                            menuManager.triggerHaptic(true, 0.35f, 0.05f);
+                        }
+                        if (_isThumbScaling) {
+                            _scaleHapticTimer += deltaTime;
+                            if (_scaleHapticTimer >= 0.12f) {
+                                menuManager.triggerHaptic(true, 0.15f, 0.025f);
+                                _scaleHapticTimer = 0.0f;
                             }
                         } else {
-                            if (_isTwoHandScaling) {
-                                RE::DebugNotification("Scaling: End");
-                                _isTwoHandScaling = false;
-                            }
+                            _scaleHapticTimer = 0.0f;
                         }
 
                         RE::NiUpdateData grabUpdateData;
@@ -1152,6 +1156,8 @@ namespace vrui
         }
 
         // --- HIGGS Dashboard Proximity Equip ---
+        bool leftPinPriorityActive = false;
+        bool rightPinPriorityActive = false;
         if (!boardPositionAdjustment && _isDashboardPinned &&
             _onPressHandler && _node && isVisible()) {
             bool isDomGripDown = VRMenuManager::get().isDominantGripButtonDown();
@@ -1160,9 +1166,8 @@ namespace vrui
             auto* domHand = VRMenuManager::get().getDominantHandNode();
             auto* offHand = VRMenuManager::get().getNonDominantHandNode();
 
-            bool isDomLeft = !VRUISettings::get().useLeftHandAsMenu;
-            bool isOffLeft = VRUISettings::get().useLeftHandAsMenu;
-
+            bool isDomLeft = VRMenuManager::get().isDominantHandLeft();
+            bool isOffLeft = VRMenuManager::get().isMenuHandLeft();
             // --- Compute palm positions ---
             RE::NiPoint3 domPalmPos{};
             if (domHand) {
@@ -1191,6 +1196,13 @@ namespace vrui
                               && g_higgsInterface && !g_higgsInterface->IsHoldingObject(isDomLeft);
             bool offInRange = offHand && (offPalmPos - proximityVolume.center).Length() <= proximityDistance
                               && g_higgsInterface && !g_higgsInterface->IsHoldingObject(isOffLeft);
+
+            if (VRMenuManager::get().isPhysicalBoardActive()) {
+                leftPinPriorityActive =
+                    (domInRange && isDomLeft) || (offInRange && isOffLeft);
+                rightPinPriorityActive =
+                    (domInRange && !isDomLeft) || (offInRange && !isOffLeft);
+            }
 
             // Priority: dominant hand first when both are in range
             bool inProximity     = domInRange || offInRange;
@@ -1237,6 +1249,11 @@ namespace vrui
             _wasNonDominantGripDown = isOffGripDown;
         }
 
+        dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton()
+            .UpdatePinnedItemGrabPriority(
+                this,
+                leftPinPriorityActive,
+                rightPinPriorityActive);
 
         // --- Drag-to-Drop Generic Processing ---
         if (!boardPositionAdjustment && _onGripDragHandler && _node &&
@@ -1369,6 +1386,8 @@ namespace vrui
         }
 
         _isGrabbed = true;
+        _grabHandIsLeft = VRMenuManager::get().isDominantHandLeft();
+        _scaleHapticTimer = 0.0f;
         _grabTimer = 0.0f;
         VRMenuManager::get().setGrabbedWidget(shared_from_this());
         VRMenuManager::get().clearHover();
@@ -1413,7 +1432,8 @@ namespace vrui
     {
         if (!_isGrabbed) return;
         _grabTimer = 0.0f;
-        _isTwoHandScaling = false;
+        _isThumbScaling = false;
+        _scaleHapticTimer = 0.0f;
         VRMenuManager::get().triggerHaptic(true, 1.0f, 0.2f);
         
         if (_node) {

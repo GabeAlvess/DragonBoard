@@ -1289,6 +1289,16 @@ namespace dragonboard::ui::rml
         return nullptr;
     }
 
+    bool RmlPanelHost::IsGripThumbScaleInputCaptured(bool leftHand) const
+    {
+        const auto& manager = vrui::VRMenuManager::get();
+        if (leftHand != manager.isDominantHandLeft()) {
+            return false;
+        }
+        return _boardGripThumbScaleCaptured.load(std::memory_order_acquire) ||
+            _surfaceGripThumbScaleCaptured.load(std::memory_order_acquire);
+    }
+
     void RmlPanelHost::Close()
     {
         if (_localPanelMode.load(std::memory_order_acquire) ==
@@ -1712,7 +1722,7 @@ namespace dragonboard::ui::rml
             if (enabled) {
                 const bool triggerWasLeft = _inputBridge.WasLastTriggerLeft();
                 const bool triggerWasDominant =
-                    vrui::VRUISettings::get().useLeftHandAsMenu ?
+                    manager.isMenuHandLeft() ?
                     !triggerWasLeft : triggerWasLeft;
                 manager.triggerHaptic(triggerWasDominant, intensity, duration);
             }
@@ -1944,7 +1954,7 @@ namespace dragonboard::ui::rml
             if (!command.empty()) {
                 const auto parsed = dragonboard::game::actions::Parse(command);
                 if (parsed.kind != dragonboard::game::actions::ActionKind::kUnknown) {
-                    const auto side = vrui::VRUISettings::get().useLeftHandAsMenu ?
+                    const auto side = vrui::VRMenuManager::get().isMenuHandLeft() ?
                         dragonboard::game::actions::EquipSide::kRight :
                         dragonboard::game::actions::EquipSide::kLeft;
                     vrui::VRMenuManager::get().toggleMenu();
@@ -2051,6 +2061,10 @@ namespace dragonboard::ui::rml
     void RmlPanelHost::UpdateSurfaceGrabsGameThread(float deltaTime)
     {
         auto& manager = vrui::VRMenuManager::get();
+        float thumbX = 0.0f;
+        float thumbY = 0.0f;
+        manager.getDominantThumbstick(thumbX, thumbY);
+        bool anySurfaceGrabbed = false;
         for (auto& [handle, surface] : _sceneSurfaces) {
             if (handle == kWelcomeSurfaceHandle) {
                 const bool welcomeGrabEnabled =
@@ -2070,8 +2084,11 @@ namespace dragonboard::ui::rml
                         2.0f,
                         true,
                         1.0f,
-                        true },
+                        true,
+                        thumbY },
                     deltaTime);
+                anySurfaceGrabbed =
+                    anySurfaceGrabbed || surface.grabController.IsGrabbed();
                 if (result.grabStarted) {
                     manager.triggerHaptic(true, 0.55f, 0.08f);
                     logger::trace(
@@ -2109,8 +2126,16 @@ namespace dragonboard::ui::rml
                     manager.getNonDominantHandNode(),
                     manager.isDominantGripButtonDown(),
                     manager.isOffhandGripButtonDown(),
-                    surface.pointerHovered },
+                    surface.pointerHovered,
+                    0.05f,
+                    20.0f,
+                    true,
+                    1.0f,
+                    true,
+                    thumbY },
                 deltaTime);
+            anySurfaceGrabbed =
+                anySurfaceGrabbed || surface.grabController.IsGrabbed();
             if (!result.grabStarted && !result.transformChanged && !result.grabEnded) {
                 continue;
             }
@@ -2144,6 +2169,9 @@ namespace dragonboard::ui::rml
                     handle);
             }
         }
+        _surfaceGripThumbScaleCaptured.store(
+            anySurfaceGrabbed,
+            std::memory_order_release);
     }
 
     void RmlPanelHost::CompleteActiveTutorialGameThread()
@@ -2245,7 +2273,9 @@ namespace dragonboard::ui::rml
         if (!surfacePanel || !surfacePanel->getNode()) {
             return;
         }
-        auto* backgroundNode = surfacePanel->getBackgroundNode();
+        auto* backgroundNode = manager.isPhysicalBoardActive() ?
+            manager.getPhysicalBoardAnchorNode() :
+            surfacePanel->getBackgroundNode();
         if (homeActive) {
             UpdateStatusSceneSurfaceGameThread(backgroundNode);
             UpdateStatusSurfaceHoverGameThread();

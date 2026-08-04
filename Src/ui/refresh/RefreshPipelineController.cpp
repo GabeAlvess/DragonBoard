@@ -23,6 +23,7 @@ namespace dragonboard::ui::refresh
         auto* rightHandNode = manager.getRightHandNode();
         dragonboard::ui::panels::PanelTransformUpdater::Update(
             manager._panelRegistry.GetPanels(),
+            manager.getPhysicalBoardAnchorNode(),
             handNode,
             pinnedAttachNode,
             leftHandNode,

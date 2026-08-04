@@ -42,6 +42,7 @@ namespace vrui
                    float itemXOffset, float itemYOffset, float itemZOffset,
                    float itemScaleMult, bool deferInit = false,
                    ItemUtils::ItemTransformSource transformSource = ItemUtils::ItemTransformSource::TypeFallback);
+        ~VRUIButton() override;
         void update(float deltaTime) override;
         void setLocalScale(float scale) override;
 
@@ -68,6 +69,7 @@ namespace vrui
         void startGrab();
         void releaseGrab();
         bool isGrabbed() const { return _isGrabbed; }
+        bool isGrabHandLeft() const { return _grabHandIsLeft; }
 
         // --- Persistence ---
         void setCanBePersistent(bool val) { _canBePersistent = val; }
@@ -218,11 +220,11 @@ namespace vrui
 
         float _grabTimer = 0.0f;
         bool _isGrabbed = false;
+        bool _grabHandIsLeft = false;
+        float _scaleHapticTimer = 0.0f;
         bool _canBePersistent = false;
         bool _isPersistent = false;
-        bool _isTwoHandScaling = false;
-        float _twoHandInitialDist = 0.0f;
-        float _twoHandInitialScale = 1.0f;
+        bool _isThumbScaling = false;
         RE::NiPoint3 _grabOffsetLocalHand;
         RE::NiPoint3 _grabInitialHandPos;
         RE::NiPoint3 _grabInitialButtonPos;

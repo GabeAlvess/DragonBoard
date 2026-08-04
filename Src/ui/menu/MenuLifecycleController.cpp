@@ -99,6 +99,7 @@ namespace dragonboard::ui::menu
             MenuPanelPresenter::PresentOpen(
                 manager._panelRegistry.GetPanels(),
                 manager._boardPinState.IsPinned(),
+                manager.getPhysicalBoardAnchorNode(),
                 menuHand,
                 manager.getLeftHandNode(),
                 manager.getRightHandNode(),
@@ -125,6 +126,7 @@ namespace dragonboard::ui::menu
             MenuPanelPresenter::PresentClosed(
                 manager._panelRegistry.GetPanels(),
                 manager._boardPinState.IsPinned(),
+                manager.getPhysicalBoardAnchorNode(),
                 manager.getMenuHandNode(),
                 manager.resolvePinnedAttachNode(manager.getPlayerSkeletonRoot()),
                 manager.getLeftHandNode(),

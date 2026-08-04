@@ -1,5 +1,7 @@
 #pragma once
 
+#include <RE/N/NiPoint3.h>
+
 #include <memory>
 
 namespace vrui
@@ -30,6 +32,10 @@ namespace dragonboard::ui::input
         bool _rmlTouchScrolling = false;
         bool _rmlTapPulseDown = false;
         bool _rmlFrontApproachArmed = false;
+        bool _hasRelativeTouchSample = false;
+        bool _contactVelocityInvalidated = false;
+        float _relativeTouchSpeed = 0.0f;
+        RE::NiPoint3 _previousRelativeTouchPosition{};
         float _frontSign = 1.0f;
         float _rmlTouchStartU = 0.0f;
         float _rmlTouchStartV = 0.0f;
