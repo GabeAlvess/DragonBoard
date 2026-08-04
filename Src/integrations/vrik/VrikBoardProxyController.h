@@ -12,6 +12,7 @@ namespace RE
 {
     class BGSArtObject;
     class NiAVObject;
+    class TESForm;
     class TESGlobal;
     class TESObjectMISC;
     class TESObjectREFR;
@@ -29,6 +30,7 @@ namespace dragonboard::integrations::vrik
         void RefreshConfiguredForms();
         void Reset();
         void Update();
+        void PrepareDragonBoardInventoryEquip(RE::TESForm* form, bool isLeft);
         void NotifyGripInput(bool isLeft, bool pressed);
         void NotifyPhysicalBoardGrabbed(RE::TESObjectREFR* reference, bool isLeft);
         void NotifyPhysicalBoardReleased(RE::TESObjectREFR* reference, bool stashed);
@@ -79,6 +81,9 @@ namespace dragonboard::integrations::vrik
         std::int32_t _activeSlotIndex = -1;
         bool _activeHandLeft = false;
         std::uint32_t _directEquipGraceFrames = 0;
+        bool _dragonBoardInventoryEquipPending = false;
+        bool _dragonBoardInventoryEquipHandLeft = false;
+        std::uint32_t _dragonBoardInventoryEquipFrames = 0;
         std::int32_t _holsterDrawCandidateSlot = -1;
         bool _holsterDrawCandidateHandLeft = false;
         std::uint32_t _holsterDrawCandidateFrames = 0;

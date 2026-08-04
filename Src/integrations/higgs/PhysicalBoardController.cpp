@@ -95,6 +95,14 @@ namespace dragonboard::integrations::higgs
             _configuredBaseForm->GetFormID());
     }
 
+    void PhysicalBoardController::PrepareSpawnedReference(
+        RE::TESObjectREFR* reference)
+    {
+        auto* rootObject = reference ? reference->Get3D() : nullptr;
+        auto* rootNode = rootObject ? rootObject->AsNode() : nullptr;
+        ApplyConfiguredObjectTransform(rootNode);
+    }
+
     void PhysicalBoardController::Reset()
     {
         if (_mapStoreRestoreHand && g_higgsInterface) {

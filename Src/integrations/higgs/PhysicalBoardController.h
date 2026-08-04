@@ -22,6 +22,7 @@ namespace dragonboard::integrations::higgs
         void RefreshConfiguredForm();
         void Reset();
         void Update();
+        void PrepareSpawnedReference(RE::TESObjectREFR* reference);
         void UpdatePinnedItemGrabPriority(
             const void* owner,
             bool leftActive,

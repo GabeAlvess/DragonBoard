@@ -21,8 +21,9 @@ Blender addon.
 ## VRIK weapon proxy
 
 Builds `dragonboard_vrik_proxy.nif` from a valid melee weapon NIF. The
-weapon collision and metadata remain intact, the template geometry is hidden,
-and the DragonBoard geometry is added as the only visible shape.
+weapon collision and metadata remain intact, the template geometry is hidden
+and collapsed so preview renderers cannot reveal it, and the DragonBoard
+geometry is added as the only visible shape.
 
 ```powershell
 python Tools/PhysicalBoardMeshGenerator/generate_vrik_proxy.py `

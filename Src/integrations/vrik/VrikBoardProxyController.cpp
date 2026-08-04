@@ -1,5 +1,6 @@
 #include "integrations/vrik/VrikBoardProxyController.h"
 
+#include "integrations/higgs/PhysicalBoardController.h"
 #include "integrations/vrik/VrikFingerPose.h"
 #include "higgsinterface001.h"
 #include "runtime/vr/ReferencePlacement.h"
@@ -33,6 +34,7 @@ namespace dragonboard::integrations::vrik
         constexpr RE::NiPoint3 kHolsterBoardHalfExtents{ 9.90f, 0.70f, 7.15f };
         constexpr std::uint32_t kInitialHolsterAssignmentTimeoutFrames = 60;
         constexpr std::uint32_t kDirectEquipGraceFrames = 45;
+        constexpr std::uint32_t kDragonBoardInventoryEquipIntentFrames = 30;
         constexpr std::uint32_t kHolsterDrawCandidateFrames = 180;
         constexpr std::uint32_t kHolsterDrawReleaseGraceFrames = 120;
         constexpr std::uint32_t kHolsterReassignmentStableFrames = 12;
@@ -52,6 +54,12 @@ namespace dragonboard::integrations::vrik
                 ui->IsMenuOpen("FavoritesMenu") ||
                 ui->IsMenuOpen("ContainerMenu") ||
                 ui->IsMenuOpen("BarterMenu"));
+        }
+
+        bool IsOriginalInventoryMenuOpen()
+        {
+            auto* ui = RE::UI::GetSingleton();
+            return ui && ui->IsMenuOpen("InventoryMenu");
         }
 
         RE::NiNode* GetControllerTrackingNode(bool isLeft)
@@ -166,6 +174,9 @@ namespace dragonboard::integrations::vrik
         _pendingInitialHolsterFrames = 0;
         _pendingInitialHolsterStashed = false;
         _directEquipGraceFrames = 0;
+        _dragonBoardInventoryEquipPending = false;
+        _dragonBoardInventoryEquipHandLeft = false;
+        _dragonBoardInventoryEquipFrames = 0;
         ClearHolsterDrawCandidate();
         _holsterReassignmentArmed = false;
         _holsterReassignmentCandidate = -1;
@@ -177,6 +188,13 @@ namespace dragonboard::integrations::vrik
 
     void VrikBoardProxyController::Update()
     {
+        if (_dragonBoardInventoryEquipFrames > 0) {
+            --_dragonBoardInventoryEquipFrames;
+            if (_dragonBoardInventoryEquipFrames == 0) {
+                _dragonBoardInventoryEquipPending = false;
+            }
+        }
+
         const auto& settings = vrui::VRUISettings::get();
         if (!settings.physicalBoardEnabled) {
             return;
@@ -321,6 +339,31 @@ namespace dragonboard::integrations::vrik
             logger::info(
                 "DragonBoardVR: added the persistent shared VRIK holster proxy after the player acquired a physical DragonBoard.");
         }
+    }
+
+    void VrikBoardProxyController::PrepareDragonBoardInventoryEquip(
+        RE::TESForm* form,
+        bool isLeft)
+    {
+        _dragonBoardInventoryEquipPending = false;
+        _dragonBoardInventoryEquipHandLeft = false;
+        _dragonBoardInventoryEquipFrames = 0;
+
+        if (!_formsResolved) {
+            RefreshConfiguredForms();
+        }
+        if (!form || form != _proxyBaseForm) {
+            return;
+        }
+
+        ClearHolsterDrawCandidate();
+        _dragonBoardInventoryEquipPending = true;
+        _dragonBoardInventoryEquipHandLeft = isLeft;
+        _dragonBoardInventoryEquipFrames =
+            kDragonBoardInventoryEquipIntentFrames;
+        logger::info(
+            "DragonBoardVR: armed DragonBoard inventory proxy equip for the {} hand.",
+            isLeft ? "left" : "right");
     }
 
     void VrikBoardProxyController::NotifyGripInput(
@@ -699,7 +742,8 @@ namespace dragonboard::integrations::vrik
             handNode->world.translate - _holsterAnchor->world.translate : RE::NiPoint3{};
         const float handDistanceSquared = handNode ?
             handDelta.SqrLength() : boardDistanceSquared;
-        const float distanceSquared = handDistanceSquared;
+        const float distanceSquared =
+            std::min(handDistanceSquared, boardDistanceSquared);
         if (!std::isfinite(distanceSquared) || !std::isfinite(boardDistanceSquared)) {
             logger::warn(
                 "DragonBoardVR: physical board release produced a non-finite distance for VRIK slot {}.",
@@ -726,12 +770,12 @@ namespace dragonboard::integrations::vrik
         }
 
         const auto storedSlot = _activeSlotIndex + 1;
-        const float distance = std::sqrt(distanceSquared);
         NotifyPhysicalBoardStored();
         logger::info(
-            "DragonBoardVR: physical board reholstered into VRIK slot {} at hand distance {:.2f}.",
+            "DragonBoardVR: physical board reholstered into VRIK slot {} (handDistance={:.2f}, boardDistance={:.2f}).",
             storedSlot,
-            distance);
+            std::sqrt(handDistanceSquared),
+            std::sqrt(boardDistanceSquared));
         return true;
     }
 
@@ -945,6 +989,8 @@ namespace dragonboard::integrations::vrik
         }
 
         reference->SetOwner(player->GetActorBase());
+        dragonboard::integrations::higgs::PhysicalBoardController::GetSingleton().
+            PrepareSpawnedReference(reference.get());
 
         const auto& manager = vrui::VRMenuManager::get();
         auto* handNode = isLeft ?
@@ -959,10 +1005,29 @@ namespace dragonboard::integrations::vrik
                 pitch,
                 yaw,
                 roll);
+            const auto& settings = vrui::VRUISettings::get();
+            const float boardScale =
+                (std::max)(0.001f, settings.backgroundScale);
+            const float gripEdgeX =
+                (isLeft ? -1.0f : 1.0f) *
+                kHolsterBoardHalfExtents.x * boardScale;
+            const RE::NiPoint3 gripPointLocal{
+                settings.backgroundOffsetX + gripEdgeX,
+                settings.backgroundOffsetY,
+                settings.backgroundOffsetZ
+            };
+            const auto spawnPosition = handNode->world.translate -
+                handNode->world.rotate * gripPointLocal;
             (void)dragonboard::runtime::vr::SetReferenceTransform(
                 reference.get(),
-                handNode->world.translate,
+                spawnPosition,
                 { pitch, yaw, roll });
+            logger::info(
+                "DragonBoardVR: spawned physical board with the {} hand centered on the lateral edge (localGrip=({:.2f}, {:.2f}, {:.2f})).",
+                isLeft ? "left" : "right",
+                gripPointLocal.x,
+                gripPointLocal.y,
+                gripPointLocal.z);
         }
 
         _activePhysicalReference = reference->CreateRefHandle();
@@ -1191,38 +1256,83 @@ namespace dragonboard::integrations::vrik
             return RE::BSEventNotifyControl::kContinue;
         }
 
+        const bool dragonBoardInventoryEquip =
+            event->equipped && _dragonBoardInventoryEquipPending &&
+            _dragonBoardInventoryEquipFrames > 0;
+        const bool dragonBoardInventoryEquipHandLeft =
+            _dragonBoardInventoryEquipHandLeft;
+        if (dragonBoardInventoryEquip) {
+            _dragonBoardInventoryEquipPending = false;
+            _dragonBoardInventoryEquipFrames = 0;
+        }
+        const bool originalInventoryEquip =
+            event->equipped && IsOriginalInventoryMenuOpen();
+
         const bool physicalBoardActive =
             _activeSlotIndex >= 0 || static_cast<bool>(_activePhysicalReference);
         if (event->equipped &&
             (physicalBoardActive || _holsterAnchorSlotIndex >= 0)) {
             if (physicalBoardActive) {
+                const bool allowedInventoryEquip =
+                    dragonBoardInventoryEquip || originalInventoryEquip;
                 const bool leftProxyEquipped = IsProxyEquipped(true);
                 const bool rightProxyEquipped = IsProxyEquipped(false);
-                _holsterReassignmentArmed = false;
+                if (!allowedInventoryEquip) {
+                    _holsterReassignmentArmed = false;
+                    _holsterReassignmentCandidate = -1;
+                    _holsterReassignmentStableFrames = 0;
+                    _holsterReassignmentWaitFrames = 0;
+                    SetEquippedProxyVisible(true, false);
+                    SetEquippedProxyVisible(false, false);
+                    if (auto* equipManager =
+                            RE::ActorEquipManager::GetSingleton()) {
+                        equipManager->UnequipObject(
+                            player,
+                            _proxyBaseForm,
+                            nullptr,
+                            1,
+                            GetHandEquipSlot(true));
+                        equipManager->UnequipObject(
+                            player,
+                            _proxyBaseForm,
+                            nullptr,
+                            1,
+                            GetHandEquipSlot(false));
+                    }
+                    logger::info(
+                        "DragonBoardVR: rejected proxy equip because a physical DragonBoard is already active (leftEquipped={}, rightEquipped={}); other VRIK holsters remain enabled.",
+                        leftProxyEquipped,
+                        rightProxyEquipped);
+                    return RE::BSEventNotifyControl::kContinue;
+                }
+
+                if (dragonBoardInventoryEquip) {
+                    _activeHandLeft = dragonBoardInventoryEquipHandLeft;
+                } else if (leftProxyEquipped != rightProxyEquipped) {
+                    _activeHandLeft = leftProxyEquipped;
+                } else {
+                    logger::warn(
+                        "DragonBoardVR: original inventory proxy equip hand was ambiguous while the physical board was active; leaving the proxy equipped without changing holster state.");
+                    return RE::BSEventNotifyControl::kContinue;
+                }
+
+                ClearHolsterDrawCandidate();
+                _holsterReassignmentArmed = true;
                 _holsterReassignmentCandidate = -1;
                 _holsterReassignmentStableFrames = 0;
                 _holsterReassignmentWaitFrames = 0;
-                SetEquippedProxyVisible(true, false);
-                SetEquippedProxyVisible(false, false);
-                if (auto* equipManager =
-                        RE::ActorEquipManager::GetSingleton()) {
-                    equipManager->UnequipObject(
-                        player,
-                        _proxyBaseForm,
-                        nullptr,
-                        1,
-                        GetHandEquipSlot(true));
-                    equipManager->UnequipObject(
-                        player,
-                        _proxyBaseForm,
-                        nullptr,
-                        1,
-                        GetHandEquipSlot(false));
+                SetEquippedProxyVisible(_activeHandLeft, true);
+                if (g_higgsInterface &&
+                    !g_higgsInterface->IsWeaponCollisionDisabled(_activeHandLeft)) {
+                    g_higgsInterface->DisableWeaponCollision(_activeHandLeft);
+                    _proxyWeaponCollisionDisabled = true;
+                    _proxyWeaponCollisionHandLeft = _activeHandLeft;
                 }
                 logger::info(
-                    "DragonBoardVR: rejected proxy equip because a physical DragonBoard is already active (leftEquipped={}, rightEquipped={}); other VRIK holsters remain enabled.",
-                    leftProxyEquipped,
-                    rightProxyEquipped);
+                    "DragonBoardVR: allowed {} proxy equip in the {} hand while the physical board is active; keeping the proxy equipped only for holster reassignment.",
+                    dragonBoardInventoryEquip ? "DragonBoard inventory" :
+                        "original InventoryMenu",
+                    _activeHandLeft ? "left" : "right");
                 return RE::BSEventNotifyControl::kContinue;
             }
 
@@ -1257,15 +1367,19 @@ namespace dragonboard::integrations::vrik
             return RE::BSEventNotifyControl::kContinue;
         }
 
-        const bool leftEquipped = IsProxyEquipped(true);
-        const bool rightEquipped = IsProxyEquipped(false);
-        if (leftEquipped == rightEquipped) {
-            logger::warn(
-                "DragonBoardVR: VRIK proxy equip hand was ambiguous; physical conversion skipped.");
-            return RE::BSEventNotifyControl::kContinue;
-        }
+        if (dragonBoardInventoryEquip) {
+            _activeHandLeft = dragonBoardInventoryEquipHandLeft;
+        } else {
+            const bool leftEquipped = IsProxyEquipped(true);
+            const bool rightEquipped = IsProxyEquipped(false);
+            if (leftEquipped == rightEquipped) {
+                logger::warn(
+                    "DragonBoardVR: VRIK proxy equip hand was ambiguous; physical conversion skipped.");
+                return RE::BSEventNotifyControl::kContinue;
+            }
 
-        _activeHandLeft = leftEquipped;
+            _activeHandLeft = leftEquipped;
+        }
         const auto rejectProxyEquip = [this, player]() {
             SetEquippedProxyVisible(_activeHandLeft, false);
             if (auto* equipManager = RE::ActorEquipManager::GetSingleton()) {
@@ -1285,6 +1399,20 @@ namespace dragonboard::integrations::vrik
                 _proxyWeaponCollisionHandLeft = _activeHandLeft;
             }
         };
+
+        if (dragonBoardInventoryEquip) {
+            ClearHolsterDrawCandidate();
+            _holsterReassignmentArmed = true;
+            _holsterReassignmentCandidate = -1;
+            _holsterReassignmentStableFrames = 0;
+            _holsterReassignmentWaitFrames = 0;
+            prepareVisibleProxy();
+            BeginUnassignedPhysicalDraw(_activeHandLeft);
+            logger::info(
+                "DragonBoardVR: DragonBoard inventory equipped the proxy in the {} hand; keeping the WEAP visible without spawning the physical MISC.",
+                _activeHandLeft ? "left" : "right");
+            return RE::BSEventNotifyControl::kContinue;
+        }
 
         const auto assignedSlotIndex = FindAssignedProxySlot();
         if (assignedSlotIndex >= 0) {

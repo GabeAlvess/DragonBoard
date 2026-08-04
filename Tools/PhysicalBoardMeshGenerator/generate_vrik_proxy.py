@@ -7,6 +7,9 @@ from pathlib import Path
 from shutil import copy2
 
 
+TEMPLATE_GEOMETRY_SCALE = 0.0001
+
+
 def find_pynifly_root(explicit: str | None) -> Path:
     candidates: list[Path] = []
     if explicit:
@@ -41,6 +44,13 @@ def main() -> None:
     from pyn.nifdefs import NODEID_NONE
     from pyn.pynifly import NifFile
 
+    def suppress_template_geometry(nif: NifFile) -> None:
+        for shape in nif.shapes:
+            shape.flags = int(shape.flags) | 1
+            transform = shape.transform
+            transform.scale = TEMPLATE_GEOMETRY_SCALE
+            shape.transform = transform
+
     visual_path = Path(args.visual).resolve()
     weapon_template_path = Path(args.weapon_template).resolve()
     output_path = Path(args.output).resolve()
@@ -53,8 +63,7 @@ def main() -> None:
         copy2(weapon_template_path, hidden_output_path)
         hidden = NifFile(str(hidden_output_path))
         hidden.rootNode.name = "DragonBoardVrikProxyHidden"
-        for shape in hidden.shapes:
-            shape.flags = int(shape.flags) | 1
+        suppress_template_geometry(hidden)
         hidden.save()
         print(f"Generated hidden first-person proxy {hidden_output_path}")
 
@@ -62,8 +71,7 @@ def main() -> None:
     destination = NifFile(str(output_path))
     destination.rootNode.name = "DragonBoardVrikProxy"
 
-    for shape in destination.shapes:
-        shape.flags = int(shape.flags) | 1
+    suppress_template_geometry(destination)
 
     source = visual.shapes[0]
     properties = source.properties.copy()

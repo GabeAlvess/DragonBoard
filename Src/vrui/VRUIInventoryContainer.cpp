@@ -1,6 +1,7 @@
 #include "VRUIInventoryContainer.h"
 #include "ui/equipment/EquipInteractionController.h"
 #include "integrations/higgs/PhysicalBoardController.h"
+#include "integrations/vrik/VrikBoardProxyController.h"
 #include "runtime/vr/ReferencePlacement.h"
 #include "VRUIItemUtils.h"
 #include "VRUIItemEditPanel.h"
@@ -1072,6 +1073,8 @@ namespace vrui
                             !isLeft ? 0x13F43 : 0x13F42);
                         manager->UnequipObject(player, item, nullptr, 1, otherSlot);
                     }
+                    dragonboard::integrations::vrik::VrikBoardProxyController::
+                        GetSingleton().PrepareDragonBoardInventoryEquip(item, isLeft);
                     manager->EquipObject(player, item, extraList, 1, slot);
                     if (!player->IsOnMount()) {
                         player->DrawWeaponMagicHands(true);
@@ -1082,6 +1085,8 @@ namespace vrui
             return true;
         }
 
+        dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton().
+            PrepareDragonBoardInventoryEquip(item, isLeft);
         equipManager->EquipObject(player, item, extraList, 1, slot);
         if (isWeapon || isSpell || isLight) {
             if (!player->IsOnMount()) player->DrawWeaponMagicHands(true);
