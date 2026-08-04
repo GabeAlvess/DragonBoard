@@ -318,7 +318,7 @@ Limites atuais do pacote do repositório:
 - o código referencia diversos NIFs DragonBoardVR que não estão em `Assets/meshes` deste checkout;
 - não há ESP/ESM no repositório nem PEX compilado de `DragonBoardVR_PlayerAlias.psc` no pipeline mostrado;
 - a versão do xmake é `1.0.0`, enquanto `Plugin::VERSION` é `1.1.3.0`;
-- o manifest declara GPL-3.0, mas não há arquivo de licença no root.
+- o projeto usa a licença MIT, disponível no arquivo `LICENSE` do root.
 
 Esses itens podem ser fornecidos por uma distribuição externa/legada, mas um build fresco deste repositório não demonstra isso. Consulte os itens de release/package em `TODO.md` antes de publicar.
 

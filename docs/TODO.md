@@ -56,7 +56,7 @@ Pronto quando: uma instalação feita somente a partir do pacote gerado pelo rep
 
 - [ ] Escolher uma única fonte de versão e gerar xmake, plugin metadata, log, API e documentação a partir dela.
 - [ ] Resolver a divergência `set_version('1.0.0')` versus `Plugin::VERSION 1.1.3.0`.
-- [ ] Adicionar `LICENSE` compatível com o `GPL-3.0` declarado.
+- [x] Adicionar o arquivo `LICENSE` com a licença MIT.
 - [ ] Adicionar README de instalação, requisitos, incompatibilidades e remoção segura.
 - [ ] Criar changelog/release notes e versionar a API separadamente da versão do mod.
 

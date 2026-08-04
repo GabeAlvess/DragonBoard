@@ -20,7 +20,7 @@ BEGIN
             VALUE "FileDescription", "VR Menu Framework - Interactive menus on non-dominant hand with raycast activation."
             VALUE "FileVersion", "1.0.0.0"
             VALUE "InternalName", "DragonBoardVR"
-            VALUE "LegalCopyright", "GabeAlvz | GPL-3.0 License"
+            VALUE "LegalCopyright", "GabeAlvz | MIT License"
             VALUE "ProductName", "DragonBoardVR"
             VALUE "ProductVersion", "1.0.0.0"
         END

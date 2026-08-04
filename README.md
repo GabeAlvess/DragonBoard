@@ -61,4 +61,4 @@ See [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md) and
 
 ## License
 
-GPL-3.0.
+MIT. See [`LICENSE`](LICENSE).
