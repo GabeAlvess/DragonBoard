@@ -1,0 +1,7 @@
+@font-face { font-family: DragonBoard; src: url("assets/Fonts/DragonBoardVR_Font.ttf"); }
+body { margin: 0; width: 1024px; height: 1080px; overflow: hidden; font-family: DragonBoard; color: #241b12; background-color: #ffffff; }
+#photo-panel { width: 1024px; height: 1080px; background-color: #ffffff; decorator: image("assets/Background/photoframe.jpg" fill); }
+#photo-image { width: 976px; height: 976px; margin: 24px 24px 0 24px; }
+#photo-caption { display: flex; flex-direction: row; align-items: center; width: 976px; height: 80px; margin: 0 24px; font-size: 56px; line-height: 64px; color: #241b12; }
+#photo-location { position: relative; top: -6px; width: 488px; text-align: left; }
+#photo-date-time { position: relative; top: -6px; width: 488px; text-align: right; }

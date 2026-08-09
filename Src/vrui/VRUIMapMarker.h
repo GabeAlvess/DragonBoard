@@ -1,5 +1,5 @@
 #pragma once
-#include "VRUIWidget.h"
+#include "VRUIButton.h"
 #include <RE/P/PlayerCharacter.h>
 #include <RE/N/NiNode.h>
 #include <RE/N/NiAVObject.h>
@@ -19,13 +19,14 @@ namespace vrui
     enum class MapMarkerSource
     {
         Player,
-        QuestObjective
+        QuestObjective,
+        GalleryPhoto
     };
 
     /**
      * @brief A widget that displays the player's real-time position on the tablet map.
      */
-    class VRUIMapMarker : public VRUIWidget
+    class VRUIMapMarker : public VRUIButton
     {
     public:
         static constexpr std::size_t kQuestMarkerSlotCount = 3;
@@ -34,7 +35,10 @@ namespace vrui
             const std::string& nifPath,
             MapMarkerSource source = MapMarkerSource::Player,
             std::size_t questSlot = 0,
-            std::string texturePath = {});
+            std::string texturePath = {},
+            RE::NiPoint3 fixedWorldPosition = {},
+            std::string galleryPhotoId = {},
+            RE::FormID fixedWorldspaceFormId = 0);
 
         static void SetQuestObjectivePosition(
             std::size_t questSlot,
@@ -47,6 +51,10 @@ namespace vrui
         // VRUIWidget interface
         void initializeVisuals() override;
         void update(float deltaTime) override;
+        bool hitTest(
+            const RE::NiPoint3& rayOriginWorld,
+            const RE::NiPoint3& rayDirWorld,
+            float& outDistance) const override;
 
     private:
         struct MapSurfaceTriangle
@@ -68,6 +76,15 @@ namespace vrui
         std::string _texturePath;
         MapMarkerSource _source = MapMarkerSource::Player;
         std::size_t _questSlot = 0;
+        RE::NiPoint3 _fixedWorldPosition{};
+        std::string _galleryPhotoId;
+        RE::FormID _fixedWorldspaceFormId = 0;
+        RE::NiPointer<RE::NiNode> _galleryHitVisualNode;
+        RE::NiPoint3 _galleryHitSurfaceCenter{};
+        RE::NiPoint3 _galleryHitSurfaceAxisX{};
+        RE::NiPoint3 _galleryHitSurfaceAxisY{};
+        RE::NiPoint3 _galleryHitSurfaceNormal{};
+        bool _galleryHitSurfaceValid = false;
         RE::NiNode* _cachedBackgroundNode = nullptr;
         std::vector<MapSurfaceTriangle> _mapSurfaceTriangles;
         bool _surfaceFailureLogged = false;

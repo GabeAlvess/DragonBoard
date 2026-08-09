@@ -37,6 +37,7 @@ namespace vrui {
         bool pinToRightHand = false;
         bool legacyHmdPin = false;
         bool visualTransformComposed = false;
+        bool boardRelativeTransform = false;
         UIJSONTransform transform;
         UIJSONVisuals visuals;
     };
@@ -60,7 +61,8 @@ namespace vrui {
         static std::vector<UIJSONElement> getContainerElements(const std::string& containerId);
 
         static void updateElementTransform(const std::string& containerId, const std::string& elementId,
-                                           const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale);
+                                           const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale,
+                                           std::optional<bool> boardRelativeTransform = std::nullopt);
         
         static void updateElementTransformAnywhere(const std::string& elementId,
                                                    const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale,
@@ -81,10 +83,15 @@ namespace vrui {
         static void setElementHideLabel(const std::string& elementId, bool hide);
         static void setElementPinToWorld(const std::string& elementId, bool pinToWorld);
         static void setElementPinToRightHand(const std::string& elementId, bool pinToRightHand);
+        static void removeElementFromContainer(
+            const std::string& containerId, const std::string& elementId);
+        static void removeElementsWithPrefix(
+            const std::string& containerId, const std::string& elementIdPrefix);
         static void removeElementAnywhere(const std::string& elementId);
 
         static void registerDefaultLayout(const std::string& containerId, const std::string& elementId,
-                                          const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale);
+                                          const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale,
+                                          bool boardRelativeTransform = false);
         static void registerDefaultContainer(const std::string& containerId, const std::string& type,
                                              const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale);
 

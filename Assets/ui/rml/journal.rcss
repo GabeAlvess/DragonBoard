@@ -1223,6 +1223,14 @@
     font-size: 25px;
 }
 
+.journal-app .last-info-card .journal-stat-label {
+    width: 84%;
+}
+
+.journal-app .last-info-card .journal-stat-value {
+    width: 16%;
+}
+
 .journal-app.lang-ru .journal-footer-active {
     width: 820px;
     font-size: 32px;

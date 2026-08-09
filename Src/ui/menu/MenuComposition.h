@@ -6,4 +6,5 @@ namespace dragonboard::ui::menu
     void Create();
     void Recreate();
     void SetDeveloperButtonVisible(bool visible);
+    void RefreshGalleryMarkers();
 }

@@ -1,0 +1,60 @@
+@font-face { font-family: DragonBoard; src: url("assets/Fonts/DragonBoardVR_Font.ttf"); }
+* { box-sizing: border-box; }
+body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; color: #d8d8d8; font-family: DragonBoard; background-color: transparent; }
+#gallery-app { position: relative; width: 1920px; height: 1080px; overflow: hidden; color: #d8d8d8; background-color: transparent; decorator: image("assets/Background/Inventory.png" fill); }
+.gallery-frame { width: 1920px; height: 1080px; background-color: transparent; }
+.gallery-workspace { display: flex; width: 1920px; height: 820px; }
+.gallery-details-sidebar { display: flex; flex-direction: column; width: 550px; height: 820px; padding: 34px 40px 24px; overflow: hidden; background-color: transparent; border-right: 1px rgba(104, 108, 108, 150); }
+.gallery-title { color: #f0f0f0; font-size: 68px; line-height: 1.0; letter-spacing: 5px; }
+.gallery-details-spacer { flex-grow: 1; }
+.gallery-status { color: #d0d1d1; font-size: 32px; line-height: 1.0; letter-spacing: 1px; }
+.gallery-divider { height: 1px; margin: 20px 0 18px; background-color: rgba(128, 132, 132, 150); }
+.gallery-info-label { margin-top: 22px; color: #aeb0b0; font-size: 34px; letter-spacing: 4px; }
+.gallery-meta { min-height: 68px; margin-top: 8px; overflow: hidden; color: #d0d1d1; font-size: 42px; line-height: 1.08; }
+.gallery-stage { display: flex; align-items: center; justify-content: center; width: 820px; height: 820px; background-color: transparent; border-right: 1px rgba(104, 108, 108, 150); }
+.gallery-preview-shell { display: flex; align-items: center; justify-content: center; width: 790px; height: 790px; background-color: transparent; border: 2px rgba(150, 154, 154, 170); }
+.gallery-preview { width: 770px; height: 770px; object-fit: contain; background-color: transparent; }
+.gallery-actions-sidebar { position: relative; display: flex; flex-direction: column; width: 550px; height: 820px; padding: 34px 30px 24px; overflow: hidden; background-color: transparent; }
+button { display: flex; align-items: center; justify-content: center; padding: 0 14px; color: #d0d1d1; font-family: DragonBoard; font-size: 25px; line-height: 1.0; text-align: center; background-color: rgba(26, 27, 27, 224); border: 1px rgba(128, 132, 132, 180); border-radius: 2px; tab-index: auto; }
+button span { display: block; width: 100%; text-align: center; pointer-events: none; }
+button:hover { color: #ffffff; background-color: rgba(58, 59, 59, 236); border-color: rgba(220, 224, 224, 220); }
+.gallery-capture-actions { display: flex; flex-direction: column; width: 490px; gap: 10px; }
+.gallery-primary-action { width: 490px; height: 104px; color: #b8c8bf; font-size: 36px; background-color: rgba(12, 35, 27, 220); border-color: rgba(50, 82, 68, 125); }
+.gallery-primary-action:hover { color: #dce8e1; background-color: rgba(18, 49, 38, 235); border-color: rgba(70, 110, 91, 180); }
+#gallery-timer { width: 490px; height: 52px; font-size: 22px; }
+#gallery-timer.active { color: #ffffff; background-color: rgba(72, 66, 53, 220); border-color: #c7b27a; }
+.gallery-action-stack { display: flex; flex-direction: column; width: 490px; margin-top: 24px; gap: 20px; }
+.gallery-main-action { width: 490px; height: 104px; color: #f4eeee; font-size: 36px; background-color: rgba(53, 7, 12, 226); border-color: rgba(102, 28, 38, 190); }
+.gallery-main-action:hover { background-color: rgba(91, 12, 23, 238); border-color: rgba(166, 62, 76, 220); }
+.gallery-delete-action.confirm { color: #ffffff; background-color: rgba(128, 17, 29, 245); border-color: #f0a0a8; }
+.gallery-favorite-action.active { color: #fff4b0; border-color: #d6be70; background-color: rgba(83, 65, 17, 230); }
+.gallery-spacer { flex-grow: 1; }
+.gallery-pin-actions { display: flex; width: 490px; gap: 16px; margin-top: 0; }
+.gallery-pin-action { width: 237px; height: 58px; color: #f2e5e5; background-color: rgba(53, 7, 12, 216); border-color: rgba(102, 28, 38, 180); font-size: 22px; }
+
+.gallery-browser { width: 1856px; height: 260px; margin: 0 32px; overflow-x: auto; overflow-y: hidden; background-color: transparent; border-top: 1px rgba(116, 120, 120, 160); }
+.gallery-browser scrollbarhorizontal { height: 30px; background-color: transparent; border: 0px transparent; }
+.gallery-browser scrollbarhorizontal sliderarrowdec,
+.gallery-browser scrollbarhorizontal sliderarrowinc { width: 0px; height: 0px; }
+.gallery-browser scrollbarhorizontal slidertrack { height: 18px; margin-top: 6px; background-color: rgba(50, 54, 58, 90); border: 1px rgba(106, 112, 118, 86); border-radius: 5px; }
+.gallery-browser scrollbarhorizontal sliderbar { min-width: 120px; height: 14px; margin-top: 8px; background-color: rgba(128, 142, 151, 155); border: 1px rgba(166, 178, 185, 136); border-radius: 5px; }
+.gallery-grid { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 14px; padding: 14px 8px 8px; }
+.gallery-empty { min-width: 520px; padding: 60px 24px; color: #a5a7a7; font-size: 28px; }
+.gallery-card { position: relative; width: 220px; height: 208px; display: block; flex-shrink: 0; overflow: hidden; background-color: rgba(20, 21, 21, 226); border: 1px rgba(86, 90, 90, 190); border-radius: 2px; }
+.gallery-card:hover { background-color: rgba(39, 40, 40, 234); border-color: rgba(150, 154, 154, 210); }
+.gallery-card.selected { background-color: rgba(72, 66, 53, 214); border: 2px #c7b27a; }
+.gallery-card.favorite { border-color: rgba(198, 173, 91, 210); }
+.gallery-card-select { position: absolute; left: 5px; top: 5px; width: 208px; height: 196px; display: block; padding: 0; overflow: hidden; background-color: transparent; border: 0px transparent; }
+.gallery-card-select:hover { background-color: transparent; border: 0px transparent; }
+.gallery-card-photo { width: 206px; height: 166px; object-fit: contain; pointer-events: none; background-color: #030404; }
+.gallery-card-name { height: 27px; padding: 5px 48px 0 7px; overflow: hidden; color: #c8c9c9; font-size: 17px; line-height: 1.0; text-align: left; pointer-events: none; }
+.gallery-card-icon { position: absolute; right: 9px; width: 42px; height: 42px; padding: 6px; z-index: 3; background-color: rgba(5, 6, 6, 210); border: 1px rgba(130, 134, 134, 170); }
+.gallery-card-icon:hover { background-color: rgba(62, 63, 63, 238); border-color: #eeeeee; }
+.gallery-card-icon img { width: 28px; height: 28px; display: block; pointer-events: none; }
+.gallery-card-favorite { top: 9px; }
+.gallery-card-favorite img { opacity: 0.34; }
+.gallery-card-favorite.active img { opacity: 1.0; }
+.gallery-card-favorite.active { background-color: rgba(84, 67, 19, 230); border-color: #d6be70; }
+.gallery-card-delete { bottom: 9px; }
+.gallery-card-delete.confirm { color: #ffffff; background-color: rgba(128, 17, 29, 245); border-color: #f0a0a8; }
+#vr-cursor { position: absolute; left: 960px; top: 540px; width: 24px; height: 24px; margin-left: -12px; margin-top: -12px; pointer-events: none; background-color: #d8d8d8; border: 4px #747676; border-radius: 13px; }

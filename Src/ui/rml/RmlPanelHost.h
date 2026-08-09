@@ -11,6 +11,7 @@
 #include "ui/rml/RmlEntranceAnimation.h"
 #include "ui/rml/RmlRenderScheduler.h"
 #include "ui/rml/RmlSurfaceGrabController.h"
+#include "ui/rml/GalleryPhotoWidget.h"
 #include "ui/rml/RmlWidgetLabelAtlas.h"
 #include "vrui/MapCalibration.h"
 
@@ -19,6 +20,7 @@
 #include <atomic>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -63,6 +65,8 @@ namespace dragonboard::ui::rml
             vrui::VRUIMagicContainer* magic,
             vrui::VRUIItemEditPanel* preview);
         bool OpenJournal();
+        bool OpenGallery();
+        bool OpenGalleryPhoto(std::string photoId);
         bool OpenWelcomeTutorialIfNeeded();
         void RequestRmlWarmup();
         bool AttachWidgetLabel(
@@ -80,6 +84,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsModsOpen() const;
         [[nodiscard]] bool RequestHoveredModOptions();
         [[nodiscard]] bool RequestHoveredModRemoval();
+        [[nodiscard]] bool RequestGrabbedSurfaceRemoval();
         [[nodiscard]] std::shared_ptr<vrui::VRUIWidget> GetPreviewInteractionTarget();
         void UpdateGameThread(float deltaTime);
         void RenderPresentThread(float deltaTime);
@@ -140,9 +145,11 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsInventoryOpen() const;
         [[nodiscard]] bool IsMagicOpen() const;
         [[nodiscard]] bool IsJournalOpen() const;
+        [[nodiscard]] bool IsGalleryOpen() const;
         void RequestQuestMarkerRestore();
 
     private:
+        struct SurfaceState;
         void ResetPanelInput();
 
         enum class LocalPanelMode : std::uint8_t
@@ -154,6 +161,7 @@ namespace dragonboard::ui::rml
             kInventory,
             kMagic,
             kJournal,
+            kGallery,
             kWelcome,
             kExternal
         };
@@ -232,7 +240,8 @@ namespace dragonboard::ui::rml
             kFilterFavorites,
             kFilterWeapons,
             kFilterArmor,
-            kFilterConsumables,
+            kFilterPotions,
+            kFilterFood,
             kFilterQuest,
             kFilterBooks,
             kFilterMisc
@@ -295,6 +304,7 @@ namespace dragonboard::ui::rml
             bool lockPins = false;
             bool showDevButton = false;
             bool showTutorials = true;
+            bool statusWidgetVisible = true;
             std::string uiLanguage{ "en" };
             bool worldPinned = false;
             float menuScale = 1.0f;
@@ -378,6 +388,8 @@ namespace dragonboard::ui::rml
         void SyncRmlInventory();
         void SyncRmlMagic();
         void SyncRmlJournal();
+        void SyncRmlGallery();
+        bool BeginSharedGalleryKeyboardPresentThread();
         bool BeginSharedDeveloperKeyboardPresentThread();
         bool BeginSharedIniKeyboardPresentThread(std::size_t visibleSettingIndex);
         bool BeginSharedIniSearchKeyboardPresentThread();
@@ -487,13 +499,20 @@ namespace dragonboard::ui::rml
         void UpdateSurfaceGrabsGameThread(float deltaTime);
         void CaptureStatusSurfaceGameThread(float deltaTime);
         void RenderStatusSurfacePresentThread();
+        void RenderGalleryPhotoSurfacesPresentThread();
         bool EnsureStatusRenderTargetPresentThread();
+        bool EnsureGalleryPhotoRenderTargetPresentThread(SurfaceState& surface);
         bool EnsureKeyboardRenderTargetPresentThread();
         bool UpdateStatusSceneSurfaceGameThread(RE::NiNode* backgroundNode);
         bool UpdateKeyboardSceneSurfaceGameThread(RE::NiNode* backgroundNode);
         void UpdateKeyboardSurfaceHoverGameThread();
         bool UpdateScenePanelGameThread(RE::NiNode* backgroundNode);
         bool UpdateWelcomeSceneSurfaceGameThread(RE::NiNode* backgroundNode);
+        void SyncGalleryPhotoSurfacesGameThread();
+        void UpdateGalleryPhotoSurfacesGameThread();
+        void UpdateGalleryPhotoSurfaceHoverGameThread(SurfaceState& surface);
+        void UpdatePinnedWidgetVisibilityGameThread(bool visible);
+        void ReleaseGalleryPhotoSurfacePresentThread(SurfaceState& surface);
         bool OpenPinTutorialIfNeeded();
         void HandleSuccessfulPinGameThread();
         void CompleteActiveTutorialGameThread();
@@ -624,9 +643,30 @@ namespace dragonboard::ui::rml
             kIniValue,
             kIniSearch,
             kInventorySearch,
-            kMagicSearch
+            kMagicSearch,
+            kGalleryRename
         };
         SharedKeyboardPurpose _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
+        std::atomic<bool> _galleryRenameKeyboardPending{ false };
+        std::atomic<bool> _galleryCapturePending{ false };
+        std::atomic<bool> _galleryTimerCyclePending{ false };
+        std::atomic<bool> _galleryCaptureCountdownActive{ false };
+        std::atomic<float> _galleryCaptureCountdownRemaining{ 0.0f };
+        std::atomic<int> _galleryCaptureCountdownDisplay{ 0 };
+        std::atomic<bool> _galleryMapPinPending{ false };
+        std::atomic<bool> _galleryPanelPinPending{ false };
+        std::atomic<bool> _galleryFavoritePending{ false };
+        std::atomic<bool> _galleryDeletePending{ false };
+        std::atomic<bool> _galleryRenameCommitPending{ false };
+        std::atomic<bool> _rmlGallerySyncPending{ true };
+        std::atomic<bool> _galleryPhotoSurfacesSyncPending{ true };
+        std::atomic<std::size_t> _gallerySelectedIndex{ 0 };
+        std::mutex _gallerySelectionMutex;
+        std::string _gallerySelectedId;
+        std::string _galleryDeleteConfirmId;
+        std::mutex _galleryRenameCommitMutex;
+        std::string _galleryRenameCommitId;
+        std::string _galleryRenameCommitName;
         std::atomic<bool> _iniKeyboardCloseRequested{ false };
         std::uint64_t _iniKeyboardOverlayHandle = 0;
         bool _iniKeyboardOpen = false;
@@ -726,6 +766,7 @@ namespace dragonboard::ui::rml
         StatusSurfaceSnapshot _statusSurfaceSnapshot;
         std::atomic<bool> _statusSurfaceDataPending{ true };
         std::atomic<bool> _statusSurfaceHomeVisible{ false };
+        std::atomic<bool> _statusWidgetResetPending{ false };
         std::atomic<bool> _keyboardSurfaceVisible{ false };
         float _statusSurfacePollAccumulator = 0.0f;
         struct SurfacePointerState
@@ -751,7 +792,8 @@ namespace dragonboard::ui::rml
             std::string id;
             RE::NiPointer<RE::NiNode> node;
             RE::NiPointer<RE::NiNode> visualNode;
-            RE::NiPointer<RE::BSLightingShaderProperty> shaderProperty;
+            RE::NiNode* tabletRootNode = nullptr;
+            RE::NiPointer<RE::BSShaderProperty> shaderProperty;
             RE::NiPointer<RE::NiSourceTexture> sourceTexture;
             const void* geometryRendererData = nullptr;
             RE::BSGraphics::Texture* originalRendererTexture = nullptr;
@@ -770,11 +812,27 @@ namespace dragonboard::ui::rml
             RmlSurfaceGrabController grabController;
             DragonBoardVR_API::SurfaceEventCallback callback = nullptr;
             void* userData = nullptr;
+            std::unique_ptr<GalleryPhotoWidget> galleryWidget;
+            std::string galleryPhotoId;
+            std::string galleryImagePath;
+
+            std::string galleryLocation;
+            std::string galleryDate;
+            bool galleryDataPending = false;
+            bool galleryReleasePending = false;
+            bool boardWidget = false;
+            bool removable = false;
+            std::function<void()> removalHandler;
         };
         static constexpr DragonBoardVR_API::SurfaceHandle kMainSurfaceHandle = 1;
         static constexpr DragonBoardVR_API::SurfaceHandle kStatusSurfaceHandle = 2;
         static constexpr DragonBoardVR_API::SurfaceHandle kKeyboardSurfaceHandle = 3;
         static constexpr DragonBoardVR_API::SurfaceHandle kWelcomeSurfaceHandle = 4;
+        static constexpr DragonBoardVR_API::SurfaceHandle kFirstGalleryPhotoSurfaceHandle = 1000;
+        static constexpr std::size_t kGalleryPhotoSurfaceCapacity = 32;
+        static constexpr DragonBoardVR_API::SurfaceHandle kGalleryPhotoSurfaceEndHandle =
+            kFirstGalleryPhotoSurfaceHandle +
+            static_cast<DragonBoardVR_API::SurfaceHandle>(kGalleryPhotoSurfaceCapacity);
         [[nodiscard]] SurfaceState& MainSceneSurface();
         [[nodiscard]] const SurfaceState& MainSceneSurface() const;
         [[nodiscard]] SurfaceState& StatusSceneSurface();
@@ -788,6 +846,8 @@ namespace dragonboard::ui::rml
             SurfaceState& surface, float u, float v, bool visible);
         static void RegisterAndApplySurfaceTransform(SurfaceState& surface);
         static void PersistSurfaceTransform(const SurfaceState& surface);
+        static void ResetBoardWidgetTransform(SurfaceState& surface);
+        std::mutex _gallerySurfaceMutex;
         std::unordered_map<DragonBoardVR_API::SurfaceHandle, SurfaceState> _sceneSurfaces;
     };
 }

@@ -3,11 +3,16 @@
 #include "ui/rml/DragonBoardRmlRenderer.h"
 #include "ui/rml/RmlPresentBridge.h"
 #include "ui/rml/StatusWidget.h"
+#include "ui/rml/GalleryPhotoWidget.h"
+#include "ui/rml/RmlSceneSurfaceUtils.h"
 #include "ui/rml/RmlWidgetLabelAtlas.h"
 #include "ui/mods/IniFileWriter.h"
+#include "ui/gallery/GalleryCatalog.h"
+#include "ui/gallery/GalleryCaptureService.h"
 
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUIPanel.h"
+#include "vrui/VRUIWidget.h"
 #include "vrui/VRUIItemEditPanel.h"
 #include "vrui/VRUIInventoryContainer.h"
 #include "vrui/VRUIMagicContainer.h"
@@ -18,6 +23,7 @@
 #include "vrui/ModActionManager.h"
 #include "game/actions/ActionExecutor.h"
 #include "ui/pointer/PointerVisualController.h"
+#include "ui/menu/MenuComposition.h"
 
 #include <algorithm>
 #include <array>
@@ -40,7 +46,152 @@ namespace dragonboard::ui::rml
         constexpr float kSceneScreenSizeScale = 0.85f;
         constexpr float kScenePlaneExtent = 170.666656f;
         constexpr float kSceneScreenSurfaceDepth = 0.50f;
+        constexpr float kStatusSurfaceWidth = 7.8125f;
         constexpr float kPhysicalBoardAuthoredScale = 1.55f;
+        constexpr const char* kRmlSurfaceLayoutContainer = "RmlUiSurfaces";
+        constexpr const char* kBoardWidgetLayoutContainer = "BoardWidgets";
+        constexpr const char* kPersistentPanelName = "Persistent_Panel";
+        constexpr const char* kBoardWidgetContainerName = "FixedWidgetsContainer";
+
+        RE::NiTransform BoardWidgetDefaultTransform(float scale)
+        {
+            RE::NiTransform transform{};
+            transform.translate = { 0.0f, 0.0f, kSceneScreenSurfaceDepth };
+            transform.rotate = RE::NiMatrix3{};
+            transform.scale = scale;
+            return transform;
+        }
+
+        RE::NiNode* ResolveBoardWidgetParentNode()
+        {
+            const auto panel =
+                vrui::VRMenuManager::get().findPanelByName(kPersistentPanelName);
+            if (!panel) return nullptr;
+            auto* container = panel->findWidgetByName(kBoardWidgetContainerName);
+            return container ? container->getNode() : nullptr;
+        }
+
+        std::vector<dragonboard::ui::gallery::GalleryPhoto>
+        FavoriteFirstGalleryPhotos()
+        {
+            auto photos =
+                dragonboard::ui::gallery::GalleryCatalog::GetSingleton().Snapshot();
+            std::stable_partition(
+                photos.begin(),
+                photos.end(),
+                [](const auto& photo) { return photo.favorite; });
+            return photos;
+        }
+
+        std::optional<RE::NiTransform> ResolveBoardRelativeTransform(
+            RE::NiNode* rootNode)
+        {
+            if (!rootNode) return std::nullopt;
+
+            RE::BSGeometry* boardGeometry = nullptr;
+            RE::BSVisit::TraverseScenegraphGeometries(
+                rootNode,
+                [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                    if (geometry && geometry->name == "DragonBoard") {
+                        boardGeometry = geometry;
+                        return RE::BSVisit::BSVisitControl::kStop;
+                    }
+                    return RE::BSVisit::BSVisitControl::kContinue;
+                });
+            if (!boardGeometry) return std::nullopt;
+
+            RE::NiTransform relative = boardGeometry->local;
+            auto* ancestor = boardGeometry->parent;
+            while (ancestor && ancestor != rootNode) {
+                relative.translate = ancestor->local.translate +
+                    (ancestor->local.rotate * relative.translate) *
+                        ancestor->local.scale;
+                relative.rotate = ancestor->local.rotate * relative.rotate;
+                relative.scale *= ancestor->local.scale;
+                ancestor = ancestor->parent;
+            }
+            if (ancestor != rootNode) return std::nullopt;
+            if (rootNode->GetObjectByName("DragonBoardCollision")) {
+                relative.scale *= kPhysicalBoardAuthoredScale;
+            }
+            return relative;
+        }
+
+        RE::NiTransform ComposeTransform(
+            const RE::NiTransform& parent,
+            const RE::NiTransform& child)
+        {
+            RE::NiTransform result;
+            result.translate = parent.translate +
+                (parent.rotate * child.translate) * parent.scale;
+            result.rotate = parent.rotate * child.rotate;
+            result.scale = parent.scale * child.scale;
+            return result;
+        }
+
+        RE::NiTransform MakeRelativeTransform(
+            const RE::NiTransform& parent,
+            const RE::NiTransform& child)
+        {
+            RE::NiTransform result;
+            const float parentScale = std::abs(parent.scale) > 1.0e-5f ?
+                parent.scale : 1.0f;
+            const auto inverseParentRotation = parent.rotate.Transpose();
+            result.translate = inverseParentRotation *
+                (child.translate - parent.translate) / parentScale;
+            result.rotate = inverseParentRotation * child.rotate;
+            result.scale = child.scale / parentScale;
+            return result;
+        }
+
+        std::optional<RE::NiTransform> ResolveTabletWorldTransform(
+            RE::NiNode* tabletRootNode)
+        {
+            const auto tabletRelative = ResolveBoardRelativeTransform(tabletRootNode);
+            if (!tabletRelative) return std::nullopt;
+            return ComposeTransform(tabletRootNode->world, *tabletRelative);
+        }
+
+        RE::NiTransform LayoutTransform(
+            const vrui::UIJSONTransform& saved)
+        {
+            RE::NiTransform transform;
+            transform.translate = { saved.px, saved.py, saved.pz };
+            if (saved.hasMatrix) {
+                for (int row = 0; row < 3; ++row) {
+                    for (int column = 0; column < 3; ++column) {
+                        transform.rotate.entry[row][column] = saved.m[row][column];
+                    }
+                }
+            } else {
+                constexpr float kDegreesToRadians = 0.017453292519943295f;
+                vrui::VRUILayoutManager::setMatrixEuler(
+                    transform.rotate,
+                    saved.rx * kDegreesToRadians,
+                    saved.ry * kDegreesToRadians,
+                    saved.rz * kDegreesToRadians);
+            }
+            transform.scale = saved.scale;
+            return transform;
+        }
+
+        void ApplyTabletSurfaceRotation(
+            RE::NiNode* visualNode,
+            RE::NiNode* tabletRootNode,
+            float width,
+            float height)
+        {
+            if (!visualNode) return;
+            RE::NiMatrix3 fit{};
+            fit.entry[0][0] = width / kScenePlaneExtent;
+            fit.entry[1][1] = height / kScenePlaneExtent;
+            if (const auto tabletTransform =
+                    ResolveBoardRelativeTransform(tabletRootNode)) {
+                visualNode->local.rotate = tabletTransform->rotate * fit;
+            } else {
+                visualNode->local.rotate = fit;
+            }
+        }
 
         bool TryGetConfiguredRmlSurfaceTransform(RE::NiTransform& transform)
         {
@@ -206,7 +357,8 @@ namespace dragonboard::ui::rml
             case Filter::Favorites: return "favorites";
             case Filter::WeaponsAll: return "weapons";
             case Filter::ArmorAll: return "armor";
-            case Filter::ConsumablesAll: return "consumables";
+            case Filter::Potions: return "potions";
+            case Filter::Food: return "food";
             case Filter::QuestItems: return "quest";
             case Filter::BooksAll: return "books";
             case Filter::MiscAll: return "misc";
@@ -517,6 +669,7 @@ namespace dragonboard::ui::rml
 
     RmlPanelHost::RmlPanelHost()
     {
+        (void)dragonboard::ui::gallery::GalleryCatalog::GetSingleton().Load();
         _widgetLabelAtlas = std::make_unique<RmlWidgetLabelAtlas>();
         _sceneSurfaces.emplace(
             kMainSurfaceHandle,
@@ -524,12 +677,25 @@ namespace dragonboard::ui::rml
         _sceneSurfaces.emplace(
             kStatusSurfaceHandle,
             SurfaceState{ "DragonBoardVR.Status" });
+        StatusSceneSurface().boardWidget = true;
         _sceneSurfaces.emplace(
             kKeyboardSurfaceHandle,
             SurfaceState{ "DragonBoardVR.Keyboard" });
         _sceneSurfaces.emplace(
             kWelcomeSurfaceHandle,
             SurfaceState{ "DragonBoardVR.WelcomeTutorial" });
+        const auto galleryFlags =
+            static_cast<std::uint32_t>(DragonBoardVR_API::SurfaceFlags::Visible) |
+            static_cast<std::uint32_t>(DragonBoardVR_API::SurfaceFlags::RenderOnDirty) |
+            static_cast<std::uint32_t>(DragonBoardVR_API::SurfaceFlags::Grabbable) |
+            static_cast<std::uint32_t>(DragonBoardVR_API::SurfaceFlags::PersistTransform);
+        for (std::size_t index = 0; index < kGalleryPhotoSurfaceCapacity; ++index) {
+            auto [surface, inserted] = _sceneSurfaces.emplace(
+                kFirstGalleryPhotoSurfaceHandle +
+                    static_cast<DragonBoardVR_API::SurfaceHandle>(index),
+                SurfaceState{ "DragonBoardVR.Gallery.Unassigned." + std::to_string(index), galleryFlags });
+            if (inserted) surface->second.boardWidget = true;
+        }
     }
 
     RmlPanelHost::SurfaceState& RmlPanelHost::MainSceneSurface()
@@ -586,38 +752,57 @@ namespace dragonboard::ui::rml
                 surface, DragonBoardVR_API::SurfaceFlags::PersistTransform)) {
             return;
         }
-        constexpr const char* kLayoutContainer = "RmlUiSurfaces";
+        const char* layoutContainer = surface.boardWidget ?
+            kBoardWidgetLayoutContainer : kRmlSurfaceLayoutContainer;
+        const std::string& layoutId = surface.id;
+        if (surface.boardWidget) {
+            vrui::VRUILayoutManager::removeElementsWithPrefix(
+                kBoardWidgetLayoutContainer, surface.id + ".BoardWidget");
+            vrui::VRUILayoutManager::removeElementFromContainer(
+                kRmlSurfaceLayoutContainer, surface.id);
+        }
         vrui::VRUILayoutManager::registerDefaultLayout(
-            kLayoutContainer,
-            surface.id,
+            layoutContainer,
+            layoutId,
             surface.node->local.translate,
             surface.node->local.rotate,
             surface.node->local.scale);
-        const auto saved = vrui::VRUILayoutManager::getElement(kLayoutContainer, surface.id);
+        const auto saved =
+            vrui::VRUILayoutManager::getElement(layoutContainer, layoutId);
         if (!saved) return;
-        surface.node->local.translate = {
-            saved->transform.px,
-            saved->transform.py,
-            saved->transform.pz };
-        if (saved->transform.hasMatrix) {
-            for (int row = 0; row < 3; ++row) {
-                for (int column = 0; column < 3; ++column) {
-                    surface.node->local.rotate.entry[row][column] =
-                        saved->transform.m[row][column];
+        const auto storedTransform = LayoutTransform(saved->transform);
+        if (surface.boardWidget && surface.tabletRootNode && surface.node->parent) {
+            const auto tabletWorld = ResolveTabletWorldTransform(surface.tabletRootNode);
+            auto* parent = surface.node->parent->AsNode();
+            if (tabletWorld && parent) {
+                if (saved->boardRelativeTransform) {
+                    surface.node->local = MakeRelativeTransform(
+                        parent->world,
+                        ComposeTransform(*tabletWorld, storedTransform));
+                } else {
+                    surface.node->local = storedTransform;
+                    RE::NiUpdateData updateData;
+                    surface.node->Update(updateData);
+                    const auto migrated = MakeRelativeTransform(
+                        *tabletWorld, surface.node->world);
+                    vrui::VRUILayoutManager::updateElementTransform(
+                        layoutContainer,
+                        layoutId,
+                        migrated.translate,
+                        migrated.rotate,
+                        migrated.scale,
+                        true);
                 }
+            } else {
+                surface.node->local = storedTransform;
             }
         } else {
-            constexpr float kDegreesToRadians = 0.017453292519943295f;
-            vrui::VRUILayoutManager::setMatrixEuler(
-                surface.node->local.rotate,
-                saved->transform.rx * kDegreesToRadians,
-                saved->transform.ry * kDegreesToRadians,
-                saved->transform.rz * kDegreesToRadians);
+            surface.node->local = storedTransform;
         }
-        surface.node->local.scale = saved->transform.scale;
         logger::info(
-            "DragonBoardVR: restored RmlUi surface '{}' transform from layout.",
-            surface.id);
+            "DragonBoardVR: restored surface '{}' transform from layout container '{}'.",
+            surface.id,
+            layoutContainer);
     }
 
     void RmlPanelHost::PersistSurfaceTransform(const SurfaceState& surface)
@@ -626,16 +811,195 @@ namespace dragonboard::ui::rml
                 surface, DragonBoardVR_API::SurfaceFlags::PersistTransform)) {
             return;
         }
-        constexpr const char* kLayoutContainer = "RmlUiSurfaces";
-        vrui::VRUILayoutManager::updateElementTransform(
-            kLayoutContainer,
-            surface.id,
-            surface.node->local.translate,
-            surface.node->local.rotate,
-            surface.node->local.scale);
+        const char* layoutContainer = surface.boardWidget ?
+            kBoardWidgetLayoutContainer : kRmlSurfaceLayoutContainer;
+        const std::string& layoutId = surface.id;
+        RE::NiTransform persisted = surface.node->local;
+        bool boardRelativeTransform = false;
+        if (surface.boardWidget && surface.tabletRootNode && surface.node->parent) {
+            const auto tabletWorld = ResolveTabletWorldTransform(surface.tabletRootNode);
+            if (tabletWorld) {
+                RE::NiUpdateData updateData;
+                surface.node->Update(updateData);
+                persisted = MakeRelativeTransform(*tabletWorld, surface.node->world);
+                boardRelativeTransform = true;
+            }
+        }
+        if (vrui::VRUILayoutManager::getElement(layoutContainer, layoutId)) {
+            vrui::VRUILayoutManager::updateElementTransform(
+                layoutContainer,
+                layoutId,
+                persisted.translate,
+                persisted.rotate,
+                persisted.scale,
+                boardRelativeTransform);
+        } else {
+            vrui::VRUILayoutManager::registerDefaultLayout(
+                layoutContainer,
+                layoutId,
+                persisted.translate,
+                persisted.rotate,
+                persisted.scale,
+                boardRelativeTransform);
+        }
         logger::info(
-            "DragonBoardVR: saved RmlUi surface '{}' transform.",
-            surface.id);
+            "DragonBoardVR: saved surface '{}' transform in layout container '{}'.",
+            surface.id,
+            layoutContainer);
+    }
+
+    void RmlPanelHost::ResetBoardWidgetTransform(SurfaceState& surface)
+    {
+        if (!surface.boardWidget) return;
+        vrui::VRUILayoutManager::removeElementAnywhere(surface.id);
+        surface.grabController.SetEnabled(false);
+        SetSurfacePointer(surface, 0.5f, 0.5f, false);
+        if (!surface.node || !surface.hasDefaultTransform) return;
+        surface.node->local = surface.defaultTransform;
+        RE::NiUpdateData updateData;
+        surface.node->Update(updateData);
+        surface.node->UpdateWorldBound();
+    }
+
+    void RmlPanelHost::ReleaseGalleryPhotoSurfacePresentThread(
+        SurfaceState& surface)
+    {
+        surface.galleryWidget.reset();
+        if (surface.sourceTexture && surface.textureBridge) {
+            surface.sourceTexture->rendererTexture = surface.originalRendererTexture;
+        }
+        surface.textureBridge.reset();
+        if (surface.shaderResource) surface.shaderResource->Release();
+        if (surface.renderTarget) surface.renderTarget->Release();
+        if (surface.renderTexture) surface.renderTexture->Release();
+        surface.shaderResource = nullptr;
+        surface.renderTarget = nullptr;
+        surface.renderTexture = nullptr;
+        surface.textureWidth = 0;
+        surface.textureHeight = 0;
+        surface.shaderProperty = nullptr;
+        surface.sourceTexture = nullptr;
+        surface.originalRendererTexture = nullptr;
+        surface.geometryRendererData = nullptr;
+        surface.node = nullptr;
+        surface.visualNode = nullptr;
+        surface.sceneVisible = false;
+        surface.galleryImagePath.clear();
+
+        surface.galleryLocation.clear();
+        surface.galleryDate.clear();
+        surface.galleryDataPending = false;
+        surface.removable = false;
+        surface.removalHandler = {};
+        surface.galleryReleasePending = false;
+    }
+
+    bool RmlPanelHost::EnsureGalleryPhotoRenderTargetPresentThread(
+        SurfaceState& surface)
+    {
+        if (surface.galleryPhotoId.empty() || surface.galleryReleasePending) return false;
+        if (surface.renderTexture && surface.renderTarget && surface.shaderResource &&
+            surface.galleryWidget) {
+            return true;
+        }
+        if (!_device || !_rmlUi || !_rmlUi->GetRenderer()) return false;
+
+        constexpr std::uint32_t width = 1024;
+        constexpr std::uint32_t height = 1080;
+        D3D11_TEXTURE2D_DESC descriptor{};
+        descriptor.Width = width;
+        descriptor.Height = height;
+        descriptor.MipLevels = 1;
+        descriptor.ArraySize = 1;
+        descriptor.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        descriptor.SampleDesc.Count = 1;
+        descriptor.Usage = D3D11_USAGE_DEFAULT;
+        descriptor.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        if (FAILED(_device->CreateTexture2D(
+                &descriptor, nullptr, &surface.renderTexture)) ||
+            FAILED(_device->CreateRenderTargetView(
+                surface.renderTexture, nullptr, &surface.renderTarget)) ||
+            FAILED(_device->CreateShaderResourceView(
+                surface.renderTexture, nullptr, &surface.shaderResource))) {
+            if (surface.shaderResource) surface.shaderResource->Release();
+            if (surface.renderTarget) surface.renderTarget->Release();
+            if (surface.renderTexture) surface.renderTexture->Release();
+            surface.shaderResource = nullptr;
+            surface.renderTarget = nullptr;
+            surface.renderTexture = nullptr;
+            logger::error(
+                "DragonBoardVR: failed to create gallery photo render target for '{}'.",
+                surface.galleryPhotoId);
+            return false;
+        }
+        surface.textureWidth = width;
+        surface.textureHeight = height;
+        surface.galleryWidget = std::make_unique<GalleryPhotoWidget>();
+        if (!surface.galleryWidget->Initialize(
+                _rmlUi->GetRenderer(),
+                "dragonboard_gallery_photo_" + surface.galleryPhotoId)) {
+            surface.galleryWidget.reset();
+            surface.shaderResource->Release();
+            surface.renderTarget->Release();
+            surface.renderTexture->Release();
+            surface.shaderResource = nullptr;
+            surface.renderTarget = nullptr;
+            surface.renderTexture = nullptr;
+            return false;
+        }
+        surface.galleryDataPending = true;
+        return true;
+    }
+
+    void RmlPanelHost::RenderGalleryPhotoSurfacesPresentThread()
+    {
+        bool hasAssignedSurface = false;
+        {
+            std::scoped_lock lock(_gallerySurfaceMutex);
+            for (DragonBoardVR_API::SurfaceHandle handle = kFirstGalleryPhotoSurfaceHandle;
+                 handle < kGalleryPhotoSurfaceEndHandle;
+                 ++handle) {
+                const auto& surface = _sceneSurfaces.at(handle);
+                if (!surface.galleryPhotoId.empty() || surface.galleryReleasePending) {
+                    hasAssignedSurface = true;
+                    break;
+                }
+            }
+        }
+        if (!hasAssignedSurface) return;
+        if (!_rendererReady.load(std::memory_order_acquire) && !InitializeRenderer()) return;
+
+        std::scoped_lock lock(_gallerySurfaceMutex);
+        bool releasedSurface = false;
+        for (DragonBoardVR_API::SurfaceHandle handle = kFirstGalleryPhotoSurfaceHandle;
+             handle < kGalleryPhotoSurfaceEndHandle;
+             ++handle) {
+            auto& surface = _sceneSurfaces.at(handle);
+            if (surface.galleryReleasePending) {
+                ReleaseGalleryPhotoSurfacePresentThread(surface);
+                releasedSurface = true;
+                continue;
+            }
+            if (surface.galleryPhotoId.empty() ||
+                !EnsureGalleryPhotoRenderTargetPresentThread(surface) ||
+                !surface.galleryWidget) {
+                continue;
+            }
+            if (surface.galleryDataPending) {
+                surface.galleryWidget->SetPhoto(
+                    surface.galleryImagePath,
+                    surface.galleryLocation,
+                    surface.galleryDate);
+                surface.galleryDataPending = false;
+            }
+            surface.galleryWidget->Render(
+                surface.renderTarget,
+                static_cast<int>(surface.textureWidth),
+                static_cast<int>(surface.textureHeight));
+        }
+        if (releasedSurface) {
+            _galleryPhotoSurfacesSyncPending.store(true, std::memory_order_release);
+        }
     }
 
     DragonBoardVR_API::PanelHandle RmlPanelHost::RegisterExternalPanel(
@@ -820,6 +1184,7 @@ namespace dragonboard::ui::rml
         _widgetLabelAtlas.reset();
         _statusWidget.reset();
         for (auto& [handle, sceneSurface] : _sceneSurfaces) {
+            sceneSurface.galleryWidget.reset();
             if (sceneSurface.sourceTexture && sceneSurface.textureBridge) {
                 sceneSurface.sourceTexture->rendererTexture =
                     sceneSurface.originalRendererTexture;
@@ -1151,6 +1516,33 @@ namespace dragonboard::ui::rml
         return true;
     }
 
+    bool RmlPanelHost::OpenGallery()
+    {
+        if (!EnsurePresentHookInstalled()) return false;
+        if ((_rmlWarmupAttempted.load() && !_rendererReady.load()) ||
+            (_rendererReady.load() && (!_rmlUi || (_rmlUi->AreBuiltinDocumentsLoaded() && !_rmlUi->IsGalleryReady())))) {
+            logger::error("DragonBoardVR: RmlUi Gallery document is unavailable.");
+            return false;
+        }
+        ResetPanelInput();
+        _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
+        _localPanelMode.store(LocalPanelMode::kGallery);
+        _rmlGallerySyncPending.store(true);
+        _visible.store(true);
+        return true;
+    }
+
+    bool RmlPanelHost::OpenGalleryPhoto(std::string photoId)
+    {
+        const auto photos = FavoriteFirstGalleryPhotos();
+        const auto it = std::find_if(photos.begin(), photos.end(), [&](const auto& photo) { return photo.id == photoId; });
+        if (it == photos.end()) return false;
+        const auto index = static_cast<std::size_t>(std::distance(photos.begin(), it));
+        _gallerySelectedIndex.store(index, std::memory_order_release);
+        { std::scoped_lock lock(_gallerySelectionMutex); _gallerySelectedId = std::move(photoId); }
+        return OpenGallery();
+    }
+
     bool RmlPanelHost::OpenWelcomeTutorialIfNeeded()
     {
         const auto& settings = vrui::VRUISettings::get();
@@ -1274,6 +1666,11 @@ namespace dragonboard::ui::rml
         return _visible.load() && _localPanelMode.load() == LocalPanelMode::kJournal;
     }
 
+    bool RmlPanelHost::IsGalleryOpen() const
+    {
+        return _visible.load() && _localPanelMode.load() == LocalPanelMode::kGallery;
+    }
+
     bool RmlPanelHost::IsModsOpen() const
     {
         return _visible.load(std::memory_order_acquire) &&
@@ -1303,6 +1700,39 @@ namespace dragonboard::ui::rml
             if (index >= _mods.size()) return false;
         }
         _modsRemovePending.store(index, std::memory_order_release);
+        return true;
+    }
+
+    bool RmlPanelHost::RequestGrabbedSurfaceRemoval()
+    {
+        const auto& settings = vrui::VRUISettings::get();
+        if (settings.lockPins || !settings.editModeEnabled) return false;
+
+        std::string surfaceId;
+        std::function<void()> removalHandler;
+        {
+            std::scoped_lock lock(_gallerySurfaceMutex);
+            const auto found = std::find_if(
+                _sceneSurfaces.begin(),
+                _sceneSurfaces.end(),
+                [](const auto& entry) {
+                    const auto& surface = entry.second;
+                    return surface.removable &&
+                        surface.grabController.IsGrabbed();
+                });
+            if (found == _sceneSurfaces.end()) return false;
+
+            auto& surface = found->second;
+            surfaceId = surface.id;
+            removalHandler = surface.removalHandler;
+            surface.grabController.SetEnabled(false);
+            if (surface.node) surface.node->SetAppCulled(true);
+            surface.sceneVisible = false;
+        }
+
+        vrui::VRUILayoutManager::removeElementAnywhere(surfaceId);
+        if (removalHandler) removalHandler();
+        RE::DebugNotification("DragonBoardVR: Pinned widget removed.");
         return true;
     }
 
@@ -1365,6 +1795,7 @@ namespace dragonboard::ui::rml
         _inventoryKeyboardCloseRequested.store(true, std::memory_order_release);
         _magicKeyboardCloseRequested.store(true, std::memory_order_release);
         _modsHoveredIndex.store(static_cast<std::size_t>(-1), std::memory_order_release);
+        _galleryRenameKeyboardPending.store(false, std::memory_order_release);
         _visible.store(false);
     }
 
@@ -1607,6 +2038,160 @@ namespace dragonboard::ui::rml
         auto& manager = vrui::VRMenuManager::get();
         auto& settings = vrui::VRUISettings::get();
         if (_widgetLabelAtlas) _widgetLabelAtlas->UpdateGameThread();
+        auto& galleryCapture = dragonboard::ui::gallery::GalleryCaptureService::GetSingleton();
+        galleryCapture.UpdateGameThread(deltaTime);
+        if (_galleryTimerCyclePending.exchange(false, std::memory_order_acq_rel)) {
+            switch (settings.galleryCaptureTimerSeconds) {
+            case 0: settings.galleryCaptureTimerSeconds = 3; break;
+            case 3: settings.galleryCaptureTimerSeconds = 5; break;
+            case 5: settings.galleryCaptureTimerSeconds = 10; break;
+            default: settings.galleryCaptureTimerSeconds = 0; break;
+            }
+            manager.saveSettingsNow();
+            _rmlGallerySyncPending.store(true, std::memory_order_release);
+        }
+        if (_galleryCapturePending.exchange(false, std::memory_order_acq_rel)) {
+            const int timerSeconds = settings.galleryCaptureTimerSeconds;
+            if (timerSeconds > 0 && !galleryCapture.IsBusy()) {
+                _galleryCaptureCountdownRemaining.store(
+                    static_cast<float>(timerSeconds), std::memory_order_release);
+                _galleryCaptureCountdownDisplay.store(timerSeconds, std::memory_order_release);
+                _galleryCaptureCountdownActive.store(true, std::memory_order_release);
+            } else if (!galleryCapture.RequestCapture()) {
+                logger::warn("DragonBoardVR: gallery capture request could not start.");
+            }
+            _rmlGallerySyncPending.store(true, std::memory_order_release);
+        }
+        if (_galleryCaptureCountdownActive.load(std::memory_order_acquire)) {
+            const float remaining = _galleryCaptureCountdownRemaining.load(std::memory_order_acquire) -
+                std::clamp(deltaTime, 0.0f, 0.5f);
+            if (remaining <= 0.0f) {
+                _galleryCaptureCountdownRemaining.store(0.0f, std::memory_order_release);
+                _galleryCaptureCountdownDisplay.store(0, std::memory_order_release);
+                _galleryCaptureCountdownActive.store(false, std::memory_order_release);
+                if (!galleryCapture.RequestCapture()) {
+                    logger::warn("DragonBoardVR: timed gallery capture request could not start.");
+                }
+                _rmlGallerySyncPending.store(true, std::memory_order_release);
+            } else {
+                _galleryCaptureCountdownRemaining.store(remaining, std::memory_order_release);
+                const int display = static_cast<int>(std::ceil(remaining));
+                if (_galleryCaptureCountdownDisplay.exchange(
+                        display, std::memory_order_acq_rel) != display) {
+                    _rmlGallerySyncPending.store(true, std::memory_order_release);
+                }
+            }
+        }
+        if (galleryCapture.ConsumeCatalogChanged()) {
+            _rmlGallerySyncPending.store(true, std::memory_order_release);
+            _galleryPhotoSurfacesSyncPending.store(true, std::memory_order_release);
+            dragonboard::ui::menu::RefreshGalleryMarkers();
+        }
+        std::string selectedGalleryId;
+        { std::scoped_lock lock(_gallerySelectionMutex); selectedGalleryId = _gallerySelectedId; }
+        if (!selectedGalleryId.empty() && _galleryMapPinPending.exchange(false, std::memory_order_acq_rel)) {
+            auto& catalog = dragonboard::ui::gallery::GalleryCatalog::GetSingleton();
+            if (auto photo = catalog.Find(selectedGalleryId)) {
+                const bool pinning = !photo->mapPinned;
+                bool requested = false;
+                if (photo->mapPinned) {
+                    requested = galleryCapture.RequestSetMapPinned(
+                        selectedGalleryId, false);
+                } else {
+                    auto mapLocation =
+                        dragonboard::ui::gallery::GalleryCaptureService::
+                            ResolveMapLocationGameThread(*photo);
+                    if (mapLocation) {
+                        requested = galleryCapture.RequestSetMapPinned(
+                            selectedGalleryId,
+                            true,
+                            std::move(mapLocation));
+                    } else {
+                        logger::warn(
+                            "DragonBoardVR: gallery photo '{}' cannot be pinned because no exterior door could be resolved from interior cell {:08X}.",
+                            selectedGalleryId,
+                            photo->cellFormId);
+                    }
+                }
+                if (requested && pinning) Close();
+                if (!requested) {
+                    _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                        DragonBoardRmlUi::HapticCue::kError));
+                }
+            }
+        }
+        if (!selectedGalleryId.empty() && _galleryPanelPinPending.exchange(false, std::memory_order_acq_rel)) {
+            auto& catalog = dragonboard::ui::gallery::GalleryCatalog::GetSingleton();
+            if (auto photo = catalog.Find(selectedGalleryId)) {
+                const bool pinning = !photo->panelPinned;
+                bool requested = false;
+                bool requestAttempted = false;
+                if (photo->panelPinned) {
+                    requestAttempted = true;
+                    requested = galleryCapture.RequestSetPanelPinned(
+                        selectedGalleryId, false);
+                } else {
+                    const auto maximumPinned = std::clamp(
+                        settings.galleryMaximumPinnedPanels,
+                        0,
+                        static_cast<int>(kGalleryPhotoSurfaceCapacity));
+                    const auto photos = catalog.Snapshot();
+                    const auto pinnedCount = std::count_if(
+                        photos.begin(), photos.end(),
+                        [](const auto& entry) { return entry.panelPinned; });
+                    if (pinnedCount < maximumPinned) {
+                        requestAttempted = true;
+                        requested = galleryCapture.RequestSetPanelPinned(
+                            selectedGalleryId, true);
+                    } else {
+                        logger::warn(
+                            "DragonBoardVR: gallery panel pin limit ({}) reached.",
+                            maximumPinned);
+                        _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                            DragonBoardRmlUi::HapticCue::kError));
+                    }
+                }
+                if (requested && pinning) Close();
+                if (requestAttempted && !requested) {
+                    _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                        DragonBoardRmlUi::HapticCue::kError));
+                }
+            }
+        }
+        if (!selectedGalleryId.empty() &&
+            _galleryFavoritePending.exchange(false, std::memory_order_acq_rel)) {
+            auto& catalog = dragonboard::ui::gallery::GalleryCatalog::GetSingleton();
+            if (const auto photo = catalog.Find(selectedGalleryId);
+                photo && !galleryCapture.RequestSetFavorite(
+                    selectedGalleryId, !photo->favorite)) {
+                _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                    DragonBoardRmlUi::HapticCue::kError));
+            }
+        }
+        if (!selectedGalleryId.empty() &&
+            _galleryDeletePending.exchange(false, std::memory_order_acq_rel)) {
+            if (!galleryCapture.RequestDelete(selectedGalleryId)) {
+                logger::warn(
+                    "DragonBoardVR: gallery delete request could not start for '{}'.",
+                    selectedGalleryId);
+                _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                    DragonBoardRmlUi::HapticCue::kError));
+            }
+        }
+        if (_galleryRenameCommitPending.exchange(false, std::memory_order_acq_rel)) {
+            std::string photoId;
+            std::string name;
+            {
+                std::scoped_lock lock(_galleryRenameCommitMutex);
+                photoId = std::move(_galleryRenameCommitId);
+                name = std::move(_galleryRenameCommitName);
+            }
+            if (!galleryCapture.RequestRename(std::move(photoId), std::move(name))) {
+                logger::warn("DragonBoardVR: gallery rename request could not start.");
+                _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                    DragonBoardRmlUi::HapticCue::kError));
+            }
+        }
 
         if (settings.tutorialPositionResetRequested) {
             settings.tutorialPositionResetRequested = false;
@@ -1678,6 +2263,11 @@ namespace dragonboard::ui::rml
             }
             _rmlModsSyncPending.store(true, std::memory_order_release);
         }
+        if (_galleryPhotoSurfacesSyncPending.exchange(
+                false, std::memory_order_acq_rel)) {
+            SyncGalleryPhotoSurfacesGameThread();
+        }
+        UpdateGalleryPhotoSurfacesGameThread();
         UpdateSurfaceGameThread();
         UpdatePositionAdjustmentGameThread(deltaTime);
         UpdateSurfaceGrabsGameThread(deltaTime);
@@ -1845,6 +2435,11 @@ namespace dragonboard::ui::rml
         if (_applyPending.exchange(false)) {
             ApplyDraftGameThread();
             vrui::VRMenuManager::get().refreshActivePanels();
+        }
+
+        if (_statusWidgetResetPending.exchange(
+                false, std::memory_order_acq_rel)) {
+            ResetBoardWidgetTransform(StatusSceneSurface());
         }
 
         if (_savePending.exchange(false)) {
@@ -2100,7 +2695,9 @@ namespace dragonboard::ui::rml
 
     void RmlPanelHost::UpdateSurfaceGrabsGameThread(float deltaTime)
     {
+        std::scoped_lock galleryLock(_gallerySurfaceMutex);
         auto& manager = vrui::VRMenuManager::get();
+        const auto& settings = vrui::VRUISettings::get();
         float thumbX = 0.0f;
         float thumbY = 0.0f;
         manager.getDominantThumbstick(thumbX, thumbY);
@@ -2154,7 +2751,9 @@ namespace dragonboard::ui::rml
                 }
                 continue;
             }
-            const bool grabbable = HasSurfaceFlag(
+            const bool removableUnlocked = !surface.removable ||
+                (settings.editModeEnabled && !settings.lockPins);
+            const bool grabbable = removableUnlocked && HasSurfaceFlag(
                 surface, DragonBoardVR_API::SurfaceFlags::Grabbable);
             surface.grabController.SetEnabled(grabbable);
             if (!grabbable || handle == kMainSurfaceHandle || !surface.node) continue;
@@ -2176,6 +2775,9 @@ namespace dragonboard::ui::rml
                 deltaTime);
             anySurfaceGrabbed =
                 anySurfaceGrabbed || surface.grabController.IsGrabbed();
+            if (result.grabStarted) {
+                manager.triggerHaptic(true, 1.0f, 0.2f);
+            }
             if (!result.grabStarted && !result.transformChanged && !result.grabEnded) {
                 continue;
             }
@@ -2266,6 +2868,327 @@ namespace dragonboard::ui::rml
             "DragonBoardVR: tutorial progress and saved Welcome position reset.");
     }
 
+    void RmlPanelHost::SyncGalleryPhotoSurfacesGameThread()
+    {
+        const auto& settings = vrui::VRUISettings::get();
+        const auto maximumPinned = std::clamp(
+            settings.galleryMaximumPinnedPanels,
+            0,
+            static_cast<int>(kGalleryPhotoSurfaceCapacity));
+        std::vector<dragonboard::ui::gallery::GalleryPhoto> desired;
+        desired.reserve(static_cast<std::size_t>(maximumPinned));
+        for (const auto& photo :
+             dragonboard::ui::gallery::GalleryCatalog::GetSingleton().Snapshot()) {
+            if (!photo.panelPinned) continue;
+            if (desired.size() >= static_cast<std::size_t>(maximumPinned)) break;
+            desired.push_back(photo);
+        }
+
+        const auto findDesired = [&](std::string_view id)
+            -> const dragonboard::ui::gallery::GalleryPhoto* {
+            const auto found = std::find_if(
+                desired.begin(), desired.end(),
+                [&](const auto& photo) { return photo.id == id; });
+            return found == desired.end() ? nullptr : std::addressof(*found);
+        };
+
+        std::scoped_lock lock(_gallerySurfaceMutex);
+        for (auto handle = kFirstGalleryPhotoSurfaceHandle;
+             handle < kFirstGalleryPhotoSurfaceHandle + kGalleryPhotoSurfaceCapacity;
+             ++handle) {
+            auto& surface = _sceneSurfaces.at(handle);
+            if (surface.galleryPhotoId.empty()) continue;
+            const auto* photo = findDesired(surface.galleryPhotoId);
+            if (!photo) {
+                surface.grabController.SetEnabled(false);
+                if (surface.node) {
+                    surface.node->SetAppCulled(true);
+                    if (surface.node->parent) {
+                        surface.node->parent->DetachChild(surface.node.get());
+                    }
+                }
+                surface.node = nullptr;
+                surface.visualNode = nullptr;
+                surface.galleryPhotoId.clear();
+                surface.galleryReleasePending = true;
+                continue;
+            }
+            const auto date = photo->skyrimDate.empty() ?
+                photo->capturedAt : photo->skyrimDate;
+            if (surface.galleryImagePath != photo->imagePath ||
+                surface.galleryLocation != photo->location ||
+                surface.galleryDate != date) {
+                surface.galleryImagePath = photo->imagePath;
+                surface.galleryLocation = photo->location;
+                surface.galleryDate = date;
+                surface.galleryDataPending = true;
+            }
+        }
+
+        for (const auto& photo : desired) {
+            const bool alreadyAssigned = std::any_of(
+                _sceneSurfaces.begin(), _sceneSurfaces.end(),
+                [&](const auto& entry) {
+                    return entry.second.galleryPhotoId == photo.id;
+                });
+            if (alreadyAssigned) continue;
+
+            SurfaceState* available = nullptr;
+            for (DragonBoardVR_API::SurfaceHandle handle = kFirstGalleryPhotoSurfaceHandle;
+                 handle < kGalleryPhotoSurfaceEndHandle;
+                 ++handle) {
+                auto& candidate = _sceneSurfaces.at(handle);
+                if (candidate.galleryPhotoId.empty() &&
+                    !candidate.galleryReleasePending) {
+                    available = std::addressof(candidate);
+                    break;
+                }
+            }
+            if (!available) break;
+
+            available->id = "gallery.board-half-photo." + photo.id;
+            available->galleryPhotoId = photo.id;
+            available->galleryImagePath = photo.imagePath;
+
+            available->galleryLocation = photo.location;
+            available->galleryDate = photo.skyrimDate.empty() ?
+                photo.capturedAt : photo.skyrimDate;
+            available->galleryDataPending = true;
+            available->sceneVisible = false;
+            available->hasDefaultTransform = false;
+            available->removable = true;
+            available->removalHandler = [this, photoId = photo.id]() {
+                if (!dragonboard::ui::gallery::GalleryCaptureService::GetSingleton()
+                         .RequestSetPanelPinned(photoId, false)) {
+                    logger::warn(
+                        "DragonBoardVR: gallery panel removal request could not start for '{}'.",
+                        photoId);
+                }
+            };
+            RequestRmlWarmup();
+        }
+    }
+
+    void RmlPanelHost::UpdateGalleryPhotoSurfaceHoverGameThread(
+        SurfaceState& surface)
+    {
+        SetSurfacePointer(surface, 0.5f, 0.5f, false);
+        if (!surface.visualNode || surface.visualNode->GetAppCulled()) return;
+
+        const auto& transform = surface.visualNode->world;
+        RE::NiPoint3 right(
+            transform.rotate.entry[0][0],
+            transform.rotate.entry[1][0],
+            transform.rotate.entry[2][0]);
+        RE::NiPoint3 up(
+            transform.rotate.entry[0][1],
+            transform.rotate.entry[1][1],
+            transform.rotate.entry[2][1]);
+        const float rightLength = right.Length();
+        const float upLength = up.Length();
+        const float worldScale = std::abs(transform.scale);
+        if (rightLength <= 1.0e-5f || upLength <= 1.0e-5f ||
+            worldScale <= 1.0e-5f) {
+            return;
+        }
+        right = right / rightLength;
+        up = up / upLength;
+        const RE::NiPoint3 normal(
+            right.y * up.z - right.z * up.y,
+            right.z * up.x - right.x * up.z,
+            right.x * up.y - right.y * up.x);
+        auto& manager = vrui::VRMenuManager::get();
+        const auto rayOrigin = manager.getLaserOrigin();
+        const auto rayDirection = manager.getLaserDirection();
+        const float denominator =
+            rayDirection.x * normal.x + rayDirection.y * normal.y +
+            rayDirection.z * normal.z;
+        if (std::abs(denominator) <= 1.0e-5f) return;
+        const auto toSurface = transform.translate - rayOrigin;
+        const float distance =
+            (toSurface.x * normal.x + toSurface.y * normal.y +
+             toSurface.z * normal.z) / denominator;
+        if (distance <= 0.0f || !std::isfinite(distance)) return;
+        const auto hit = rayOrigin + rayDirection * distance - transform.translate;
+        const float width = kScenePlaneExtent * rightLength * worldScale;
+        const float height = kScenePlaneExtent * upLength * worldScale;
+        const float localX =
+            (hit.x * right.x + hit.y * right.y + hit.z * right.z) / width;
+        const float localY =
+            (hit.x * up.x + hit.y * up.y + hit.z * up.z) / height;
+        if (std::abs(localX) <= 0.5f && std::abs(localY) <= 0.5f) {
+            SetSurfacePointer(surface, localX + 0.5f, 0.5f - localY, true);
+        }
+    }
+
+    void RmlPanelHost::UpdateGalleryPhotoSurfacesGameThread()
+    {
+        auto& manager = vrui::VRMenuManager::get();
+        if (!manager.isMenuOpen() || _visible.load(std::memory_order_acquire)) {
+            std::scoped_lock lock(_gallerySurfaceMutex);
+            for (auto handle = kFirstGalleryPhotoSurfaceHandle;
+                 handle < kGalleryPhotoSurfaceEndHandle;
+                 ++handle) {
+                auto& surface = _sceneSurfaces.at(handle);
+                if (surface.node) surface.node->SetAppCulled(true);
+                surface.sceneVisible = false;
+                SetSurfacePointer(surface, 0.5f, 0.5f, false);
+            }
+            return;
+        }
+        auto surfacePanel = manager.findPanelByName("Background_Panel");
+        if (!surfacePanel || !surfacePanel->getNode()) {
+            surfacePanel = manager.findPanelByName("Persistent_Panel");
+        }
+        if (!surfacePanel || !surfacePanel->getNode()) {
+            surfacePanel = manager.findPanelByName("MainPanel");
+        }
+        auto* backgroundNode = manager.isPhysicalBoardActive() ?
+            manager.getPhysicalBoardAnchorNode() :
+            (surfacePanel ? surfacePanel->getBackgroundNode() : nullptr);
+        auto* widgetParentNode = ResolveBoardWidgetParentNode();
+        std::scoped_lock lock(_gallerySurfaceMutex);
+        if (!backgroundNode || !widgetParentNode) {
+            for (DragonBoardVR_API::SurfaceHandle handle = kFirstGalleryPhotoSurfaceHandle;
+                 handle < kGalleryPhotoSurfaceEndHandle;
+                 ++handle) {
+                auto& surface = _sceneSurfaces.at(handle);
+                if (surface.node) surface.node->SetAppCulled(true);
+                surface.sceneVisible = false;
+            }
+            return;
+        }
+
+        const auto& settings = vrui::VRUISettings::get();
+        for (auto handle = kFirstGalleryPhotoSurfaceHandle;
+             handle < kFirstGalleryPhotoSurfaceHandle + kGalleryPhotoSurfaceCapacity;
+             ++handle) {
+            auto& surface = _sceneSurfaces.at(handle);
+            if (surface.galleryPhotoId.empty() || surface.galleryReleasePending ||
+                !surface.shaderResource) {
+                if (surface.node) surface.node->SetAppCulled(true);
+                surface.sceneVisible = false;
+                continue;
+            }
+
+            if (!surface.node) {
+                surface.node = RE::NiPointer<RE::NiNode>(RE::NiNode::Create(1));
+                surface.visualNode = vrui::VRUIWidget::loadModelFromNif(
+                    "DragonBoardVR\\RmlUIScreen.nif", false);
+                if (!surface.node || !surface.visualNode) {
+                    surface.node = nullptr;
+                    surface.visualNode = nullptr;
+                    continue;
+                }
+                surface.node->name = "DragonBoardVR_GalleryPhotoSurfaceRoot";
+                surface.visualNode->name = "DragonBoardVR_GalleryPhotoSurfaceVisual";
+
+                constexpr float width = 18.0f;
+                constexpr float height = width * 1080.0f / 1024.0f;
+                ApplyTabletSurfaceRotation(
+                    surface.visualNode.get(), backgroundNode, width, height);
+                surface.tabletRootNode = backgroundNode;
+                surface.visualNode->local.translate = {};
+                surface.visualNode->local.scale = 1.0f;
+
+                bool materialFound = false;
+                RE::BSVisit::TraverseScenegraphGeometries(
+                    surface.visualNode.get(),
+                    [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
+                        if (!geometry) {
+                            return RE::BSVisit::BSVisitControl::kContinue;
+                        }
+                        auto binding = IsolateRmlSurfaceMaterial(*geometry);
+                        if (!binding) {
+                            return RE::BSVisit::BSVisitControl::kContinue;
+                        }
+                        surface.geometryRendererData =
+                            geometry->GetGeometryRuntimeData().rendererData;
+                        surface.shaderProperty = std::move(binding.shaderProperty);
+                        surface.sourceTexture = std::move(binding.sourceTexture);
+                        surface.originalRendererTexture =
+                            surface.sourceTexture->rendererTexture;
+                        materialFound = true;
+                        return RE::BSVisit::BSVisitControl::kStop;
+                    });
+                vrui::VRUIWidget::normalizePhysicalMaterialLighting(
+                    surface.visualNode.get(), true);
+                if (!materialFound || !surface.sourceTexture) {
+                    logger::error(
+                        "DragonBoardVR: gallery photo '{}' has no isolated surface material.",
+                        surface.galleryPhotoId);
+                    surface.node = nullptr;
+                    surface.visualNode = nullptr;
+                    continue;
+                }
+
+                surface.textureBridge = std::make_unique<RE::BSGraphics::Texture>();
+                surface.textureBridge->texture = surface.renderTexture;
+                surface.textureBridge->unk08 = 0;
+                surface.textureBridge->resourceView = surface.shaderResource;
+                surface.sourceTexture->rendererTexture = surface.textureBridge.get();
+                if (surface.shaderProperty) {
+                    ConfigureRmlSurfaceFullbright(*surface.shaderProperty);
+                }
+                surface.node->AttachChild(surface.visualNode.get());
+
+                surface.node->local = BoardWidgetDefaultTransform(
+                    settings.galleryPhotoPanelDefaultScale);
+                surface.defaultTransform = surface.node->local;
+                surface.hasDefaultTransform = true;
+                widgetParentNode->AttachChild(surface.node.get());
+                surface.tabletRootNode = backgroundNode;
+                RegisterAndApplySurfaceTransform(surface);
+                logger::info(
+                    "DragonBoardVR: pinned gallery photo panel '{}' attached to the DragonBoard.",
+                    surface.galleryPhotoId);
+            } else if (surface.node->parent != widgetParentNode &&
+                       !surface.grabController.IsGrabbed()) {
+                if (surface.node->parent) {
+                    surface.node->parent->DetachChild(surface.node.get());
+                }
+                widgetParentNode->AttachChild(surface.node.get());
+            }
+            if (surface.tabletRootNode != backgroundNode) {
+                constexpr float width = 18.0f;
+                constexpr float height = width * 1080.0f / 1024.0f;
+                ApplyTabletSurfaceRotation(
+                    surface.visualNode.get(), backgroundNode, width, height);
+                surface.tabletRootNode = backgroundNode;
+                RegisterAndApplySurfaceTransform(surface);
+            }
+
+            if (!surface.sceneVisible && surface.shaderProperty) {
+                RefreshRmlSurfaceShader(*surface.shaderProperty);
+            }
+            surface.sceneVisible = true;
+            surface.node->SetAppCulled(false);
+            RE::NiUpdateData updateData;
+            surface.node->Update(updateData);
+            surface.node->UpdateWorldBound();
+            UpdateGalleryPhotoSurfaceHoverGameThread(surface);
+        }
+    }
+
+    void RmlPanelHost::UpdatePinnedWidgetVisibilityGameThread(bool visible)
+    {
+        auto& manager = vrui::VRMenuManager::get();
+        const auto setContainerVisible = [&](
+            std::string_view panelName,
+            std::string_view containerName) {
+            const auto panel = manager.findPanelByName(std::string(panelName));
+            if (!panel) return;
+            if (auto* container = panel->findWidgetByName(std::string(containerName))) {
+                container->setVisible(visible);
+            }
+        };
+        setContainerVisible("Persistent_Panel", "FixedWidgetsContainer");
+        setContainerVisible("AlwaysVisiblePanel", "AlwaysVisibleWidgetsContainer");
+        setContainerVisible(
+            "AlwaysVisibleRightHandPanel",
+            "AlwaysVisibleRightHandWidgetsContainer");
+    }
+
     void RmlPanelHost::UpdateSurfaceGameThread()
     {
         auto& manager = vrui::VRMenuManager::get();
@@ -2280,6 +3203,7 @@ namespace dragonboard::ui::rml
         const bool mainPanelActive = menuActive && _visible.load();
         const bool homeActive = menuActive && !_visible.load();
         _statusSurfaceHomeVisible.store(homeActive, std::memory_order_release);
+        UpdatePinnedWidgetVisibilityGameThread(!mainPanelActive);
         if (!menuActive) {
             if (surface.node) {
                 surface.node->SetAppCulled(true);
@@ -2628,22 +3552,8 @@ namespace dragonboard::ui::rml
             snapshot.weight = player->GetActorValue(RE::ActorValue::kInventoryWeight);
         }
         snapshot.capacity = player->GetActorValue(RE::ActorValue::kCarryWeight);
-        if (auto* location = player->GetCurrentLocation()) {
-            if (const char* name = location->GetFullName(); name && name[0] != '\0') {
-                snapshot.location = name;
-            }
-        }
-        if (snapshot.location == "SKYRIM") {
-            if (auto* cell = player->GetParentCell()) {
-                if (const char* name = cell->GetName(); name && name[0] != '\0') {
-                    snapshot.location = name;
-                } else if (auto* worldspace = cell->GetRuntimeData().worldSpace) {
-                    if (const char* name = worldspace->GetName(); name && name[0] != '\0') {
-                        snapshot.location = name;
-                    }
-                }
-            }
-        }
+        snapshot.location = dragonboard::ui::gallery::GalleryCaptureService::
+            ResolveLocationNameGameThread(*player);
         {
             std::scoped_lock lock(_statusSurfaceMutex);
             _statusSurfaceSnapshot = std::move(snapshot);
@@ -2731,27 +3641,16 @@ namespace dragonboard::ui::rml
                     if (surface.sourceTexture || !geometry) {
                         return RE::BSVisit::BSVisitControl::kContinue;
                     }
-                    auto* property = geometry->lightingShaderProp_cast();
-                    auto* baseMaterial = property ? property->GetBaseMaterial() : nullptr;
-                    auto* material = static_cast<RE::BSLightingShaderMaterialBase*>(baseMaterial);
-                    if (!material || !material->diffuseTexture) {
+                    auto binding = IsolateRmlSurfaceMaterial(*geometry);
+                    if (!binding) {
                         return RE::BSVisit::BSVisitControl::kContinue;
                     }
-
-                    surface.sourceTexture = material->diffuseTexture;
-                    surface.shaderProperty =
-                        RE::NiPointer<RE::BSLightingShaderProperty>(property);
+                    surface.shaderProperty = std::move(binding.shaderProperty);
+                    surface.sourceTexture = std::move(binding.sourceTexture);
                     surface.geometryRendererData =
                         geometry->GetGeometryRuntimeData().rendererData;
-                    surface.originalRendererTexture = surface.sourceTexture->rendererTexture;
-
-                    // The legacy-named screen NIF is a dedicated SSE quad with a complete
-                    // 0..1 UV range. Keep the runtime material transform at
-                    // identity so both triangles sample the same panel texture.
-                    material->texCoordScale[0] = { 1.0f, 1.0f };
-                    material->texCoordOffset[0] = { 0.0f, 0.0f };
-                    material->texCoordScale[1] = material->texCoordScale[0];
-                    material->texCoordOffset[1] = material->texCoordOffset[0];
+                    surface.originalRendererTexture =
+                        surface.sourceTexture->rendererTexture;
                     return RE::BSVisit::BSVisitControl::kStop;
                 });
 
@@ -2832,8 +3731,7 @@ namespace dragonboard::ui::rml
             surface.textureBridge->resourceView = _panelShaderResource;
             surface.sourceTexture->rendererTexture = surface.textureBridge.get();
             if (surface.shaderProperty) {
-                surface.shaderProperty->InvalidateTextures(0);
-                surface.shaderProperty->DoClearRenderPasses();
+                ConfigureRmlSurfaceFullbright(*surface.shaderProperty);
             }
 
             logger::trace(
@@ -2877,63 +3775,36 @@ namespace dragonboard::ui::rml
 
     bool RmlPanelHost::UpdateStatusSceneSurfaceGameThread(RE::NiNode* backgroundNode)
     {
-        const auto resolveBoardRelative = [](RE::NiNode* rootNode)
-            -> std::optional<RE::NiTransform> {
-            if (!rootNode) return std::nullopt;
-
-            RE::BSGeometry* boardGeometry = nullptr;
-            RE::BSVisit::TraverseScenegraphGeometries(
-                rootNode,
-                [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
-                    if (geometry && geometry->name == "DragonBoard") {
-                        boardGeometry = geometry;
-                        return RE::BSVisit::BSVisitControl::kStop;
-                    }
-                    return RE::BSVisit::BSVisitControl::kContinue;
-                });
-            if (!boardGeometry) return std::nullopt;
-
-            RE::NiTransform relative = boardGeometry->local;
-            auto* ancestor = boardGeometry->parent;
-            while (ancestor && ancestor != rootNode) {
-                relative.translate = ancestor->local.translate +
-                    (ancestor->local.rotate * relative.translate) *
-                        ancestor->local.scale;
-                relative.rotate = ancestor->local.rotate * relative.rotate;
-                relative.scale *= ancestor->local.scale;
-                ancestor = ancestor->parent;
-            }
-            if (ancestor != rootNode) return std::nullopt;
-
-            if (rootNode->GetObjectByName("DragonBoardCollision")) {
-                relative.scale *= kPhysicalBoardAuthoredScale;
-            }
-            return relative;
-        };
-        const auto composeTransform = [](const RE::NiTransform& parent,
-                                         const RE::NiTransform& child) {
-            RE::NiTransform result;
-            result.translate = parent.translate +
-                (parent.rotate * child.translate) * parent.scale;
-            result.rotate = parent.rotate * child.rotate;
-            result.scale = parent.scale * child.scale;
-            return result;
-        };
-        const auto makeRelativeTransform = [](const RE::NiTransform& parent,
-                                              const RE::NiTransform& child) {
-            const float parentScale = std::abs(parent.scale) > 1.0e-5f ?
-                parent.scale : 1.0f;
-            const auto inverseRotation = parent.rotate.Transpose();
-            RE::NiTransform result;
-            result.translate = inverseRotation *
-                (child.translate - parent.translate) / parentScale;
-            result.rotate = inverseRotation * child.rotate;
-            result.scale = child.scale / parentScale;
-            return result;
-        };
-
         auto& surface = StatusSceneSurface();
-        if (!backgroundNode ||
+        auto& settings = vrui::VRUISettings::get();
+        auto* widgetParentNode = ResolveBoardWidgetParentNode();
+        if (!surface.removable) {
+            surface.removable = true;
+            surface.removalHandler = [this]() {
+                auto& currentSettings = vrui::VRUISettings::get();
+                currentSettings.statusWidgetVisible = false;
+                {
+                    std::scoped_lock lock(_draftMutex);
+                    _draft.statusWidgetVisible = false;
+                }
+                _statusSurfaceHomeVisible.store(false, std::memory_order_release);
+                auto& statusSurface = StatusSceneSurface();
+                ResetBoardWidgetTransform(statusSurface);
+                if (statusSurface.node) statusSurface.node->SetAppCulled(true);
+                statusSurface.sceneVisible = false;
+                _rmlSettingsSyncPending.store(true, std::memory_order_release);
+                vrui::VRMenuManager::get().saveSettingsNow();
+                logger::info(
+                    "DragonBoardVR: Status widget removed and disabled in the Layout INI.");
+            };
+        }
+        if (!settings.statusWidgetVisible) {
+            SetSurfacePointer(surface, 0.5f, 0.5f, false);
+            if (surface.node) surface.node->SetAppCulled(true);
+            surface.sceneVisible = false;
+            return false;
+        }
+        if (!backgroundNode || !widgetParentNode ||
             !_statusSurfaceHomeVisible.load(std::memory_order_acquire) ||
             !surface.shaderResource) {
             if (surface.node) surface.node->SetAppCulled(true);
@@ -2941,16 +3812,9 @@ namespace dragonboard::ui::rml
         }
 
         if (!surface.node) {
-            auto boardRelative = resolveBoardRelative(backgroundNode);
-            if (!boardRelative) {
-                RE::NiTransform configuredTransform{};
-                if (TryGetConfiguredRmlSurfaceTransform(configuredTransform)) {
-                    boardRelative = configuredTransform;
-                }
-            }
             surface.node = RE::NiPointer<RE::NiNode>(RE::NiNode::Create(1));
             surface.visualNode = vrui::VRUIWidget::loadModelFromNif(
-                "DragonBoardVR\\StatusScreen.nif", false);
+                "DragonBoardVR\\RmlUIScreen.nif", false);
             if (!surface.node || !surface.visualNode) {
                 surface.node = nullptr;
                 surface.visualNode = nullptr;
@@ -2958,12 +3822,11 @@ namespace dragonboard::ui::rml
             }
             surface.node->name = "DragonBoardVR_StatusSurfaceRoot";
             surface.visualNode->name = "DragonBoardVR_StatusSurfaceVisual";
-            const float width = 3.125f;
+            const float width = kStatusSurfaceWidth;
             const float height = width * (32.0f / 250.0f);
-            RE::NiMatrix3 fit{};
-            fit.entry[0][0] = width / kScenePlaneExtent;
-            fit.entry[1][1] = height / kScenePlaneExtent;
-            surface.visualNode->local.rotate = fit;
+            ApplyTabletSurfaceRotation(
+                surface.visualNode.get(), backgroundNode, width, height);
+            surface.tabletRootNode = backgroundNode;
             surface.visualNode->local.translate = {};
             surface.visualNode->local.scale = 1.0f;
 
@@ -2975,36 +3838,21 @@ namespace dragonboard::ui::rml
                         surface.geometryRendererData =
                             geometry->GetGeometryRuntimeData().rendererData;
                     }
-                    auto* property = geometry ? geometry->lightingShaderProp_cast() : nullptr;
-                    if (geometry && property) {
-                        surface.shaderProperty =
-                            RE::NiPointer<RE::BSLightingShaderProperty>(property);
-                    }
-                    auto* material = property ? static_cast<RE::BSLightingShaderMaterialBase*>(
-                        property->GetBaseMaterial()) : nullptr;
-                    if (!material || !material->diffuseTexture) {
+                    auto binding = geometry ?
+                        IsolateRmlSurfaceMaterial(*geometry) :
+                        RmlSurfaceMaterialBinding{};
+                    if (!binding) {
                         return RE::BSVisit::BSVisitControl::kContinue;
                     }
-                    const auto& mainSurface = MainSceneSurface();
-                    if (mainSurface.sourceTexture &&
-                        material->diffuseTexture == mainSurface.sourceTexture) {
-                        logger::error(
-                            "DragonBoardVR: status surface texture isolation rejected a shared "
-                            "NiSourceTexture.");
-                        return RE::BSVisit::BSVisitControl::kStop;
-                    }
-                    surface.sourceTexture = material->diffuseTexture;
-                    surface.originalRendererTexture = surface.sourceTexture->rendererTexture;
-                    logger::trace(
-                        "DragonBoardVR: status surface uses intrinsic texture "
-                        "(material={}, status={}, main={}, path='{}').",
-                        static_cast<const void*>(material),
-                        static_cast<const void*>(surface.sourceTexture.get()),
-                        static_cast<const void*>(mainSurface.sourceTexture.get()),
-                        surface.sourceTexture->name.c_str());
+                    surface.shaderProperty = std::move(binding.shaderProperty);
+                    surface.sourceTexture = std::move(binding.sourceTexture);
+                    surface.originalRendererTexture =
+                        surface.sourceTexture->rendererTexture;
                     isolated = true;
                     return RE::BSVisit::BSVisitControl::kStop;
                 });
+            vrui::VRUIWidget::normalizePhysicalMaterialLighting(
+                surface.visualNode.get(), true);
             if (!isolated || !surface.sourceTexture) {
                 logger::error("DragonBoardVR: failed to isolate the status surface material.");
                 surface.node = nullptr;
@@ -3017,49 +3865,36 @@ namespace dragonboard::ui::rml
             surface.textureBridge->resourceView = surface.shaderResource;
             surface.sourceTexture->rendererTexture = surface.textureBridge.get();
             if (surface.shaderProperty) {
-                surface.shaderProperty->InvalidateTextures(0);
-                surface.shaderProperty->DoClearRenderPasses();
+                ConfigureRmlSurfaceFullbright(*surface.shaderProperty);
             }
             surface.node->AttachChild(surface.visualNode.get());
 
-            const RE::NiPoint3 offset{ 12.5f, 0.0f, 0.82f };
-            if (boardRelative) {
-                RE::NiTransform boardOffset;
-                boardOffset.translate = offset;
-                boardOffset.rotate = RE::NiMatrix3{};
-                boardOffset.scale = 1.0f;
-                surface.node->local = composeTransform(*boardRelative, boardOffset);
-            } else {
-                surface.node->local.translate = offset;
-                surface.node->local.rotate = RE::NiMatrix3{};
-                surface.node->local.scale = 1.0f;
-            }
+            surface.node->local = BoardWidgetDefaultTransform(1.0f);
+            surface.defaultTransform = surface.node->local;
+            surface.hasDefaultTransform = true;
+            widgetParentNode->AttachChild(surface.node.get());
+            surface.tabletRootNode = backgroundNode;
             RegisterAndApplySurfaceTransform(surface);
-            backgroundNode->AttachChild(surface.node.get());
             logger::trace("DragonBoardVR: independent status surface attached.");
-        } else if (surface.node->parent != backgroundNode &&
+        } else if (surface.node->parent != widgetParentNode &&
                    !surface.grabController.IsGrabbed()) {
-            const auto previousBoardRelative =
-                resolveBoardRelative(surface.node->parent);
-            const auto nextBoardRelative = resolveBoardRelative(backgroundNode);
-            if (previousBoardRelative && nextBoardRelative) {
-                const auto boardLocal = makeRelativeTransform(
-                    *previousBoardRelative,
-                    surface.node->local);
-                surface.node->local = composeTransform(
-                    *nextBoardRelative,
-                    boardLocal);
-            }
             if (surface.node->parent) {
                 surface.node->parent->DetachChild(surface.node.get());
             }
-            backgroundNode->AttachChild(surface.node.get());
+            widgetParentNode->AttachChild(surface.node.get());
+        }
+        if (surface.tabletRootNode != backgroundNode) {
+            const float width = kStatusSurfaceWidth;
+            const float height = width * (32.0f / 250.0f);
+            ApplyTabletSurfaceRotation(
+                surface.visualNode.get(), backgroundNode, width, height);
+            surface.tabletRootNode = backgroundNode;
+            RegisterAndApplySurfaceTransform(surface);
         }
 
         if (!surface.sceneVisible) {
             if (surface.shaderProperty) {
-                surface.shaderProperty->InvalidateTextures(0);
-                surface.shaderProperty->DoClearRenderPasses();
+                RefreshRmlSurfaceShader(*surface.shaderProperty);
             }
             surface.sceneVisible = true;
         }
@@ -3139,28 +3974,14 @@ namespace dragonboard::ui::rml
                         surface.geometryRendererData =
                             geometry->GetGeometryRuntimeData().rendererData;
                     }
-                    auto* property =
-                        geometry ? geometry->lightingShaderProp_cast() : nullptr;
-                    if (geometry && property) {
-                        surface.shaderProperty =
-                            RE::NiPointer<RE::BSLightingShaderProperty>(property);
-                    }
-                    auto* material = property ?
-                        static_cast<RE::BSLightingShaderMaterialBase*>(
-                            property->GetBaseMaterial()) :
-                        nullptr;
-                    if (!material || !material->diffuseTexture) {
+                    auto binding = geometry ?
+                        IsolateRmlSurfaceMaterial(*geometry) :
+                        RmlSurfaceMaterialBinding{};
+                    if (!binding) {
                         return RE::BSVisit::BSVisitControl::kContinue;
                     }
-                    const auto& mainSurface = MainSceneSurface();
-                    if (mainSurface.sourceTexture &&
-                        material->diffuseTexture == mainSurface.sourceTexture) {
-                        logger::error(
-                            "DragonBoardVR: Welcome tutorial surface rejected "
-                            "a shared NiSourceTexture.");
-                        return RE::BSVisit::BSVisitControl::kStop;
-                    }
-                    surface.sourceTexture = material->diffuseTexture;
+                    surface.shaderProperty = std::move(binding.shaderProperty);
+                    surface.sourceTexture = std::move(binding.sourceTexture);
                     surface.originalRendererTexture =
                         surface.sourceTexture->rendererTexture;
                     isolated = true;
@@ -3182,8 +4003,7 @@ namespace dragonboard::ui::rml
             surface.sourceTexture->rendererTexture =
                 surface.textureBridge.get();
             if (surface.shaderProperty) {
-                surface.shaderProperty->InvalidateTextures(0);
-                surface.shaderProperty->DoClearRenderPasses();
+                ConfigureRmlSurfaceFullbright(*surface.shaderProperty);
             }
             surface.node->AttachChild(surface.visualNode.get());
 
@@ -3294,28 +4114,14 @@ namespace dragonboard::ui::rml
                         surface.geometryRendererData =
                             geometry->GetGeometryRuntimeData().rendererData;
                     }
-                    auto* property = geometry ? geometry->lightingShaderProp_cast() : nullptr;
-                    if (geometry && property) {
-                        surface.shaderProperty =
-                            RE::NiPointer<RE::BSLightingShaderProperty>(property);
-                    }
-                    auto* material = property ? static_cast<RE::BSLightingShaderMaterialBase*>(
-                        property->GetBaseMaterial()) : nullptr;
-                    if (!material || !material->diffuseTexture) {
+                    auto binding = geometry ?
+                        IsolateRmlSurfaceMaterial(*geometry) :
+                        RmlSurfaceMaterialBinding{};
+                    if (!binding) {
                         return RE::BSVisit::BSVisitControl::kContinue;
                     }
-                    const auto& mainSurface = MainSceneSurface();
-                    const auto& statusSurface = StatusSceneSurface();
-                    if ((mainSurface.sourceTexture &&
-                         material->diffuseTexture == mainSurface.sourceTexture) ||
-                        (statusSurface.sourceTexture &&
-                         material->diffuseTexture == statusSurface.sourceTexture)) {
-                        logger::error(
-                            "DragonBoardVR: keyboard surface rejected a shared "
-                            "NiSourceTexture.");
-                        return RE::BSVisit::BSVisitControl::kStop;
-                    }
-                    surface.sourceTexture = material->diffuseTexture;
+                    surface.shaderProperty = std::move(binding.shaderProperty);
+                    surface.sourceTexture = std::move(binding.sourceTexture);
                     surface.originalRendererTexture =
                         surface.sourceTexture->rendererTexture;
                     isolated = true;
@@ -3335,8 +4141,7 @@ namespace dragonboard::ui::rml
             surface.textureBridge->resourceView = surface.shaderResource;
             surface.sourceTexture->rendererTexture = surface.textureBridge.get();
             if (surface.shaderProperty) {
-                surface.shaderProperty->InvalidateTextures(0);
-                surface.shaderProperty->DoClearRenderPasses();
+                ConfigureRmlSurfaceFullbright(*surface.shaderProperty);
             }
             surface.node->AttachChild(surface.visualNode.get());
 
@@ -3363,8 +4168,7 @@ namespace dragonboard::ui::rml
 
         if (!surface.sceneVisible) {
             if (surface.shaderProperty) {
-                surface.shaderProperty->InvalidateTextures(0);
-                surface.shaderProperty->DoClearRenderPasses();
+                RefreshRmlSurfaceShader(*surface.shaderProperty);
             }
             surface.sceneVisible = true;
         }
@@ -3523,6 +4327,7 @@ namespace dragonboard::ui::rml
         if (_statusSurfaceHomeVisible.load(std::memory_order_acquire)) {
             RenderStatusSurfacePresentThread();
         }
+        RenderGalleryPhotoSurfacesPresentThread();
         if (_rendererReady.load(std::memory_order_acquire) && _widgetLabelAtlas &&
             _rmlUi && _rmlUi->GetRenderer()) {
             _widgetLabelAtlas->RenderPresentThread(
@@ -3919,6 +4724,8 @@ namespace dragonboard::ui::rml
             _rmlUi && _rmlUi->IsMagicReady();
         const bool journalRmlActive = panelMode == LocalPanelMode::kJournal &&
             _rmlUi && _rmlUi->IsJournalReady();
+        const bool galleryRmlActive = panelMode == LocalPanelMode::kGallery &&
+            _rmlUi && _rmlUi->IsGalleryReady();
         const bool welcomeRmlActive = panelMode == LocalPanelMode::kWelcome &&
             _rmlUi && _rmlUi->IsWelcomeReady();
         const auto externalPanel = _activeExternalPanel.load();
@@ -3932,9 +4739,18 @@ namespace dragonboard::ui::rml
         }
         const bool externalRmlActive = panelMode == LocalPanelMode::kExternal &&
             _rmlUi && _rmlUi->IsPanelReady(externalPanel);
+        if (galleryRmlActive && _galleryRenameKeyboardPending.exchange(
+                false, std::memory_order_acq_rel)) {
+            if (!BeginSharedGalleryKeyboardPresentThread()) {
+                _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                    dragonboard::ui::rml::DragonBoardRmlUi::HapticCue::kError));
+                logger::warn(
+                    "DragonBoardVR: gallery rename keyboard could not be opened.");
+            }
+        }
         if (settingsRmlActive || developerRmlActive || itemEditRmlActive ||
             modsRmlActive || inventoryRmlActive || magicRmlActive ||
-            journalRmlActive || welcomeRmlActive ||
+            journalRmlActive || galleryRmlActive || welcomeRmlActive ||
             externalRmlActive) {
             if (settingsRmlActive) {
                 _rmlUi->ShowSettings();
@@ -3983,6 +4799,12 @@ namespace dragonboard::ui::rml
                 _rmlUi->ShowJournal();
                 if (_rmlJournalSyncPending.exchange(false)) {
                     SyncRmlJournal();
+                    _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
+            } else if (galleryRmlActive) {
+                _rmlUi->ShowGallery();
+                if (_rmlGallerySyncPending.exchange(false)) {
+                    SyncRmlGallery();
                     _renderScheduler.MarkDirty(RmlDirtyReason::kData);
                 }
             } else if (welcomeRmlActive) {
@@ -4096,6 +4918,23 @@ namespace dragonboard::ui::rml
                     _applyPending.store(true);
                     logger::info(
                         "DragonBoardVR: tutorials {} from RmlUi settings.",
+                        enabled ? "enabled" : "disabled");
+                }
+                if (_rmlUi->ConsumeStatusWidgetToggleRequested()) {
+                    bool enabled = false;
+                    {
+                        std::scoped_lock lock(_draftMutex);
+                        _draft.statusWidgetVisible = !_draft.statusWidgetVisible;
+                        enabled = _draft.statusWidgetVisible;
+                    }
+                    _rmlUi->SetStatusWidgetEnabled(enabled);
+                    if (!enabled) {
+                        _statusWidgetResetPending.store(
+                            true, std::memory_order_release);
+                    }
+                    _applyPending.store(true);
+                    logger::info(
+                        "DragonBoardVR: Status widget {} from RmlUi settings.",
                         enabled ? "enabled" : "disabled");
                 }
                 if (auto language =
@@ -4266,8 +5105,11 @@ namespace dragonboard::ui::rml
                 case RmlInventoryAction::kFilterArmor:
                     _inventoryActionPending.store(InventoryAction::kFilterArmor);
                     break;
-                case RmlInventoryAction::kFilterConsumables:
-                    _inventoryActionPending.store(InventoryAction::kFilterConsumables);
+                case RmlInventoryAction::kFilterPotions:
+                    _inventoryActionPending.store(InventoryAction::kFilterPotions);
+                    break;
+                case RmlInventoryAction::kFilterFood:
+                    _inventoryActionPending.store(InventoryAction::kFilterFood);
                     break;
                 case RmlInventoryAction::kFilterQuest:
                     _inventoryActionPending.store(InventoryAction::kFilterQuest);
@@ -4396,6 +5238,82 @@ namespace dragonboard::ui::rml
                     _journalActionPending.store(JournalAction::kClose);
                     break;
                 case RmlJournalAction::kNone:
+                    break;
+                }
+            } else if (galleryRmlActive) {
+                const auto [action, index] = _rmlUi->ConsumeGalleryAction();
+                using GalleryAction = dragonboard::ui::rml::DragonBoardRmlUi::GalleryAction;
+                const auto photos = FavoriteFirstGalleryPhotos();
+                const auto selectPhoto = [&](std::size_t selectedIndex) {
+                    if (photos.empty()) return;
+                    selectedIndex = std::min(selectedIndex, photos.size() - 1);
+                    _gallerySelectedIndex.store(selectedIndex, std::memory_order_release);
+                    {
+                        std::scoped_lock lock(_gallerySelectionMutex);
+                        _gallerySelectedId = photos[selectedIndex].id;
+                        _galleryDeleteConfirmId.clear();
+                    }
+                    _rmlGallerySyncPending.store(true, std::memory_order_release);
+                };
+                const auto requestDelete = [&](std::size_t selectedIndex) {
+                    if (selectedIndex >= photos.size()) return;
+                    _gallerySelectedIndex.store(selectedIndex, std::memory_order_release);
+                    bool confirmed = false;
+                    {
+                        std::scoped_lock lock(_gallerySelectionMutex);
+                        _gallerySelectedId = photos[selectedIndex].id;
+                        confirmed = _galleryDeleteConfirmId == _gallerySelectedId;
+                        if (confirmed) _galleryDeleteConfirmId.clear();
+                        else _galleryDeleteConfirmId = _gallerySelectedId;
+                    }
+                    if (confirmed) {
+                        _galleryDeletePending.store(true, std::memory_order_release);
+                    }
+                    _rmlGallerySyncPending.store(true, std::memory_order_release);
+                };
+                switch (action) {
+                case GalleryAction::kCapture:
+                    _galleryCapturePending.store(true, std::memory_order_release);
+                    _rmlGallerySyncPending.store(true, std::memory_order_release);
+                    break;
+                case GalleryAction::kCycleTimer:
+                    _galleryTimerCyclePending.store(true, std::memory_order_release);
+                    break;
+                case GalleryAction::kSelect:
+                    if (index < photos.size()) selectPhoto(index);
+                    break;
+                case GalleryAction::kRename:
+                    _galleryRenameKeyboardPending.store(
+                        true, std::memory_order_release);
+                    break;
+                case GalleryAction::kToggleFavorite:
+                    _galleryFavoritePending.store(true, std::memory_order_release);
+                    break;
+                case GalleryAction::kToggleFavoriteAt:
+                    if (index < photos.size()) {
+                        selectPhoto(index);
+                        _galleryFavoritePending.store(true, std::memory_order_release);
+                    }
+                    break;
+                case GalleryAction::kDelete:
+                    if (photos.empty()) break;
+                    requestDelete(std::min(
+                        _gallerySelectedIndex.load(std::memory_order_acquire),
+                        photos.size() - 1));
+                    break;
+                case GalleryAction::kDeleteAt:
+                    requestDelete(index);
+                    break;
+                case GalleryAction::kToggleMapPin:
+                    _galleryMapPinPending.store(true, std::memory_order_release);
+                    break;
+                case GalleryAction::kTogglePanelPin:
+                    _galleryPanelPinPending.store(true, std::memory_order_release);
+                    break;
+                case GalleryAction::kClose:
+                    Close();
+                    break;
+                case GalleryAction::kNone:
                     break;
                 }
             } else {
@@ -4560,6 +5478,7 @@ namespace dragonboard::ui::rml
         _rmlUi->SetPinsLocked(_draft.lockPins);
         _rmlUi->SetDeveloperButtonEnabled(_draft.showDevButton);
         _rmlUi->SetShowTutorialsEnabled(_draft.showTutorials);
+        _rmlUi->SetStatusWidgetEnabled(_draft.statusWidgetVisible);
         _rmlUi->SetLanguageSelection(_draft.uiLanguage);
         _rmlUi->SetWorldPinned(_draft.worldPinned);
         _rmlUi->SetPositionAdjustmentActive(
@@ -5242,6 +6161,54 @@ namespace dragonboard::ui::rml
         _magicPresenter.Sync(
             *_rmlUi,
             vrui::VRUISettings::get().editModeEnabled);
+    }
+
+    void RmlPanelHost::SyncRmlGallery()
+    {
+        if (!_rmlUi || !_rmlUi->IsGalleryReady()) return;
+        const auto photos = FavoriteFirstGalleryPhotos();
+        std::vector<DragonBoardRmlUi::GalleryPhotoInfo> info;
+        info.reserve(photos.size());
+        for (const auto& photo : photos) {
+            info.push_back({ photo.id, photo.name, photo.imagePath, photo.thumbnailPath.empty() ? photo.imagePath : photo.thumbnailPath,
+                photo.capturedAt, photo.skyrimDate, photo.location, photo.mapPinned, photo.panelPinned, photo.favorite });
+        }
+        auto selected = _gallerySelectedIndex.load(std::memory_order_acquire);
+        bool deleteConfirmationPending = false;
+        {
+            std::scoped_lock lock(_gallerySelectionMutex);
+            if (!photos.empty()) {
+                if (!_gallerySelectedId.empty()) {
+                    const auto selectedPhoto = std::find_if(
+                        photos.begin(),
+                        photos.end(),
+                        [&](const auto& photo) { return photo.id == _gallerySelectedId; });
+                    if (selectedPhoto != photos.end()) {
+                        selected = static_cast<std::size_t>(
+                            std::distance(photos.begin(), selectedPhoto));
+                    } else {
+                        selected = std::min(selected, photos.size() - 1);
+                    }
+                } else {
+                    selected = std::min(selected, photos.size() - 1);
+                }
+                _gallerySelectedId = photos[selected].id;
+                deleteConfirmationPending =
+                    _galleryDeleteConfirmId == _gallerySelectedId;
+            } else {
+                _gallerySelectedId.clear();
+                _galleryDeleteConfirmId.clear();
+            }
+        }
+        _gallerySelectedIndex.store(selected, std::memory_order_release);
+        _rmlUi->SetGallery(
+            info,
+            selected,
+            dragonboard::ui::gallery::GalleryCaptureService::GetSingleton().IsCaptureBusy(),
+            vrui::VRUISettings::get().galleryCaptureTimerSeconds,
+            _galleryCaptureCountdownDisplay.load(std::memory_order_acquire),
+            vrui::VRUISettings::get().galleryGridColumns,
+            deleteConfirmationPending);
     }
 
     void RmlPanelHost::SyncRmlJournal()
@@ -6388,6 +7355,55 @@ namespace dragonboard::ui::rml
         _journalPollAccumulator = 0.5f;
     }
 
+    bool RmlPanelHost::BeginSharedGalleryKeyboardPresentThread()
+    {
+        if (!_rmlUi) return false;
+        if (_sharedKeyboardPurpose != SharedKeyboardPurpose::kNone) {
+            if (_rmlUi->IsKeyboardOpen()) return false;
+            logger::warn(
+                "DragonBoardVR: cleared stale shared keyboard purpose before gallery rename.");
+            _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
+            _keyboardSurfaceVisible.store(false, std::memory_order_release);
+        }
+
+        std::string selectedId;
+        {
+            std::scoped_lock lock(_gallerySelectionMutex);
+            selectedId = _gallerySelectedId;
+        }
+        auto& catalog = dragonboard::ui::gallery::GalleryCatalog::GetSingleton();
+        auto photo = catalog.Find(selectedId);
+        if (!photo) {
+            const auto photos = catalog.Snapshot();
+            if (photos.empty()) {
+                logger::warn(
+                    "DragonBoardVR: gallery rename requested without a photo.");
+                return false;
+            }
+            const auto selected = std::min(
+                _gallerySelectedIndex.load(std::memory_order_acquire),
+                photos.size() - 1);
+            photo = photos[selected];
+            selectedId = photo->id;
+            {
+                std::scoped_lock lock(_gallerySelectionMutex);
+                _gallerySelectedId = selectedId;
+            }
+        }
+        if (!_rmlUi->OpenKeyboard("Rename photo", photo->name, 96)) {
+            logger::warn(
+                "DragonBoardVR: shared RmlUi keyboard rejected gallery rename.");
+            return false;
+        }
+        _sharedKeyboardPurpose = SharedKeyboardPurpose::kGalleryRename;
+        _keyboardSurfaceVisible.store(true, std::memory_order_release);
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+        logger::info(
+            "DragonBoardVR: gallery rename keyboard opened for photo '{}'.",
+            selectedId);
+        return true;
+    }
+
     bool RmlPanelHost::BeginSharedDeveloperKeyboardPresentThread()
     {
         if (!_rmlUi || _sharedKeyboardPurpose != SharedKeyboardPurpose::kNone) {
@@ -6515,7 +7531,18 @@ namespace dragonboard::ui::rml
             return;
         }
 
-        if (purpose == SharedKeyboardPurpose::kDeveloperCommand) {
+        if (purpose == SharedKeyboardPurpose::kGalleryRename) {
+            std::string selectedId;
+            { std::scoped_lock lock(_gallerySelectionMutex); selectedId = _gallerySelectedId; }
+            if (!selectedId.empty() && !result->text.empty()) {
+                {
+                    std::scoped_lock lock(_galleryRenameCommitMutex);
+                    _galleryRenameCommitId = std::move(selectedId);
+                    _galleryRenameCommitName = result->text;
+                }
+                _galleryRenameCommitPending.store(true, std::memory_order_release);
+            }
+        } else if (purpose == SharedKeyboardPurpose::kDeveloperCommand) {
             QueueDeveloperCommandAdditionPresentThread(result->text);
         } else if (purpose == SharedKeyboardPurpose::kInventorySearch) {
             ApplyInventorySearchQueryPresentThread(result->text);
@@ -7378,7 +8405,8 @@ namespace dragonboard::ui::rml
         case InventoryAction::kFilterFavorites:
         case InventoryAction::kFilterWeapons:
         case InventoryAction::kFilterArmor:
-        case InventoryAction::kFilterConsumables:
+        case InventoryAction::kFilterPotions:
+        case InventoryAction::kFilterFood:
         case InventoryAction::kFilterQuest:
         case InventoryAction::kFilterBooks:
         case InventoryAction::kFilterMisc:
@@ -7389,7 +8417,8 @@ namespace dragonboard::ui::rml
                 case InventoryAction::kFilterFavorites: requested = Filter::Favorites; break;
                 case InventoryAction::kFilterWeapons: requested = Filter::WeaponsAll; break;
                 case InventoryAction::kFilterArmor: requested = Filter::ArmorAll; break;
-                case InventoryAction::kFilterConsumables: requested = Filter::ConsumablesAll; break;
+                case InventoryAction::kFilterPotions: requested = Filter::Potions; break;
+                case InventoryAction::kFilterFood: requested = Filter::Food; break;
                 case InventoryAction::kFilterQuest: requested = Filter::QuestItems; break;
                 case InventoryAction::kFilterBooks: requested = Filter::BooksAll; break;
                 case InventoryAction::kFilterMisc: requested = Filter::MiscAll; break;

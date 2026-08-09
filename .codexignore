@@ -1,0 +1,27 @@
+# G:\Meus Mods\Base\projects\DragonBoardVR v08\.codexignore
+# Ignore binaries, heavy submodules, and assets in Codex
+
+# OpenVR / CommonLib submodules samples
+**/lib/commonlibsse-ng/extern/openvr/samples/
+**/lib/commonlibsse-ng/extern/openvr/bin/
+**/lib/commonlibsse-ng/extern/openvr/controller_callouts/
+
+# DragonBoardVR assets
+Assets/textures/
+Assets/tools/
+Assets/ui/rml/assets/Background/
+Assets/ui/rml/assets/Fonts/
+
+# Build artifacts
+**/build/
+**/bin/
+**/obj/
+**/.xmake/
+
+# Local backups and external folders
+Backups/
+External/
+artifacts/
+nif_tests/
+stable_before_*/
+stable_full_reload/

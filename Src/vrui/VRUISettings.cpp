@@ -1003,6 +1003,8 @@ namespace vrui
                 bMapRotX, bMapRotY, bMapRotZ, bMapScale);
             loadLayoutButton("fDev", bDevPosX, bDevPosY, bDevPosZ,
                 bDevRotX, bDevRotY, bDevRotZ, bDevScale);
+            loadLayoutButton("fGallery", bGalleryPosX, bGalleryPosY, bGalleryPosZ,
+                bGalleryRotX, bGalleryRotY, bGalleryRotZ, bGalleryScale);
 
             bStatusLabel = layoutIni.GetValue(
                 "FixedButtons", "sStatusLabel", bStatusLabel.c_str());
@@ -1036,6 +1038,33 @@ namespace vrui
                 "FixedButtons", "sDevLabel", bDevLabel.c_str());
             bDevAction = layoutIni.GetValue(
                 "FixedButtons", "sDevAction", bDevAction.c_str());
+            bGalleryLabel = layoutIni.GetValue(
+                "FixedButtons", "sGalleryLabel", bGalleryLabel.c_str());
+            bGalleryAction = layoutIni.GetValue(
+                "FixedButtons", "sGalleryAction", bGalleryAction.c_str());
+            statusWidgetVisible = layoutIni.GetBoolValue(
+                "StatusWidget", "bVisible", statusWidgetVisible);
+            galleryCaptureTimerSeconds = static_cast<int>(layoutIni.GetLongValue(
+                "Gallery", "iCaptureTimerSeconds", galleryCaptureTimerSeconds));
+            if (galleryCaptureTimerSeconds != 0 && galleryCaptureTimerSeconds != 3 &&
+                galleryCaptureTimerSeconds != 5 && galleryCaptureTimerSeconds != 10) {
+                galleryCaptureTimerSeconds = 0;
+            }
+            galleryGridColumns = static_cast<int>(layoutIni.GetLongValue("Gallery", "iGridColumns", galleryGridColumns));
+            galleryThumbnailWidth = static_cast<int>(layoutIni.GetLongValue("Gallery", "iThumbnailWidth", galleryThumbnailWidth));
+            galleryMaximumVisibleMarkers = static_cast<int>(layoutIni.GetLongValue("Gallery", "iMaximumVisibleMarkers", galleryMaximumVisibleMarkers));
+            galleryMaximumPinnedPanels = static_cast<int>(layoutIni.GetLongValue("Gallery", "iMaximumPinnedPanels", galleryMaximumPinnedPanels));
+            galleryCameraMarkerScale = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fCameraMarkerScale", galleryCameraMarkerScale));
+            galleryCameraMarkerRotX = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fCameraMarkerRotX", galleryCameraMarkerRotX));
+            galleryCameraMarkerRotY = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fCameraMarkerRotY", galleryCameraMarkerRotY));
+            galleryCameraMarkerRotZ = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fCameraMarkerRotZ", galleryCameraMarkerRotZ));
+            galleryPhotoPanelDefaultScale = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fPhotoPanelDefaultScale", galleryPhotoPanelDefaultScale));
+            galleryPhotoPanelDefaultPosX = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fPhotoPanelDefaultPosX", galleryPhotoPanelDefaultPosX));
+            galleryPhotoPanelDefaultPosY = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fPhotoPanelDefaultPosY", galleryPhotoPanelDefaultPosY));
+            galleryPhotoPanelDefaultPosZ = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fPhotoPanelDefaultPosZ", galleryPhotoPanelDefaultPosZ));
+            galleryPhotoPanelDefaultRotX = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fPhotoPanelDefaultRotX", galleryPhotoPanelDefaultRotX));
+            galleryPhotoPanelDefaultRotY = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fPhotoPanelDefaultRotY", galleryPhotoPanelDefaultRotY));
+            galleryPhotoPanelDefaultRotZ = static_cast<float>(layoutIni.GetDoubleValue("Gallery", "fPhotoPanelDefaultRotZ", galleryPhotoPanelDefaultRotZ));
             showDevButton = layoutIni.GetBoolValue(
                 "FixedButtons", "bShowDevButton", showDevButton);
             defaultPanelAction = layoutIni.GetValue(
@@ -1464,6 +1493,8 @@ namespace vrui
         saveBtn("fGold",   bGoldPosX,   bGoldPosY,   bGoldPosZ,   bGoldRotX,   bGoldRotY,   bGoldRotZ,   bGoldScale);
         saveBtn("fMap",    bMapPosX,    bMapPosY,    bMapPosZ,    bMapRotX,    bMapRotY,    bMapRotZ,    bMapScale);
         saveBtn("fDev",    bDevPosX,    bDevPosY,    bDevPosZ,    bDevRotX,    bDevRotY,    bDevRotZ,    bDevScale);
+        saveBtn("fGallery", bGalleryPosX, bGalleryPosY, bGalleryPosZ,
+            bGalleryRotX, bGalleryRotY, bGalleryRotZ, bGalleryScale);
 
         // Remove obsolete persistent page-button settings from legacy combined
         // INIs before the split files are reconstructed.
@@ -1517,6 +1548,33 @@ namespace vrui
         ini.SetValue("FixedButtons", "sMapAction",    bMapAction.c_str(),    "; Action: MapMenu");
         ini.SetValue("FixedButtons", "sDevLabel",     bDevLabel.c_str(),     "; Displayed name of the Dev button");
         ini.SetValue("FixedButtons", "sDevAction",    bDevAction.c_str(),    "; Action: DevPanel");
+        ini.SetValue("FixedButtons", "sGalleryLabel", bGalleryLabel.c_str(), "; Displayed name of the Gallery button");
+        ini.SetValue("FixedButtons", "sGalleryAction", bGalleryAction.c_str(), "; Action: Gallery");
+        ini.SetBoolValue(
+            "StatusWidget",
+            "bVisible",
+            statusWidgetVisible,
+            "; Show the removable Status widget on the DragonBoard home panel");
+        ini.SetLongValue(
+            "Gallery",
+            "iCaptureTimerSeconds",
+            galleryCaptureTimerSeconds,
+            "; Snapshot timer: 0=off, 3, 5, or 10 seconds");
+        ini.SetLongValue("Gallery", "iGridColumns", galleryGridColumns);
+        ini.SetLongValue("Gallery", "iThumbnailWidth", galleryThumbnailWidth);
+        ini.SetLongValue("Gallery", "iMaximumVisibleMarkers", galleryMaximumVisibleMarkers);
+        ini.SetLongValue("Gallery", "iMaximumPinnedPanels", galleryMaximumPinnedPanels);
+        ini.SetDoubleValue("Gallery", "fCameraMarkerScale", galleryCameraMarkerScale);
+        ini.SetDoubleValue("Gallery", "fCameraMarkerRotX", galleryCameraMarkerRotX);
+        ini.SetDoubleValue("Gallery", "fCameraMarkerRotY", galleryCameraMarkerRotY);
+        ini.SetDoubleValue("Gallery", "fCameraMarkerRotZ", galleryCameraMarkerRotZ);
+        ini.SetDoubleValue("Gallery", "fPhotoPanelDefaultScale", galleryPhotoPanelDefaultScale);
+        ini.SetDoubleValue("Gallery", "fPhotoPanelDefaultPosX", galleryPhotoPanelDefaultPosX);
+        ini.SetDoubleValue("Gallery", "fPhotoPanelDefaultPosY", galleryPhotoPanelDefaultPosY);
+        ini.SetDoubleValue("Gallery", "fPhotoPanelDefaultPosZ", galleryPhotoPanelDefaultPosZ);
+        ini.SetDoubleValue("Gallery", "fPhotoPanelDefaultRotX", galleryPhotoPanelDefaultRotX);
+        ini.SetDoubleValue("Gallery", "fPhotoPanelDefaultRotY", galleryPhotoPanelDefaultRotY);
+        ini.SetDoubleValue("Gallery", "fPhotoPanelDefaultRotZ", galleryPhotoPanelDefaultRotZ);
         ini.SetBoolValue("FixedButtons", "bShowDevButton", showDevButton,    "; Toggle: Show or hide the Dev button");
 
         ini.SetValue("FixedButtons", "sDefaultPanelAction", defaultPanelAction.c_str(), "; The action/panel to open when the menu opens");
@@ -1660,6 +1718,7 @@ namespace vrui
         }
         CopyIniSection(ini, layoutOut, "FixedButtons");
         CopyIniSection(ini, layoutOut, "Slots");
+        CopyIniSection(ini, layoutOut, "Gallery");
 
         for (std::size_t i = 0; i < mapCalibrationPoints.size(); ++i) {
             const auto prefix = "Point" + std::to_string(i + 1);

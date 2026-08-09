@@ -1,0 +1,15 @@
+<rml>
+<head>
+    <title>DragonBoard Gallery Photo</title>
+    <link type="text/rcss" href="gallery_photo_pin.rcss" />
+</head>
+<body>
+<div id="photo-panel">
+    <img id="photo-image" />
+    <div id="photo-caption">
+        <span id="photo-location">Skyrim</span>
+        <span id="photo-date-time"></span>
+    </div>
+</div>
+</body>
+</rml>

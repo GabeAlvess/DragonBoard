@@ -585,7 +585,10 @@ namespace vrui
                     return RE::BSVisit::BSVisitControl::kContinue;
                 }
 
-                if (!allowCastShadows) {
+                if (allowCastShadows) {
+                    property->flags.set(
+                        RE::BSShaderProperty::EShaderPropertyFlag::kCastShadows);
+                } else {
                     property->flags.reset(
                         RE::BSShaderProperty::EShaderPropertyFlag::kCastShadows);
                 }

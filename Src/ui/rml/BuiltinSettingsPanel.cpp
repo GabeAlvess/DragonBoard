@@ -82,6 +82,7 @@ namespace dragonboard::ui::rml
         _draft.lockPins = settings.lockPins;
         _draft.showDevButton = settings.showDevButton;
         _draft.showTutorials = settings.showTutorials;
+        _draft.statusWidgetVisible = settings.statusWidgetVisible;
         _draft.uiLanguage = settings.uiLanguage;
         _draft.worldPinned = vrui::VRMenuManager::get().isBoardWorldPinned();
         _draft.menuScale = settings.menuScale;
@@ -118,6 +119,7 @@ namespace dragonboard::ui::rml
         settings.lockPins = _draft.lockPins;
         settings.showDevButton = _draft.showDevButton;
         settings.showTutorials = _draft.showTutorials;
+        settings.statusWidgetVisible = _draft.statusWidgetVisible;
         if (applyLanguage) settings.uiLanguage = _draft.uiLanguage;
         if (tutorialsReenabled) {
             settings.resetTutorialProgress();

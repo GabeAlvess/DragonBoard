@@ -13,6 +13,7 @@
 #include "MapCalibration.h"
 #include "VRMenuManager.h"
 #include "VRUIPanel.h"
+#include "ui/rml/RmlPanelHost.h"
 
 #include <DirectXPackedVector.h>
 #include <algorithm>
@@ -43,6 +44,7 @@ namespace vrui
         constexpr float kRotatedMapSourceWidth = 1536.0f;
         constexpr float kRotatedMapSourceHeight = 2216.0f;
         constexpr float kRotatedMapSourceTop = 1880.0f;
+        constexpr float kInverseSqrtTwo = 0.70710678118f;
 
         RE::NiPoint2 MapArtworkUvToAtlasUv(float mapU, float mapV)
         {
@@ -127,18 +129,29 @@ namespace vrui
         const std::string& nifPath,
         MapMarkerSource source,
         std::size_t questSlot,
-        std::string texturePath) :
-        VRUIWidget(
-            source == MapMarkerSource::Player ?
-                "MapMarker" :
-                "QuestObjectiveMarker" + std::to_string(questSlot + 1),
-            0.5f,
-            0.5f),
+        std::string texturePath,
+        RE::NiPoint3 fixedWorldPosition,
+        std::string galleryPhotoId,
+        RE::FormID fixedWorldspaceFormId) :
+        VRUIButton("", nifPath, texturePath, 0.5f, 0.5f, true),
         _nifPath(nifPath),
         _texturePath(std::move(texturePath)),
         _source(source),
-        _questSlot(std::min(questSlot, kQuestMarkerSlotCount - 1))
+        _questSlot(std::min(questSlot, kQuestMarkerSlotCount - 1)),
+        _fixedWorldPosition(fixedWorldPosition),
+        _galleryPhotoId(std::move(galleryPhotoId)),
+        _fixedWorldspaceFormId(fixedWorldspaceFormId)
     {
+        _name = source == MapMarkerSource::Player ? "MapMarker" :
+            (source == MapMarkerSource::QuestObjective ?
+                "QuestObjectiveMarker" + std::to_string(questSlot + 1) :
+                "GalleryMarker_" + _galleryPhotoId);
+        setPointerHitTestEnabled(source == MapMarkerSource::GalleryPhoto);
+        if (source == MapMarkerSource::GalleryPhoto) {
+            setOnPressHandler([photoId = _galleryPhotoId](VRUIButton*, EquipHand) {
+                (void)dragonboard::ui::rml::RmlPanelHost::GetSingleton().OpenGalleryPhoto(photoId);
+            });
+        }
         initializeVisuals();
     }
 
@@ -183,6 +196,13 @@ namespace vrui
         if (modelNode) {
             sanitizeModel(modelNode.get());
             if (!_texturePath.empty()) {
+                auto* rawTextureSet = RE::BSShaderTextureSet::Create();
+                RE::NiPointer<RE::BSTextureSet> textureSet(rawTextureSet);
+                if (rawTextureSet) {
+                    rawTextureSet->SetTexturePath(
+                        RE::BSTextureSet::Texture::kDiffuse,
+                        _texturePath.c_str());
+                }
                 RE::BSVisit::TraverseScenegraphGeometries(
                     modelNode.get(),
                     [&](RE::BSGeometry* geometry) {
@@ -197,15 +217,65 @@ namespace vrui
                         if (effect && effect->GetMaterial()) {
                             effect->GetMaterial()->sourceTexturePath = _texturePath;
                         }
+                        auto* lighting = geometry->lightingShaderProp_cast();
+                        auto* material = lighting ?
+                            static_cast<RE::BSLightingShaderMaterialBase*>(
+                                lighting->GetBaseMaterial()) : nullptr;
+                        if (material && textureSet) {
+                            material->SetTextureSet(textureSet);
+                            lighting->InvalidateTextures(0);
+                            lighting->DoClearRenderPasses();
+                        }
                         return RE::BSVisit::BSVisitControl::kContinue;
                     });
             }
             _node->AttachChild(modelNode.get(), true);
+            if (_source == MapMarkerSource::GalleryPhoto) {
+                _galleryHitVisualNode = modelNode;
+            }
         } else {
             // Fallback: create a small colored quad if NIF fails
             auto fallback = createQuadNode("MapMarkerFallback", 0.3f, 0.3f, { 1.0f, 0.0f, 0.0f, 1.0f });
             _node->AttachChild(fallback.get(), true);
         }
+
+    }
+
+    bool VRUIMapMarker::hitTest(
+        const RE::NiPoint3& rayOriginWorld,
+        const RE::NiPoint3& rayDirWorld,
+        float& outDistance) const
+    {
+        if (_source != MapMarkerSource::GalleryPhoto || !_galleryHitVisualNode) {
+            return VRUIButton::hitTest(rayOriginWorld, rayDirWorld, outDistance);
+        }
+        if (!_node || !_pointerHitTestEnabled || !isVisible() ||
+            !_galleryHitSurfaceValid) {
+            return false;
+        }
+
+        const auto& bound = _galleryHitVisualNode->worldBound;
+        if (!std::isfinite(bound.radius) || bound.radius <= 0.001f) return false;
+
+        const auto dot = [](const RE::NiPoint3& left, const RE::NiPoint3& right) {
+            return left.x * right.x + left.y * right.y + left.z * right.z;
+        };
+
+        const float denominator = dot(rayDirWorld, _galleryHitSurfaceNormal);
+        if (std::abs(denominator) <= 1.0e-6f) return false;
+        const float distance = dot(_galleryHitSurfaceCenter - rayOriginWorld, _galleryHitSurfaceNormal) / denominator;
+        if (distance < 0.0f) return false;
+
+        const RE::NiPoint3 hitOffset =
+            rayOriginWorld + rayDirWorld * distance - _galleryHitSurfaceCenter;
+        const float halfExtent = bound.radius * kInverseSqrtTwo;
+        if (std::abs(dot(hitOffset, _galleryHitSurfaceAxisX)) > halfExtent ||
+            std::abs(dot(hitOffset, _galleryHitSurfaceAxisY)) > halfExtent) {
+            return false;
+        }
+
+        outDistance = distance;
+        return true;
     }
 
     void VRUIMapMarker::update(float deltaTime)
@@ -214,7 +284,9 @@ namespace vrui
 
         auto& settings = VRUISettings::get();
         const bool questMarker = _source == MapMarkerSource::QuestObjective;
-        if ((!questMarker && !settings.bEnableMapMarker) ||
+        const bool galleryMarker = _source == MapMarkerSource::GalleryPhoto;
+        if (galleryMarker) _galleryHitSurfaceValid = false;
+        if ((!questMarker && !galleryMarker && !settings.bEnableMapMarker) ||
             (questMarker && !settings.bEnableQuestMarker)) {
             setVisible(false);
             return;
@@ -232,6 +304,19 @@ namespace vrui
                 return;
             }
             worldPos = cached.worldPosition;
+        } else if (galleryMarker) {
+            auto* currentCell = player->GetParentCell();
+            const bool currentCellIsInterior =
+                currentCell && currentCell->IsInteriorCell();
+            auto* currentWorldspace = currentCell ?
+                currentCell->GetRuntimeData().worldSpace : nullptr;
+            if (!currentCellIsInterior &&
+                (!currentWorldspace ||
+                 currentWorldspace->GetFormID() != _fixedWorldspaceFormId)) {
+                setVisible(false);
+                return;
+            }
+            worldPos = _fixedWorldPosition;
         } else {
             worldPos = player->GetPosition();
             RE::TESObjectCELL* currentCell = player->parentCell;
@@ -280,11 +365,31 @@ namespace vrui
                 const auto atlasUv = MapArtworkUvToAtlasUv(mapU, mapV);
                 logger::warn(
                     "DragonBoardVR: {} calibrated map UV ({:.4f}, {:.4f}) / atlas UV ({:.4f}, {:.4f}) is not covered by the map mesh UVs.",
-                    questMarker ? "quest objective" : "player",
+                    galleryMarker ? "gallery photo" : (questMarker ? "quest objective" : "player"),
                     mapU, mapV, atlasUv.x, atlasUv.y);
                 _surfaceFailureLogged = true;
             }
             return;
+        }
+
+        if (galleryMarker) {
+            RE::NiPoint3 pointerPlanePosition = surfacePosition;
+            pointerPlanePosition.y = 0.0f;
+            _galleryHitSurfaceCenter = panelNode->world * pointerPlanePosition;
+            const auto& panelRotation = panelNode->world.rotate;
+            _galleryHitSurfaceAxisX = RE::NiPoint3(
+                panelRotation.entry[0][0],
+                panelRotation.entry[1][0],
+                panelRotation.entry[2][0]);
+            _galleryHitSurfaceNormal = RE::NiPoint3(
+                panelRotation.entry[0][1],
+                panelRotation.entry[1][1],
+                panelRotation.entry[2][1]);
+            _galleryHitSurfaceAxisY = RE::NiPoint3(
+                panelRotation.entry[0][2],
+                panelRotation.entry[1][2],
+                panelRotation.entry[2][2]);
+            _galleryHitSurfaceValid = true;
         }
 
         _surfaceFailureLogged = false;
@@ -292,25 +397,26 @@ namespace vrui
             const auto atlasUv = MapArtworkUvToAtlasUv(mapU, mapV);
             logger::info(
                 "DragonBoardVR: {} map marker placement resolved: mapUV=({:.4f}, {:.4f}) atlasUV=({:.4f}, {:.4f}) panel=({:.3f}, {:.3f}, {:.3f}) normal=({:.3f}, {:.3f}, {:.3f}).",
-                questMarker ? "quest objective" : "player",
+                galleryMarker ? "gallery photo" : (questMarker ? "quest objective" : "player"),
                 mapU, mapV, atlasUv.x, atlasUv.y,
                 surfacePosition.x, surfacePosition.y, surfacePosition.z,
                 surfaceNormal.x, surfaceNormal.y, surfaceNormal.z);
             _surfacePlacementLogged = true;
         }
         setVisible(true);
-        setLocalPosition(surfacePosition + surfaceNormal * (questMarker ? 0.10f : 0.08f));
-        setLocalScale(questMarker ? settings.questMarkerScale : settings.mapMarkerScale);
+        setLocalPosition(surfacePosition + surfaceNormal * (galleryMarker ? 0.12f : (questMarker ? 0.10f : 0.08f)));
+        setLocalScale(galleryMarker ? settings.galleryCameraMarkerScale :
+            (questMarker ? settings.questMarkerScale : settings.mapMarkerScale));
 
         // Apply rotation
         RE::NiMatrix3 meshRot;
         meshRot.SetEulerAnglesXYZ(
-            (questMarker ? settings.questMarkerRotX : settings.mapMarkerRotX) * kDegToRad,
-            (questMarker ? settings.questMarkerRotY : settings.mapMarkerRotY) * kDegToRad,
-            (questMarker ? settings.questMarkerRotZ : settings.mapMarkerRotZ) * kDegToRad
+            (galleryMarker ? settings.galleryCameraMarkerRotX : (questMarker ? settings.questMarkerRotX : settings.mapMarkerRotX)) * kDegToRad,
+            (galleryMarker ? settings.galleryCameraMarkerRotY : (questMarker ? settings.questMarkerRotY : settings.mapMarkerRotY)) * kDegToRad,
+            (galleryMarker ? settings.galleryCameraMarkerRotZ : (questMarker ? settings.questMarkerRotZ : settings.mapMarkerRotZ)) * kDegToRad
         );
 
-        if (!questMarker && settings.bMapMarkerDynamicRotation) {
+        if (!questMarker && !galleryMarker && settings.bMapMarkerDynamicRotation) {
             // The player's heading (yaw) is around the Z axis in world space.
             // The tablet's surface normal is the Y axis (local space X-Z plane).
             float heading = player->GetAngle().z + (settings.mapMarkerRotOffset * kDegToRad);

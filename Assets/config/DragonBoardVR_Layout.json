@@ -375,6 +375,52 @@
                     "formID": 0,
                     "function": "",
                     "hideLabel": false,
+                    "id": "Btn_Gallery",
+                    "label": "",
+                    "pinToRightHand": false,
+                    "pinToWorld": false,
+                    "transform": {
+                        "hasMatrix": false,
+                        "matrix": [
+                            [
+                                1.0,
+                                0.0,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                1.0,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        ],
+                        "position": {
+                            "x": -14.0,
+                            "y": 0.25,
+                            "z": 0.0
+                        },
+                        "rotation": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 20.0
+                        },
+                        "scale": 1.0
+                    },
+                    "visualTransformComposed": false,
+                    "visuals": {
+                        "icon": "",
+                        "model": ""
+                    }
+                },
+                {
+                    "category": "",
+                    "formID": 0,
+                    "function": "",
+                    "hideLabel": false,
                     "id": "Btn_Dev",
                     "label": "",
                     "pinToRightHand": false,

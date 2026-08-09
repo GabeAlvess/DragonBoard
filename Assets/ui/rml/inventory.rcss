@@ -27,21 +27,21 @@ body {
 
 .category-strip {
     position: absolute;
-    left: 68px;
+    left: 67px;
     top: 92px;
-    width: 884px;
-    height: 116px;
+    width: 873px;
+    height: 96px;
     display: flex;
     align-items: center;
 }
 
 .inventory-filter {
-    width: 112px;
-    height: 116px;
+    width: 96px;
+    height: 96px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 16px;
+    margin-right: 15px;
     padding: 8px;
     color: #b5b5b5;
     background-color: rgba(2, 3, 3, 126);
@@ -62,8 +62,8 @@ body {
 }
 
 .inventory-filter img {
-    width: 90px;
-    height: 90px;
+    width: 72px;
+    height: 72px;
     display: block;
     pointer-events: none;
 }
@@ -74,10 +74,10 @@ body {
 
 .mod-title-banner {
     position: absolute;
-    left: 972px;
+    left: 980px;
     top: 92px;
-    width: 884px;
-    height: 116px;
+    width: 876px;
+    height: 96px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -89,7 +89,7 @@ body {
 }
 
 .mod-title-banner .selected-name {
-    width: 850px;
+    width: 842px;
     height: 58px;
     max-height: 58px;
     margin-left: 0;

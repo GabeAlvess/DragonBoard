@@ -2,6 +2,7 @@
 
 #include "ui/rml/RmlWidgetLabelAtlas.h"
 #include "ui/rml/DragonBoardRmlRenderer.h"
+#include "ui/rml/RmlSceneSurfaceUtils.h"
 #include "vrui/VRUIWidget.h"
 
 #include <array>
@@ -71,28 +72,6 @@ namespace dragonboard::ui::rml
             staging->Release();
         }
 
-        RE::NiPointer<RE::NiSourceTexture> CreateIsolatedSourceTexture(
-            const RE::NiSourceTexture& source)
-        {
-            auto* texture = RE::malloc<RE::NiSourceTexture>();
-            if (!texture) return nullptr;
-
-            std::memset(texture, 0, sizeof(*texture));
-            std::memcpy(texture, std::addressof(source), sizeof(void*));
-            std::memcpy(
-                std::addressof(texture->formatPrefs),
-                std::addressof(source.formatPrefs),
-                sizeof(texture->formatPrefs));
-            new (std::addressof(texture->name)) RE::BSFixedString(source.name);
-            texture->unk28 = source.unk28;
-            texture->unk2C = source.unk2C;
-            texture->rendererTexture = source.rendererTexture;
-            texture->flags = source.flags;
-            texture->pad51 = source.pad51;
-            texture->pad52 = source.pad52;
-            texture->pad54 = source.pad54;
-            return RE::NiPointer<RE::NiSourceTexture>(texture);
-        }
     }
 
     RmlWidgetLabelAtlas::~RmlWidgetLabelAtlas()

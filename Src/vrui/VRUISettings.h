@@ -358,6 +358,30 @@ namespace vrui
         float bDevRotX = 0.000000f; float bDevRotY = 0.000000f; float bDevRotZ = 0.000000f;
         float bDevScale = 0.800000f;   
         bool  showDevButton = true;
+
+        std::string bGalleryLabel = "Gallery";
+        std::string bGalleryAction = "Gallery";
+        float bGalleryPosX = -14.0f; float bGalleryPosY = 0.25f; float bGalleryPosZ = 0.0f;
+        float bGalleryRotX = 0.0f; float bGalleryRotY = 0.0f; float bGalleryRotZ = 20.0f;
+        float bGalleryScale = 1.0f;
+
+        bool statusWidgetVisible = true;
+        int galleryCaptureTimerSeconds = 0;
+        int galleryGridColumns = 8;
+        int galleryThumbnailWidth = 512;
+        int galleryMaximumVisibleMarkers = 64;
+        int galleryMaximumPinnedPanels = 8;
+        float galleryCameraMarkerScale = 0.30f;
+        float galleryCameraMarkerRotX = 90.0f;
+        float galleryCameraMarkerRotY = 0.0f;
+        float galleryCameraMarkerRotZ = 180.0f;
+        float galleryPhotoPanelDefaultScale = 0.5f;
+        float galleryPhotoPanelDefaultPosX = 0.0f;
+        float galleryPhotoPanelDefaultPosY = 0.0f;
+        float galleryPhotoPanelDefaultPosZ = 0.5f;
+        float galleryPhotoPanelDefaultRotX = 0.0f;
+        float galleryPhotoPanelDefaultRotY = 0.0f;
+        float galleryPhotoPanelDefaultRotZ = 0.0f;
         std::string defaultPanelAction = "MainPanel";
 
         // -----------------------------------------------------------------------

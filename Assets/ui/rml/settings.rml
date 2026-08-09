@@ -16,6 +16,8 @@
             <button id="tab-general" class="nav-item"><i class="fade-layer"></i><span>General</span></button>
             <button id="tab-visuals" class="nav-item"><i class="fade-layer"></i><span>Visuals</span></button>
             <button id="tab-items" class="nav-item"><i class="fade-layer"></i><span>Item scale</span></button>
+            <button id="tab-widgets" class="nav-item"><i class="fade-layer"></i><span>Widgets</span></button>
+            <button id="tab-tutorials" class="nav-item"><i class="fade-layer"></i><span>Tutorials</span></button>
         </aside>
 
         <div class="content-shell">
@@ -42,14 +44,6 @@
                             <button id="toggle-dev-panel" class="toggle-button">
                                 <span class="toggle-track"><span class="toggle-knob"></span></span>
                                 <span id="toggle-dev-state" class="toggle-state">Disabled</span>
-                            </button>
-                        </div>
-                        <div class="setting-row toggle-setting">
-                            <div class="setting-copy"><span class="setting-label">Show tutorials</span><span class="setting-help">Show tutorial panels; enabling this again resets their progress and position</span></div>
-                            <div class="toggle-space"></div>
-                            <button id="toggle-show-tutorials" class="toggle-button">
-                                <span class="toggle-track"><span class="toggle-knob"></span></span>
-                                <span id="toggle-show-tutorials-state" class="toggle-state">Enabled</span>
                             </button>
                         </div>
                         <div class="setting-row language-setting">
@@ -97,6 +91,36 @@
                         <div class="setting-row"><div class="setting-copy"><span class="setting-label">Potions</span><span class="setting-help">Potions and poisons</span></div><input id="itemPotionScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemPotionScale" class="value">1.00</span></div>
                         <div class="setting-row"><div class="setting-copy"><span class="setting-label">Food</span><span class="setting-help">Food and ingredients</span></div><input id="itemFoodScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemFoodScale" class="value">1.00</span></div>
                         <div class="setting-row"><div class="setting-copy"><span class="setting-label">Miscellaneous</span><span class="setting-help">Books, keys and other objects</span></div><input id="itemMiscScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemMiscScale" class="value">1.00</span></div>
+                    </div>
+                </section>
+
+                <section id="page-widgets" class="page">
+                    <h1>Widgets</h1>
+                    <p class="lead">Choose which widgets appear with DragonBoard.</p>
+                    <div class="settings-card">
+                        <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Status</span><span class="setting-help">Show the Status widget; disabling it resets its saved position</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-status-widget" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-status-widget-state" class="toggle-state">Enabled</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="page-tutorials" class="page">
+                    <h1>Tutorials</h1>
+                    <p class="lead">Control the guided panels shown by DragonBoard.</p>
+                    <div class="settings-card">
+                        <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Show tutorials</span><span class="setting-help">Show tutorial panels; enabling this again resets their progress and position</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-show-tutorials" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-show-tutorials-state" class="toggle-state">Enabled</span>
+                            </button>
+                        </div>
                     </div>
                 </section>
 

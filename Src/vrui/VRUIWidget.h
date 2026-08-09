@@ -66,7 +66,7 @@ namespace vrui
 
         // --- Hit Testing ---
         AABB getWorldAABB() const;
-        bool hitTest(const RE::NiPoint3& rayOriginWorld, const RE::NiPoint3& rayDirWorld, float& outDistance) const;
+        virtual bool hitTest(const RE::NiPoint3& rayOriginWorld, const RE::NiPoint3& rayDirWorld, float& outDistance) const;
         void setVisualHitTestBounds(RE::NiNode* node, float width, float height, float depth = 0.8f);
         void clearVisualHitTestBounds();
         void setPointerHitTestEnabled(bool enabled) { _pointerHitTestEnabled = enabled; }

@@ -10,6 +10,7 @@
 #include "ui/rml/RmlPanelHost.h"
 #include "ui/menu/MenuActionRouter.h"
 #include "ui/menu/MenuComposition.h"
+#include "ui/gallery/GalleryCatalog.h"
 
 #include "vrui/VRMenuManager.h"
 #include "vrui/VRUIItemUtils.h"
@@ -31,6 +32,7 @@ namespace
 {
     bool g_menuCreated = false;
     std::weak_ptr<VRUIButton> g_developerButton;
+    std::weak_ptr<VRUIContainer> g_galleryMarkerContainer;
 }
 
 // =========================================================================
@@ -220,6 +222,30 @@ void dragonboard::ui::menu::Recreate()
     Create();
 }
 
+
+void dragonboard::ui::menu::RefreshGalleryMarkers()
+{
+    auto container = g_galleryMarkerContainer.lock();
+    if (!container) return;
+    container->clearElements();
+    const auto& settings = VRUISettings::get();
+    std::size_t count = 0;
+    for (const auto& photo : dragonboard::ui::gallery::GalleryCatalog::GetSingleton().Snapshot()) {
+        if (!photo.mapPinned || photo.worldspaceFormId == 0 ||
+            count >= static_cast<std::size_t>(std::max(settings.galleryMaximumVisibleMarkers, 0))) continue;
+        auto marker = std::make_shared<vrui::VRUIMapMarker>(
+            "DragonBoardVR\\DBCameraMarker.nif",
+            vrui::MapMarkerSource::GalleryPhoto,
+            0,
+            "textures\\DBCameraMarker.dds",
+            photo.position,
+            photo.id,
+            photo.worldspaceFormId);
+        container->addElement(std::static_pointer_cast<vrui::VRUIWidget>(marker));
+        ++count;
+    }
+}
+
 void dragonboard::ui::menu::SetDeveloperButtonVisible(bool visible)
 {
     if (auto button = g_developerButton.lock()) {
@@ -248,6 +274,10 @@ void dragonboard::ui::menu::Create()
     // --- Panels ---
     auto panel = std::make_shared<VRUIPanel>("MainPanel");
     auto bgPanel = std::make_shared<VRUIPanel>("Background_Panel", 1.0f, true);
+
+    auto galleryMarkers = std::make_shared<VRUIContainer>("GalleryMarkers", ContainerLayout::Free);
+    bgPanel->addElement(galleryMarkers);
+    g_galleryMarkerContainer = galleryMarkers;
 
     // Player Map Marker integration
     auto mapMarker = std::make_shared<vrui::VRUIMapMarker>(settings.mapMarkerNifPath);
@@ -287,6 +317,10 @@ void dragonboard::ui::menu::Create()
     // uniformly across ALL fixed buttons (sidebar + nav share the same parent).
     // =========================================================================
     auto fixedContainer = std::make_shared<VRUIContainer>("FixedButtons", ContainerLayout::Free);
+    auto fixedWidgetsContainer = std::make_shared<VRUIContainer>(
+        "FixedWidgetsContainer",
+        ContainerLayout::Free);
+    persistentPanel->addElement(fixedWidgetsContainer);
 
     // --- Sidebar Fixed Buttons ---
     constexpr const char* kSkillsIconNif = "DragonBoardVR\\skillsicon.nif";
@@ -380,6 +414,15 @@ void dragonboard::ui::menu::Create()
     applyJSONTransform(sbMap, "TopTabs", "Btn_Map");
     configureFavoriteButton(fixedContainer, sbMap, settings.bMapAction, settings.bMapLabel);
 
+    auto sbGallery = std::make_shared<VRUIButton>("", settings.devNifPath, "", 2.0f, 2.0f, true);
+    attachRmlButtonLabel(sbGallery, "fixed.gallery", settings.bGalleryLabel);
+    sbGallery->setOnPressHandler(resolveFixedButtonAction(settings.bGalleryAction));
+    sbGallery->setLocalPosition({ settings.bGalleryPosX, settings.bGalleryPosY, settings.bGalleryPosZ });
+    setWidgetEulerDegrees(sbGallery, settings.bGalleryRotX, settings.bGalleryRotY, settings.bGalleryRotZ);
+    sbGallery->setLocalScale(settings.bGalleryScale);
+    applyJSONTransform(sbGallery, "TopTabs", "Btn_Gallery");
+    configureFavoriteButton(fixedContainer, sbGallery, settings.bGalleryAction, settings.bGalleryLabel);
+
     auto sbDev = std::make_shared<VRUIButton>("", settings.devNifPath, "", 2.0f, 2.0f, true);
     attachRmlButtonLabel(sbDev, "fixed.dev", settings.bDevLabel);
     sbDev->setOnPressHandler(resolveFixedButtonAction(settings.bDevAction));
@@ -415,6 +458,7 @@ void dragonboard::ui::menu::Create()
     fixedContainer->addElement(sbFav);
 
     fixedContainer->addElement(sbMap);
+    fixedContainer->addElement(sbGallery);
     // sbDev is always present internally; Settings controls its visibility.
     fixedContainer->addElement(homeBtn);
     persistentPanel->addElement(fixedContainer);
@@ -577,6 +621,7 @@ void dragonboard::ui::menu::Create()
     itemEditPanel->addElement(itemEditContainer);
 
     manager.registerPanel(bgPanel);
+    dragonboard::ui::menu::RefreshGalleryMarkers();
     manager.registerPanel(persistentPanel);
     manager.registerPanel(alwaysVisiblePanel);
     manager.registerPanel(alwaysVisibleRightHandPanel);

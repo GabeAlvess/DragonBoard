@@ -95,6 +95,10 @@ namespace dragonboard::ui::input
             }
         }
 
+        const bool secondaryPressed = manager._inputButtons.Secondary() &&
+            !manager._secondaryButtonTracker.IsPressed();
+        const bool dominantSecondaryPressed = manager._inputButtons.DominantSecondary() &&
+            !manager._dominantSecondaryButtonTracker.IsPressed();
         const auto secondaryEvents = manager._secondaryButtonTracker.Update(
             manager._inputButtons.Secondary(), deltaTime, 0.5f, manager._menuSession.IsOpen());
         const auto dominantSecondaryEvents = manager._dominantSecondaryButtonTracker.Update(
@@ -107,7 +111,24 @@ namespace dragonboard::ui::input
         const bool secondaryOnRightHand = manager.isMenuHandLeft();
         const auto& panelSecondaryEvents = modsRmlActive ?
             dominantSecondaryEvents : secondaryEvents;
-        if (panelSecondaryEvents.longPress) {
+        bool removedGrabbedSurface = false;
+        if (!modsRmlActive &&
+            (secondaryPressed || dominantSecondaryPressed)) {
+            removedGrabbedSurface = rmlHost.RequestGrabbedSurfaceRemoval();
+            if (removedGrabbedSurface && settings.hapticOnPress) {
+                const bool rightHand = dominantSecondaryPressed ?
+                    !manager.isDominantHandLeft() : secondaryOnRightHand;
+                manager.triggerHaptic(
+                    rightHand,
+                    settings.hapticIntensity * 1.5f,
+                    settings.hapticDuration * 2.0f);
+            }
+            if (removedGrabbedSurface) {
+                manager._secondaryButtonTracker.SuppressUntilRelease();
+                manager._dominantSecondaryButtonTracker.SuppressUntilRelease();
+            }
+        }
+        if (!removedGrabbedSurface && panelSecondaryEvents.longPress) {
             if (modsRmlActive) {
                 if (rmlHost.RequestHoveredModRemoval() && settings.hapticOnPress) {
                     manager.triggerHaptic(

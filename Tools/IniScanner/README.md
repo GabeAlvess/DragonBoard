@@ -18,10 +18,16 @@ xmake build IniEditorTests
 .\Tools\IniScanner\BuildScanner.ps1 -OutputDirectory .\Assets\tools
 ```
 
-The normal DragonBoardVR build copies the resulting executable to:
+The script creates an unpacked PyInstaller bundle (`--onedir --noupx`) and
+extracts PyInstaller's `base_library.zip` into `_internal` so release packages
+do not contain nested archives. Keep the executable and its `_internal`
+directory together. The normal DragonBoardVR build copies the complete bundle
+to:
 
 ```text
-install_output\SKSE\Plugins\DragonBoardVR\tools\DragonBoardIniScanner.exe
+install_output\SKSE\Plugins\DragonBoardVR\tools\
+|-- DragonBoardIniScanner.exe
+`-- _internal\
 ```
 
 ## Manual scan

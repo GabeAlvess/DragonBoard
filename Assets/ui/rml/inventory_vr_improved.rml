@@ -1,0 +1,99 @@
+<rml>
+<head>
+    <title>DragonBoard Inventory</title>
+    <link type="text/rcss" href="vr-scrollbars.rcss" />
+    <link type="text/rcss" href="inventory_vr_improved.rcss" />
+</head>
+<body>
+    <div id="app" class="inventory-app">
+        <div class="top-frame"></div>
+
+        <div class="category-strip">
+            <button id="inventory-filter-favorites" class="inventory-filter active" title="Favorites"><img src="assets/Icons/favoriteIcon.png" /><span>FAVORITES</span></button>
+            <button id="inventory-filter-weapons" class="inventory-filter" title="Weapons"><img src="assets/Icons/weaponicon.png" /><span>WEAPONS</span></button>
+            <button id="inventory-filter-armor" class="inventory-filter" title="Armor"><img src="assets/Icons/armoricon.png" /><span>ARMOR</span></button>
+            <button id="inventory-filter-potions" class="inventory-filter" title="Potions"><img src="assets/Icons/consumiblesicon.png" /><span>POTIONS</span></button>
+            <button id="inventory-filter-food" class="inventory-filter" title="Food"><img src="assets/Icons/foodincon.png" /><span>FOOD</span></button>
+            <button id="inventory-filter-quest" class="inventory-filter" title="Quest Items"><img src="assets/Icons/questicon.png" /><span>QUEST</span></button>
+            <button id="inventory-filter-books" class="inventory-filter" title="Books"><img src="assets/Icons/booksicon.png" /><span>BOOKS</span></button>
+            <button id="inventory-filter-misc" class="inventory-filter" title="Miscellaneous"><img src="assets/Icons/miscicon.png" /><span>MISC</span></button>
+        </div>
+
+        <div class="mod-title-banner">
+            <span class="banner-eyebrow">SELECTED ITEM</span>
+            <span id="inventory-selected-name" class="selected-name">Select an item</span>
+        </div>
+
+        <section class="inventory-list-panel panel-shell">
+            <div class="panel-heading-row">
+                <span class="panel-heading-label">INVENTORY</span>
+                <span id="inventory-item-count" class="item-count">0</span>
+            </div>
+
+            <div class="inventory-search-shell">
+                <button id="inventory-search" class="inventory-search"><span id="inventory-search-text">SEARCH ITEMS</span></button>
+                <button id="inventory-search-clear" class="inventory-search-clear"><span>X</span></button>
+            </div>
+
+            <div class="inventory-list-shell">
+                <div id="inventory-scroll-proxy" class="inventory-scroll-proxy">
+                    <div class="inventory-scroll-track"><div id="inventory-scroll-thumb" class="inventory-scroll-thumb"></div></div>
+                </div>
+                <div id="inventory-item-list" class="inventory-item-list">
+                    <div class="inventory-empty">Inventory is empty</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="inventory-preview-panel panel-shell">
+            <div class="preview-ring preview-ring-outer"></div>
+            <div class="preview-ring preview-ring-inner"></div>
+            <div class="preview-axis"></div>
+            <div id="inventory-left-hand-state" class="hand-state left-hand-state"><img class="equipped-hand-icon" src="assets/Icons/LHand.png" /></div>
+            <div id="inventory-right-hand-state" class="hand-state right-hand-state"><img class="equipped-hand-icon" src="assets/Icons/RHand.png" /></div>
+            <div class="preview-reticle"></div>
+            <div id="inventory-preview-hit-zone" class="preview-interaction-zone"></div>
+            <div class="preview-help"><span>GRIP: ROTATE</span><span class="help-divider">|</span><span>THUMB: SCALE</span></div>
+        </section>
+
+        <section class="inventory-details-panel panel-shell">
+            <div class="details-copy">
+                <span id="inventory-selected-category" class="selected-category detail-selected-category">ITEM</span>
+                <span id="inventory-description" class="description-text">No description available.</span>
+            </div>
+
+            <div class="attribute-grid">
+                <div class="attribute-card wide-card"><span class="attribute-label">ATTACK</span><span id="inventory-attack" class="attribute-value">--</span></div>
+                <div class="attribute-card wide-card"><span class="attribute-label">DEFENSE</span><span id="inventory-defense" class="attribute-value">--</span></div>
+                <div class="attribute-card compact-card"><span class="attribute-label">WEIGHT</span><span id="inventory-weight" class="attribute-value compact-value">--</span></div>
+                <div class="attribute-card compact-card"><span class="attribute-label">VALUE</span><span id="inventory-value" class="attribute-value compact-value">--</span></div>
+            </div>
+
+            <div class="quantity-row"><span>QUANTITY</span><span id="inventory-count">--</span></div>
+        </section>
+
+        <div class="player-currency panel-shell">
+            <div class="currency-inline"><span class="summary-label">GOLD</span><span id="inventory-gold" class="summary-value">0</span></div>
+            <div class="currency-inline weight-inline"><span class="summary-label">CARRY WEIGHT</span><span id="inventory-carry-weight" class="summary-value">0 / 0</span></div>
+        </div>
+
+        <div class="inventory-actions panel-shell">
+            <button id="inventory-drop" class="inventory-action"><span>DROP</span></button>
+            <button id="inventory-equip" class="inventory-action primary-action"><span id="inventory-equip-label">EQUIP</span></button>
+            <button id="inventory-pin" class="inventory-action pin-action"><span>PIN</span></button>
+        </div>
+
+        <section class="player-vitals panel-shell">
+            <div class="player-identity">
+                <span id="inventory-player-name" class="player-name">Dragonborn</span>
+                <div class="player-level"><span class="player-level-label">LVL</span><span id="inventory-player-level" class="player-level-value">1</span></div>
+            </div>
+            <div class="vital-row health-row"><div class="vital-track"><div id="inventory-health-fill" class="vital-fill health-fill"></div><span id="inventory-health-text" class="vital-value">0 / 0</span></div></div>
+            <div class="vital-row stamina-row"><div class="vital-track"><div id="inventory-stamina-fill" class="vital-fill stamina-fill"></div><span id="inventory-stamina-text" class="vital-value">0 / 0</span></div></div>
+            <div class="vital-row magicka-row"><div class="vital-track"><div id="inventory-magicka-fill" class="vital-fill magicka-fill"></div><span id="inventory-magicka-text" class="vital-value">0 / 0</span></div></div>
+        </section>
+
+        <div id="vr-cursor"></div>
+    </div>
+</body>
+</rml>

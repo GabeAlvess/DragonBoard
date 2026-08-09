@@ -1,0 +1,54 @@
+<rml>
+<head>
+    <title>DragonBoard Gallery</title>
+    <link type="text/rcss" href="gallery.rcss" />
+</head>
+<body>
+<div id="gallery-app">
+    <div class="gallery-frame">
+        <div class="gallery-workspace">
+            <div class="gallery-details-sidebar">
+                <div class="gallery-title">GALLERY</div>
+                <div class="gallery-divider"></div>
+
+                <div class="gallery-info-label">LOCATION</div>
+                <div id="gallery-location" class="gallery-meta">Riverwood</div>
+                <div class="gallery-info-label">DATE</div>
+                <div id="gallery-date" class="gallery-meta">Heartfire 10, 4E 201 - 14:28</div>
+                <div class="gallery-details-spacer"></div>
+                <div id="gallery-status" class="gallery-status">8 photos</div>
+            </div>
+
+            <div class="gallery-stage">
+                <div class="gallery-preview-shell">
+                    <img id="gallery-preview" class="gallery-preview" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_original.png" />
+                </div>
+            </div>
+
+            <div class="gallery-actions-sidebar">
+                <div class="gallery-capture-actions">
+                    <button id="gallery-capture" class="gallery-primary-action"><span>SNAPSHOT</span></button>
+                    <button id="gallery-timer"><span>TIMER OFF</span></button>
+                </div>
+                <div class="gallery-action-stack">
+
+                    <button id="gallery-delete" class="gallery-main-action gallery-delete-action"><span>DELETE</span></button>
+                    <button id="gallery-favorite" class="gallery-main-action gallery-favorite-action active"><span>UNFAVORITE</span></button>
+                </div>
+                <div class="gallery-spacer"></div>
+                <div class="gallery-pin-actions">
+                    <button id="gallery-pin-panel" class="gallery-pin-action"><span>PIN</span></button>
+                    <button id="gallery-pin-map" class="gallery-pin-action"><span>MARKER ON MAP</span></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="gallery-browser" class="gallery-browser">
+
+            <div id="gallery-grid" class="gallery-grid"><div class="gallery-card selected favorite"><button id="gallery-photo-0" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-0" class="gallery-card-icon gallery-card-favorite active"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-0" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div><div class="gallery-card favorite"><button id="gallery-photo-1" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-1" class="gallery-card-icon gallery-card-favorite active"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-1" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div><div class="gallery-card"><button id="gallery-photo-2" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-2" class="gallery-card-icon gallery-card-favorite"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-2" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div><div class="gallery-card"><button id="gallery-photo-3" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-3" class="gallery-card-icon gallery-card-favorite"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-3" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div><div class="gallery-card"><button id="gallery-photo-4" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-4" class="gallery-card-icon gallery-card-favorite"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-4" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div><div class="gallery-card"><button id="gallery-photo-5" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-5" class="gallery-card-icon gallery-card-favorite"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-5" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div><div class="gallery-card"><button id="gallery-photo-6" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-6" class="gallery-card-icon gallery-card-favorite"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-6" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div><div class="gallery-card"><button id="gallery-photo-7" class="gallery-card-select"><img class="gallery-card-photo" src="I:/Games/Skyrim VR FUS/mods/DragonBoardVR3/SKSE/Plugins/DragonBoardVR/gallery/photos/20260809_032016_0001_thumb.png" /><div class="gallery-card-name">Riverwood</div></button><button id="gallery-card-favorite-7" class="gallery-card-icon gallery-card-favorite"><img src="assets/Icons/favoriteIcon.png" /></button><button id="gallery-card-delete-7" class="gallery-card-icon gallery-card-delete"><img src="assets/Icons/trashIcon.png" /></button></div></div>
+        </div>
+    </div>
+    <div id="vr-cursor"></div>
+</div>
+</body>
+</rml>

@@ -116,6 +116,7 @@ namespace dragonboard::ui::rml
         }
 
         constexpr const char* kContextName = "dragonboard_local_panels_rml";
+        constexpr std::size_t kBuiltinDocumentCount = 10;
 
         constexpr std::array<const char*, 3> kDocumentCandidates{
             "Data/SKSE/Plugins/DragonBoardVR/ui/settings.rml",
@@ -157,6 +158,12 @@ namespace dragonboard::ui::rml
             "Data/SKSE/Plugins/DragonBoardVR/ui/journal.rml",
             "SKSE/Plugins/DragonBoardVR/ui/journal.rml",
             "Assets/ui/rml/journal.rml"
+        };
+
+        constexpr std::array<const char*, 3> kGalleryDocumentCandidates{
+            "Data/SKSE/Plugins/DragonBoardVR/ui/gallery.rml",
+            "SKSE/Plugins/DragonBoardVR/ui/gallery.rml",
+            "Assets/ui/rml/gallery.rml"
         };
 
         constexpr std::array<const char*, 3> kKeyboardDocumentCandidates{
@@ -249,8 +256,8 @@ namespace dragonboard::ui::rml
             "Assets/ui/rml/assets/Fonts/NotoSansCJKsc-Regular.otf"
         };
 
-        constexpr std::array<const char*, 3> kPages{
-            "general", "visuals", "items"
+        constexpr std::array<const char*, 5> kPages{
+            "general", "visuals", "items", "widgets", "tutorials"
         };
 
         constexpr std::array<const char*, 6> kSliders{
@@ -491,7 +498,7 @@ namespace dragonboard::ui::rml
         if (!_context || !_localization) return false;
 
         HideAllDocuments();
-        const std::array<Rml::ElementDocument**, 9> documents{ {
+        const std::array<Rml::ElementDocument**, 10> documents{ {
             &_settingsDocument,
             &_developerDocument,
             &_itemEditDocument,
@@ -499,6 +506,7 @@ namespace dragonboard::ui::rml
             &_inventoryDocument,
             &_magicDocument,
             &_journalDocument,
+            &_galleryDocument,
             &_welcomeDocument,
             &_keyboardDocument,
         } };
@@ -531,7 +539,6 @@ namespace dragonboard::ui::rml
 
     bool DragonBoardRmlUi::LoadNextBuiltinDocument()
     {
-        constexpr std::size_t kBuiltinDocumentCount = 9;
         if (!_context || !_eventListener || _builtinDocumentLoadStep >= kBuiltinDocumentCount) {
             return false;
         }
@@ -596,6 +603,7 @@ namespace dragonboard::ui::rml
                 BindClick(_settingsDocument, "toggle-lock-pins");
                 BindClick(_settingsDocument, "toggle-dev-panel");
                 BindClick(_settingsDocument, "toggle-show-tutorials");
+                BindClick(_settingsDocument, "toggle-status-widget");
                 BindClick(_settingsDocument, "language-previous");
                 BindClick(_settingsDocument, "language-next");
                 BindClick(_settingsDocument, "toggle-world-pin");
@@ -679,7 +687,8 @@ namespace dragonboard::ui::rml
                          "inventory-search", "inventory-search-clear",
                          "inventory-filter-favorites",
                          "inventory-filter-weapons", "inventory-filter-armor",
-                         "inventory-filter-consumables", "inventory-filter-quest",
+                         "inventory-filter-potions", "inventory-filter-food",
+                         "inventory-filter-quest",
                          "inventory-filter-books", "inventory-filter-misc" }) {
                     BindClick(_inventoryDocument, id);
                 }
@@ -728,6 +737,21 @@ namespace dragonboard::ui::rml
         }
         case 7: {
             const auto* path = loadDocument(
+                kGalleryDocumentCandidates, _galleryDocument, "Gallery");
+            loadedDocument = _galleryDocument;
+            if (_galleryDocument) {
+                for (const auto* id : {
+                         "gallery-capture", "gallery-timer", "gallery-favorite",
+                         "gallery-delete", "gallery-pin-map", "gallery-pin-panel" }) {
+                    BindClick(_galleryDocument, id);
+                }
+                _galleryDocument->Hide();
+                logger::trace("DragonBoardVR: Gallery panel loaded from '{}'.", path);
+            }
+            break;
+        }
+        case 8: {
+            const auto* path = loadDocument(
                 kWelcomeDocumentCandidates, _welcomeDocument, "Welcome");
             loadedDocument = _welcomeDocument;
             if (_welcomeDocument) {
@@ -741,7 +765,7 @@ namespace dragonboard::ui::rml
             }
             break;
         }
-        case 8: {
+        case 9: {
             const auto* path = loadDocument(
                 kKeyboardDocumentCandidates, _keyboardDocument, "Keyboard");
             loadedDocument = _keyboardDocument;
@@ -770,7 +794,7 @@ namespace dragonboard::ui::rml
 
     bool DragonBoardRmlUi::AreBuiltinDocumentsLoaded() const
     {
-        return _builtinDocumentLoadStep >= 9;
+        return _builtinDocumentLoadStep >= kBuiltinDocumentCount;
     }
 
     void DragonBoardRmlUi::Shutdown()
@@ -880,6 +904,11 @@ namespace dragonboard::ui::rml
         return _renderer && _renderer->IsReady() && _context && _journalDocument;
     }
 
+    bool DragonBoardRmlUi::IsGalleryReady() const
+    {
+        return _renderer && _renderer->IsReady() && _context && _galleryDocument;
+    }
+
     bool DragonBoardRmlUi::IsWelcomeReady() const
     {
         return _renderer && _renderer->IsReady() && _context && _welcomeDocument;
@@ -969,6 +998,17 @@ namespace dragonboard::ui::rml
         HideAllDocuments();
         _journalDocument->Show();
         _activeDocument = _journalDocument;
+        return true;
+    }
+
+    bool DragonBoardRmlUi::ShowGallery()
+    {
+        if (!IsGalleryReady()) return false;
+        if (IsKeyboardOpen()) return true;
+        if (_activeDocument == _galleryDocument) return true;
+        HideAllDocuments();
+        _galleryDocument->Show();
+        _activeDocument = _galleryDocument;
         return true;
     }
 
@@ -1341,6 +1381,22 @@ namespace dragonboard::ui::rml
                             pointerX < 468 ? "mods-ini-list" : "mods-ini-detail";
                         _gripScrollTarget =
                             _activeDocument->GetElementById(fallbackId);
+                    }
+                }
+                if (!_gripScrollTarget && hovered &&
+                    _activeDocument == _galleryDocument) {
+                    auto* browser =
+                        _galleryDocument->GetElementById("gallery-browser");
+                    auto* grid =
+                        _galleryDocument->GetElementById("gallery-grid");
+                    for (auto* element = hovered;
+                         element && element != _galleryDocument;
+                         element = element->GetParentNode()) {
+                        if (element == browser || element == grid) {
+                            _gripScrollTarget = browser;
+                            _gripScrollHorizontal = true;
+                            break;
+                        }
                     }
                 }
                 if (!_gripScrollTarget && hovered) {
@@ -1894,6 +1950,7 @@ namespace dragonboard::ui::rml
         if (_inventoryDocument) _inventoryDocument->Hide();
         if (_magicDocument) _magicDocument->Hide();
         if (_journalDocument) _journalDocument->Hide();
+        if (_galleryDocument) _galleryDocument->Hide();
         if (_welcomeDocument) _welcomeDocument->Hide();
         if (_keyboardDocument) _keyboardDocument->Hide();
         for (auto& [handle, panel] : _registeredPanels) {
@@ -2411,6 +2468,11 @@ namespace dragonboard::ui::rml
         return std::exchange(_showTutorialsToggleRequested, false);
     }
 
+    bool DragonBoardRmlUi::ConsumeStatusWidgetToggleRequested()
+    {
+        return std::exchange(_statusWidgetToggleRequested, false);
+    }
+
     std::optional<std::string>
     DragonBoardRmlUi::ConsumeLanguageSelectionRequested()
     {
@@ -2506,6 +2568,15 @@ namespace dragonboard::ui::rml
         _journalActionInstanceID = 0;
         _journalActionObjectiveInstanceID = 0;
         _journalActionObjectiveID = 0;
+        return result;
+    }
+
+    std::pair<DragonBoardRmlUi::GalleryAction, std::size_t>
+    DragonBoardRmlUi::ConsumeGalleryAction()
+    {
+        const auto result = std::pair{ _galleryAction, _galleryActionIndex };
+        _galleryAction = GalleryAction::kNone;
+        _galleryActionIndex = 0;
         return result;
     }
 
@@ -2990,11 +3061,12 @@ namespace dragonboard::ui::rml
                 "display", info.searchQuery.empty() ? "none" : "flex");
         }
 
-        constexpr std::array<std::pair<const char*, const char*>, 7> kInventoryFilters{ {
+        constexpr std::array<std::pair<const char*, const char*>, 8> kInventoryFilters{ {
             { "inventory-filter-favorites", "favorites" },
             { "inventory-filter-weapons", "weapons" },
             { "inventory-filter-armor", "armor" },
-            { "inventory-filter-consumables", "consumables" },
+            { "inventory-filter-potions", "potions" },
+            { "inventory-filter-food", "food" },
             { "inventory-filter-quest", "quest" },
             { "inventory-filter-books", "books" },
             { "inventory-filter-misc", "misc" }
@@ -3437,6 +3509,97 @@ namespace dragonboard::ui::rml
         }
     }
 
+
+    void DragonBoardRmlUi::SetGallery(
+        const std::vector<GalleryPhotoInfo>& photos,
+        std::size_t selectedIndex,
+        bool captureBusy,
+        int captureTimerSeconds,
+        int countdownSeconds,
+        int gridColumns,
+        bool deleteConfirmationPending)
+    {
+        if (!_galleryDocument) return;
+        _galleryPhotos = photos;
+        _gallerySelectedIndex = photos.empty() ? 0 : std::min(selectedIndex, photos.size() - 1);
+        (void)gridColumns;
+        std::string markup;
+        for (std::size_t index = 0; index < photos.size(); ++index) {
+            const auto& photo = photos[index];
+            const auto indexText = std::to_string(index);
+            markup += "<div class=\"gallery-card";
+            if (index == _gallerySelectedIndex) markup += " selected";
+            if (photo.favorite) markup += " favorite";
+            markup += "\"><button id=\"gallery-photo-" + indexText +
+                "\" class=\"gallery-card-select\"><img class=\"gallery-card-photo\" src=\"" +
+                EscapeRml(photo.thumbnailPath.empty() ?
+                    photo.imagePath : photo.thumbnailPath) +
+                "\" /><div class=\"gallery-card-name\">" + EscapeRml(photo.location) +
+                "</div></button><button id=\"gallery-card-favorite-" + indexText +
+                "\" class=\"gallery-card-icon gallery-card-favorite" +
+                (photo.favorite ? " active" : "") +
+                "\"><img src=\"assets/Icons/favoriteIcon.png\" /></button>" +
+                "<button id=\"gallery-card-delete-" + indexText +
+                "\" class=\"gallery-card-icon gallery-card-delete" +
+                (deleteConfirmationPending && index == _gallerySelectedIndex ? " confirm" : "") +
+                "\"><img src=\"assets/Icons/trashIcon.png\" /></button></div>";
+        }
+        if (photos.empty()) markup = "<div class=\"gallery-empty\">No photos captured yet.</div>";
+        if (markup != _galleryGridMarkup) {
+            _galleryGridMarkup = markup;
+            if (auto* grid = _galleryDocument->GetElementById("gallery-grid")) {
+                grid->SetInnerRML(markup);
+            }
+            for (std::size_t index = 0; index < photos.size(); ++index) {
+                BindClick(_galleryDocument, ("gallery-photo-" + std::to_string(index)).c_str());
+                BindClick(_galleryDocument, ("gallery-card-favorite-" + std::to_string(index)).c_str());
+                BindClick(_galleryDocument, ("gallery-card-delete-" + std::to_string(index)).c_str());
+            }
+        }
+        if (auto* status = _galleryDocument->GetElementById("gallery-status")) {
+            std::string statusText;
+            if (countdownSeconds > 0) {
+                statusText = "Snapshot in " + std::to_string(countdownSeconds) + "...";
+            } else if (captureBusy) {
+                statusText = "Capturing screenshot...";
+            } else {
+                statusText = std::to_string(photos.size()) + " photos";
+            }
+            status->SetInnerRML(EscapeRml(statusText));
+        }
+        const GalleryPhotoInfo* selected = photos.empty() ? nullptr : &photos[_gallerySelectedIndex];
+        const auto setText = [&](const char* id, std::string_view value) {
+            if (auto* element = _galleryDocument->GetElementById(id)) element->SetInnerRML(EscapeRml(value));
+        };
+        setText("gallery-name", selected ? selected->name : "No photo selected");
+        setText("gallery-location", selected ? selected->location : "Location");
+        setText("gallery-date", selected ? (selected->skyrimDate.empty() ? selected->capturedAt : selected->skyrimDate) : "Date");
+        if (auto* preview = _galleryDocument->GetElementById("gallery-preview")) {
+            if (selected) preview->SetAttribute("src", selected->imagePath);
+            else preview->RemoveAttribute("src");
+        }
+        const auto setButtonText = [&](const char* id, std::string_view value) {
+            if (auto* element = _galleryDocument->GetElementById(id)) {
+                element->SetInnerRML("<span>" + EscapeRml(value) + "</span>");
+            }
+        };
+        setButtonText("gallery-pin-map", selected && selected->mapPinned ? "REMOVE MARKER" : "MARKER ON MAP");
+        setButtonText("gallery-pin-panel", selected && selected->panelPinned ? "UNPIN" : "PIN");
+        setButtonText("gallery-favorite", selected && selected->favorite ? "UNFAVORITE" : "FAVORITE");
+        setButtonText("gallery-delete", deleteConfirmationPending ? "CONFIRM DELETE" : "DELETE");
+        setButtonText("gallery-timer", captureTimerSeconds > 0 ?
+            "TIMER " + std::to_string(captureTimerSeconds) + "S" : "TIMER OFF");
+        if (auto* timer = _galleryDocument->GetElementById("gallery-timer")) {
+            timer->SetClass("active", captureTimerSeconds > 0);
+        }
+        if (auto* favorite = _galleryDocument->GetElementById("gallery-favorite")) {
+            favorite->SetClass("active", selected && selected->favorite);
+        }
+        if (auto* remove = _galleryDocument->GetElementById("gallery-delete")) {
+            remove->SetClass("confirm", deleteConfirmationPending);
+        }
+    }
+
     void DragonBoardRmlUi::SetJournal(const JournalInfo& info)
     {
         if (!_journalDocument) return;
@@ -3812,6 +3975,20 @@ namespace dragonboard::ui::rml
         }
         if (auto* state =
                 _settingsDocument->GetElementById("toggle-show-tutorials-state")) {
+            state->SetInnerRML(EscapeRml(
+                Tr(enabled ? "Enabled" : "Disabled")));
+        }
+    }
+
+    void DragonBoardRmlUi::SetStatusWidgetEnabled(bool enabled)
+    {
+        if (!_settingsDocument) return;
+        if (auto* toggle =
+                _settingsDocument->GetElementById("toggle-status-widget")) {
+            toggle->SetClass("enabled", enabled);
+        }
+        if (auto* state =
+                _settingsDocument->GetElementById("toggle-status-widget-state")) {
             state->SetInnerRML(EscapeRml(
                 Tr(enabled ? "Enabled" : "Disabled")));
         }
@@ -4248,8 +4425,10 @@ namespace dragonboard::ui::rml
             _inventoryAction = InventoryAction::kFilterWeapons;
         } else if (value == "inventory-filter-armor") {
             _inventoryAction = InventoryAction::kFilterArmor;
-        } else if (value == "inventory-filter-consumables") {
-            _inventoryAction = InventoryAction::kFilterConsumables;
+        } else if (value == "inventory-filter-potions") {
+            _inventoryAction = InventoryAction::kFilterPotions;
+        } else if (value == "inventory-filter-food") {
+            _inventoryAction = InventoryAction::kFilterFood;
         } else if (value == "inventory-filter-quest") {
             _inventoryAction = InventoryAction::kFilterQuest;
         } else if (value == "inventory-filter-books") {
@@ -4357,6 +4536,45 @@ namespace dragonboard::ui::rml
             } else {
                 logger::warn("DragonBoardVR: invalid journal objective id '{}'.", id);
             }
+        } else if (value == "gallery-capture") {
+            _galleryAction = GalleryAction::kCapture;
+        } else if (value == "gallery-timer") {
+            _galleryAction = GalleryAction::kCycleTimer;
+        } else if (value == "gallery-close") {
+            _galleryAction = GalleryAction::kClose;
+        } else if (value == "gallery-rename") {
+            _galleryAction = GalleryAction::kRename;
+        } else if (value == "gallery-favorite") {
+            _galleryAction = GalleryAction::kToggleFavorite;
+        } else if (value == "gallery-delete") {
+            _galleryAction = GalleryAction::kDelete;
+        } else if (value == "gallery-pin-map") {
+            _galleryAction = GalleryAction::kToggleMapPin;
+        } else if (value == "gallery-pin-panel") {
+            _galleryAction = GalleryAction::kTogglePanelPin;
+        } else if (value.starts_with("gallery-card-favorite-")) {
+            try {
+                constexpr std::string_view prefix = "gallery-card-favorite-";
+                _galleryActionIndex = static_cast<std::size_t>(std::stoull(std::string(value.substr(prefix.size()))));
+                _galleryAction = GalleryAction::kToggleFavoriteAt;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid gallery favorite id '{}'.", id);
+            }
+        } else if (value.starts_with("gallery-card-delete-")) {
+            try {
+                constexpr std::string_view prefix = "gallery-card-delete-";
+                _galleryActionIndex = static_cast<std::size_t>(std::stoull(std::string(value.substr(prefix.size()))));
+                _galleryAction = GalleryAction::kDeleteAt;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid gallery delete id '{}'.", id);
+            }
+        } else if (value.starts_with("gallery-photo-")) {
+            try {
+                _galleryActionIndex = static_cast<std::size_t>(std::stoull(std::string(value.substr(14))));
+                _galleryAction = GalleryAction::kSelect;
+            } catch (...) {
+                logger::warn("DragonBoardVR: invalid gallery photo id '{}'.", id);
+            }
         } else if (value == "save") {
             _saveRequested = true;
         } else if (value == "position-adjustment") {
@@ -4367,6 +4585,8 @@ namespace dragonboard::ui::rml
             _developerPanelToggleRequested = true;
         } else if (value == "toggle-show-tutorials") {
             _showTutorialsToggleRequested = true;
+        } else if (value == "toggle-status-widget") {
+            _statusWidgetToggleRequested = true;
         } else if (value == "language-previous") {
             _settingsLanguageCode =
                 LocalizationManager::PreviousCode(_settingsLanguageCode);

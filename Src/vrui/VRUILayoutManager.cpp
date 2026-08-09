@@ -196,6 +196,7 @@ namespace vrui {
                                 "pinToRightHand", el.value("pinToHmdWorld", false));
                             elem.legacyHmdPin = legacyHmdPin;
                             elem.visualTransformComposed = el.value("visualTransformComposed", false);
+                            elem.boardRelativeTransform = el.value("boardRelativeTransform", false);
 
                             if (el.contains("transform")) {
                                 auto& t = el["transform"];
@@ -278,6 +279,7 @@ namespace vrui {
                     je["pinToWorld"] = e.pinToWorld;
                     je["pinToRightHand"] = e.pinToRightHand;
                     je["visualTransformComposed"] = e.visualTransformComposed;
+                    je["boardRelativeTransform"] = e.boardRelativeTransform;
 
                     nlohmann::json jte;
                     jte["position"] = { {"x", e.transform.px}, {"y", e.transform.py}, {"z", e.transform.pz} };
@@ -348,7 +350,8 @@ namespace vrui {
     }
 
     void VRUILayoutManager::updateElementTransform(const std::string& containerId, const std::string& elementId,
-                                                   const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale) {
+                                                   const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale,
+                                                   std::optional<bool> boardRelativeTransform) {
         for (auto& c : _containers) {
             if (c.id == containerId) {
                 for (auto& e : c.elements) {
@@ -364,6 +367,9 @@ namespace vrui {
                             }
                         }
                         setTransformFromRuntimeMatrix(e.transform, elementId, pos, rot, scale, isBow);
+                        if (boardRelativeTransform) {
+                            e.boardRelativeTransform = *boardRelativeTransform;
+                        }
                         saveLayout();
                         return;
                     }
@@ -593,6 +599,34 @@ namespace vrui {
         }
     }
 
+    void VRUILayoutManager::removeElementFromContainer(
+        const std::string& containerId, const std::string& elementId)
+    {
+        for (auto& container : _containers) {
+            if (container.id != containerId) continue;
+            const auto before = container.elements.size();
+            std::erase_if(container.elements, [&](const UIJSONElement& element) {
+                return element.id == elementId;
+            });
+            if (container.elements.size() != before) saveLayout();
+            return;
+        }
+    }
+
+    void VRUILayoutManager::removeElementsWithPrefix(
+        const std::string& containerId, const std::string& elementIdPrefix)
+    {
+        for (auto& container : _containers) {
+            if (container.id != containerId) continue;
+            const auto before = container.elements.size();
+            std::erase_if(container.elements, [&](const UIJSONElement& element) {
+                return element.id.starts_with(elementIdPrefix);
+            });
+            if (container.elements.size() != before) saveLayout();
+            return;
+        }
+    }
+
     void VRUILayoutManager::removeElementAnywhere(const std::string& elementId) {
         bool changedJSON = false;
         
@@ -645,13 +679,15 @@ namespace vrui {
     }
 
     void VRUILayoutManager::registerDefaultLayout(const std::string& containerId, const std::string& elementId,
-                                                  const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale) {
+                                                  const RE::NiPoint3& pos, const RE::NiMatrix3& rot, float scale,
+                                                  bool boardRelativeTransform) {
         if (findElementAnywhere(elementId)) {
             return; // Already exists
         }
 
         UIJSONElement ne;
         ne.id = elementId;
+        ne.boardRelativeTransform = boardRelativeTransform;
         setTransformFromRuntimeMatrix(ne.transform, elementId, pos, rot, scale);
 
         bool containerFound = false;

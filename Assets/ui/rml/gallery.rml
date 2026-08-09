@@ -1,0 +1,54 @@
+<rml>
+<head>
+    <title>DragonBoard Gallery</title>
+    <link type="text/rcss" href="gallery.rcss" />
+</head>
+<body>
+<div id="gallery-app">
+    <div class="gallery-frame">
+        <div class="gallery-workspace">
+            <div class="gallery-details-sidebar">
+                <div class="gallery-title">GALLERY</div>
+                <div class="gallery-divider"></div>
+
+                <div class="gallery-info-label">LOCATION</div>
+                <div id="gallery-location" class="gallery-meta">Location</div>
+                <div class="gallery-info-label">DATE</div>
+                <div id="gallery-date" class="gallery-meta">Date</div>
+                <div class="gallery-details-spacer"></div>
+                <div id="gallery-status" class="gallery-status">0 photos</div>
+            </div>
+
+            <div class="gallery-stage">
+                <div class="gallery-preview-shell">
+                    <img id="gallery-preview" class="gallery-preview" />
+                </div>
+            </div>
+
+            <div class="gallery-actions-sidebar">
+                <div class="gallery-capture-actions">
+                    <button id="gallery-capture" class="gallery-primary-action"><span>SNAPSHOT</span></button>
+                    <button id="gallery-timer"><span>TIMER OFF</span></button>
+                </div>
+                <div class="gallery-action-stack">
+
+                    <button id="gallery-delete" class="gallery-main-action gallery-delete-action"><span>DELETE</span></button>
+                    <button id="gallery-favorite" class="gallery-main-action gallery-favorite-action"><span>FAVORITE</span></button>
+                </div>
+                <div class="gallery-spacer"></div>
+                <div class="gallery-pin-actions">
+                    <button id="gallery-pin-panel" class="gallery-pin-action"><span>PIN</span></button>
+                    <button id="gallery-pin-map" class="gallery-pin-action"><span>MARKER ON MAP</span></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="gallery-browser" class="gallery-browser">
+
+            <div id="gallery-grid" class="gallery-grid"></div>
+        </div>
+    </div>
+    <div id="vr-cursor"></div>
+</div>
+</body>
+</rml>

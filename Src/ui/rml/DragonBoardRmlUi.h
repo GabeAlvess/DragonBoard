@@ -233,7 +233,8 @@ namespace dragonboard::ui::rml
             kFilterFavorites,
             kFilterWeapons,
             kFilterArmor,
-            kFilterConsumables,
+            kFilterPotions,
+            kFilterFood,
             kFilterQuest,
             kFilterBooks,
             kFilterMisc
@@ -268,6 +269,36 @@ namespace dragonboard::ui::rml
             kToggleTracking,
             kTrackObjective,
             kSettings,
+            kClose
+        };
+
+        struct GalleryPhotoInfo
+        {
+            std::string id;
+            std::string name;
+            std::string imagePath;
+            std::string thumbnailPath;
+            std::string capturedAt;
+            std::string skyrimDate;
+            std::string location;
+            bool mapPinned = false;
+            bool panelPinned = false;
+            bool favorite = false;
+        };
+
+        enum class GalleryAction : std::uint8_t
+        {
+            kNone,
+            kCapture,
+            kCycleTimer,
+            kSelect,
+            kRename,
+            kToggleFavorite,
+            kToggleFavoriteAt,
+            kDelete,
+            kDeleteAt,
+            kToggleMapPin,
+            kTogglePanelPin,
             kClose
         };
 
@@ -431,6 +462,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool IsInventoryReady() const;
         [[nodiscard]] bool IsMagicReady() const;
         [[nodiscard]] bool IsJournalReady() const;
+        [[nodiscard]] bool IsGalleryReady() const;
         [[nodiscard]] bool IsWelcomeReady() const;
         [[nodiscard]] bool IsKeyboardReady() const;
         [[nodiscard]] bool IsKeyboardOpen() const;
@@ -441,6 +473,7 @@ namespace dragonboard::ui::rml
         bool ShowInventory();
         bool ShowMagic();
         bool ShowJournal();
+        bool ShowGallery();
         bool ShowWelcome();
         bool OpenKeyboard(
             std::string prompt,
@@ -498,6 +531,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool ConsumeLockPinsToggleRequested();
         [[nodiscard]] bool ConsumeDeveloperPanelToggleRequested();
         [[nodiscard]] bool ConsumeShowTutorialsToggleRequested();
+        [[nodiscard]] bool ConsumeStatusWidgetToggleRequested();
         [[nodiscard]] std::optional<std::string> ConsumeLanguageSelectionRequested();
         [[nodiscard]] bool ConsumeWorldPinToggleRequested();
         [[nodiscard]] bool ConsumeRestartRequested();
@@ -512,6 +546,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] std::pair<InventoryAction, std::size_t> ConsumeInventoryAction();
         [[nodiscard]] std::pair<MagicAction, std::size_t> ConsumeMagicAction();
         [[nodiscard]] JournalActionRequest ConsumeJournalAction();
+        [[nodiscard]] std::pair<GalleryAction, std::size_t> ConsumeGalleryAction();
         [[nodiscard]] bool ConsumeWelcomeNextRequested();
         [[nodiscard]] bool ConsumeWelcomeCloseRequested();
         [[nodiscard]] std::optional<std::size_t> GetHoveredModsIndex() const;
@@ -534,12 +569,21 @@ namespace dragonboard::ui::rml
         void SetInventory(InventoryInfo info);
         void SetMagic(MagicInfo info);
         void SetJournal(const JournalInfo& info);
+        void SetGallery(
+            const std::vector<GalleryPhotoInfo>& photos,
+            std::size_t selectedIndex,
+            bool captureBusy,
+            int captureTimerSeconds,
+            int countdownSeconds,
+            int gridColumns,
+            bool deleteConfirmationPending);
         void SetWelcomePage(std::uint8_t page, bool grabCompleted);
         void SetPinTutorial();
         void SetPositionAdjustmentActive(bool active);
         void SetPinsLocked(bool locked);
         void SetDeveloperButtonEnabled(bool enabled);
         void SetShowTutorialsEnabled(bool enabled);
+        void SetStatusWidgetEnabled(bool enabled);
         void SetLanguageSelection(std::string_view code);
         void SetWorldPinned(bool pinned);
         [[nodiscard]] std::string ActiveLanguageCode() const;
@@ -650,6 +694,7 @@ namespace dragonboard::ui::rml
         Rml::ElementDocument* _inventoryDocument = nullptr;
         Rml::ElementDocument* _magicDocument = nullptr;
         Rml::ElementDocument* _journalDocument = nullptr;
+        Rml::ElementDocument* _galleryDocument = nullptr;
         Rml::ElementDocument* _welcomeDocument = nullptr;
         Rml::ElementDocument* _keyboardDocument = nullptr;
         Rml::ElementDocument* _activeDocument = nullptr;
@@ -719,6 +764,7 @@ namespace dragonboard::ui::rml
         bool _lockPinsToggleRequested = false;
         bool _developerPanelToggleRequested = false;
         bool _showTutorialsToggleRequested = false;
+        bool _statusWidgetToggleRequested = false;
         std::optional<std::string> _languageSelectionRequested;
         std::string _settingsLanguageCode{ "en" };
         bool _worldPinToggleRequested = false;
@@ -755,6 +801,9 @@ namespace dragonboard::ui::rml
         float _magicSyncedScrollTop = 0.0f;
         std::string _journalQuestListMarkup;
         JournalInfo _journalInfo;
+        std::vector<GalleryPhotoInfo> _galleryPhotos;
+        std::size_t _gallerySelectedIndex = 0;
+        std::string _galleryGridMarkup;
         std::string _journalQuestFilter{ "all" };
         std::vector<std::uint64_t> _journalActiveQuestOrder;
         float _inventoryMarqueeOffset = 0.0f;
@@ -780,6 +829,8 @@ namespace dragonboard::ui::rml
         MagicAction _magicAction = MagicAction::kNone;
         std::size_t _magicActionIndex = 0;
         JournalAction _journalAction = JournalAction::kNone;
+        GalleryAction _galleryAction = GalleryAction::kNone;
+        std::size_t _galleryActionIndex = 0;
         std::uint32_t _journalActionFormID = 0;
         std::uint32_t _journalActionInstanceID = 0;
         std::uint32_t _journalActionObjectiveInstanceID = 0;

@@ -60,10 +60,13 @@ target('DragonBoardVR')
     add_installfiles('Assets/ui/translations/*.json', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/translations'
     })
+    add_installfiles('Assets/DBCameraMarker.dds', {
+        prefixdir = 'textures'
+    })
     add_installfiles('Assets/ui/translations/README.txt', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/translations'
     })
-    add_installfiles('Assets/tools/DragonBoardIniScanner.exe', {
+    add_installfiles('Assets/tools/(**)', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/tools'
     })
     add_installfiles('Src/papyrus/*.psc', {
@@ -95,6 +98,9 @@ target('DragonBoardVR')
         prefixdir = 'meshes/DragonBoardVR'
     })
     add_installfiles('Assets/meshes/DragonBoardVR/DBMarker*.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
+    add_installfiles('Assets/meshes/DragonBoardVR/DBCameraMarker.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
     add_installfiles('Assets/textures/RmlUI0.dds', {
@@ -131,9 +137,12 @@ target('DragonBoardVR')
         local iconPlaneNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'iconplane.nif')
         local categoryMarkerNifs = path.join(
             os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'DBMarker*.nif')
+        local galleryCameraMarkerNif = path.join(
+            os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'DBCameraMarker.nif')
         local screenTexture = path.join(os.projectdir(), 'Assets', 'textures', 'RmlUI0.dds')
         local spellWheelTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DragonBoardMat_*.dds')
         local categoryMarkerTextures = path.join(os.projectdir(), 'Assets', 'textures', 'DBMarker*.dds')
+        local galleryCameraMarkerTexture = path.join(os.projectdir(), 'Assets', 'DBCameraMarker.dds')
         os.mkdir(path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.mkdir(path.join(installRoot, 'meshes', 'Magic'))
         os.mkdir(path.join(installRoot, 'textures'))
@@ -179,6 +188,9 @@ target('DragonBoardVR')
         os.cp(physicalBoardPlugin, path.join(installRoot, 'DragonBoardVR.esp'))
         os.cp(iconPlaneNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'iconplane.nif'))
         os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
+        os.cp(
+            galleryCameraMarkerNif,
+            path.join(installRoot, 'meshes', 'DragonBoardVR', 'DBCameraMarker.nif'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI0.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI1.dds'))
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI2.dds'))
@@ -186,6 +198,7 @@ target('DragonBoardVR')
         os.cp(screenTexture, path.join(installRoot, 'textures', 'RmlUI4.dds'))
         os.cp(spellWheelTextures, path.join(installRoot, 'textures'))
         os.cp(categoryMarkerTextures, path.join(installRoot, 'textures'))
+        os.cp(galleryCameraMarkerTexture, path.join(installRoot, 'textures', 'DBCameraMarker.dds'))
         local rmlUiDir = path.join(os.projectdir(), 'Assets', 'ui', 'rml')
         local installedRmlUiDir = path.join(outputDir, 'DragonBoardVR', 'ui')
         os.mkdir(installedRmlUiDir)
@@ -210,12 +223,17 @@ target('DragonBoardVR')
         os.mkdir(installedTranslationDir)
         os.cp(path.join(translationDir, '*.json'), installedTranslationDir)
         os.cp(path.join(translationDir, 'README.txt'), installedTranslationDir)
-        local iniScanner = path.join(
-            os.projectdir(), 'Assets', 'tools', 'DragonBoardIniScanner.exe')
+        local iniScannerDir = path.join(os.projectdir(), 'Assets', 'tools')
+        local iniScanner = path.join(iniScannerDir, 'DragonBoardIniScanner.exe')
         local installedToolsDir = path.join(outputDir, 'DragonBoardVR', 'tools')
         if os.isfile(iniScanner) then
+            if os.isdir(installedToolsDir) then
+                os.rm(installedToolsDir)
+            end
             os.mkdir(installedToolsDir)
-            os.cp(iniScanner, path.join(installedToolsDir, 'DragonBoardIniScanner.exe'))
+            os.cp(path.join(iniScannerDir, '**'), installedToolsDir, {
+                rootdir = iniScannerDir
+            })
         else
             cprint('${yellow}INI scanner executable not found:${clear} %s', iniScanner)
         end

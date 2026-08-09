@@ -90,6 +90,13 @@ namespace dragonboard::ui::menu
                 rmlHost.IsDeveloperOpen(),
                 [&rmlHost]() { return rmlHost.OpenDeveloper(); });
         }
+        if (normalized == "gallery" || normalized == "gallerypanel") {
+            return OpenRmlDocument(
+                manager,
+                mode,
+                rmlHost.IsGalleryOpen(),
+                [&rmlHost]() { return rmlHost.OpenGallery(); });
+        }
         if (normalized == "journal" || normalized == "journalmenu" ||
             normalized == "favoritespanel" || normalized == "container:favorites" ||
             normalized == "favorites_dyn") {

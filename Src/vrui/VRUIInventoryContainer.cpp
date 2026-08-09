@@ -203,6 +203,24 @@ namespace vrui
             return description;
         }
 
+        RE::EnchantmentItem* resolveInventoryEnchantment(
+            RE::TESBoundObject* item,
+            const RE::InventoryEntryData* inventoryEntry)
+        {
+            if (inventoryEntry) {
+                if (auto* enchantment = inventoryEntry->GetEnchantment()) {
+                    return enchantment;
+                }
+            }
+            if (auto* weapon = item ? item->As<RE::TESObjectWEAP>() : nullptr) {
+                return weapon->formEnchanting;
+            }
+            if (auto* armor = item ? item->As<RE::TESObjectARMO>() : nullptr) {
+                return armor->formEnchanting;
+            }
+            return nullptr;
+        }
+
         std::string fallbackInventoryDescription(RE::TESBoundObject* item)
         {
             if (!item) return "No description available.";
@@ -223,17 +241,24 @@ namespace vrui
             return "A miscellaneous item.";
         }
 
-        std::string resolveInventoryDescription(RE::TESBoundObject* item)
+        std::string resolveInventoryDescription(
+            RE::TESBoundObject* item,
+            const RE::InventoryEntryData* inventoryEntry)
         {
             if (!item) return fallbackInventoryDescription(item);
 
+            std::string effectDescription;
             if (item->Is(RE::FormType::AlchemyItem) ||
                 item->Is(RE::FormType::Scroll)) {
                 if (auto* magicItem = item->As<RE::MagicItem>()) {
-                    auto effectDescription =
-                        resolveMagicItemEffectDescription(magicItem);
-                    if (!effectDescription.empty()) return effectDescription;
+                    effectDescription = resolveMagicItemEffectDescription(magicItem);
                 }
+            } else if (inventoryEntry) {
+                effectDescription = resolveMagicItemEffectDescription(
+                    resolveInventoryEnchantment(item, inventoryEntry));
+            } else {
+                effectDescription = resolveMagicItemEffectDescription(
+                    resolveInventoryEnchantment(item, nullptr));
             }
 
             RE::BSString rawDescription;
@@ -250,8 +275,17 @@ namespace vrui
             const char* rawText = rawDescription.c_str();
             if (rawText && *rawText) {
                 auto cleaned = cleanInventoryDescription(rawText);
-                if (!cleaned.empty()) return cleaned;
+                if (!cleaned.empty()) {
+                    if (effectDescription.empty()) return cleaned;
+                    if (effectDescription.size() < 280) {
+                        effectDescription.push_back(' ');
+                        effectDescription.append(
+                            cleaned, 0, 280 - effectDescription.size());
+                    }
+                    return effectDescription;
+                }
             }
+            if (!effectDescription.empty()) return effectDescription;
             return fallbackInventoryDescription(item);
         }
 
@@ -683,7 +717,7 @@ namespace vrui
             const char* rawName = item->GetName();
             entry.name = rawName && *rawName ? rawName : "Unknown item";
             entry.category = resolveInventoryCategory(item);
-            entry.description = resolveInventoryDescription(item);
+            entry.description = resolveInventoryDescription(item, data.second.get());
             entry.editCategory = resolveItemEditCategory(item);
             entry.modelPath = ItemUtils::getModelPath(item);
             entry.weight = item->GetWeight();
@@ -779,6 +813,10 @@ namespace vrui
             }
             if (data.second && data.second->IsFavorited()) {
                 row ^= 0x4000000000000000ull;
+            }
+            if (const auto* enchantment =
+                    resolveInventoryEnchantment(item, data.second.get())) {
+                row ^= static_cast<std::uint64_t>(enchantment->formID) << 1;
             }
             rows.push_back(row);
         }

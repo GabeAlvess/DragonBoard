@@ -33,6 +33,7 @@
 /Backups/
 /External/
 /artifacts/
+/.tmp/
 /design-preview/
 /nif_tests/
 /RMLUI_VR_SURFACE_TEST.md

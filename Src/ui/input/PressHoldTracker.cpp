@@ -10,6 +10,11 @@ namespace dragonboard::ui::input
     {
         PressHoldEvents events;
 
+        if (_suppressUntilRelease) {
+            if (!pressed) Reset();
+            return events;
+        }
+
         if (pressed && !_pressed) {
             _pressed = true;
             _holdTimer = 0.0f;
@@ -34,5 +39,6 @@ namespace dragonboard::ui::input
         _holdTimer = 0.0f;
         _pressed = false;
         _longPressTriggered = false;
+        _suppressUntilRelease = false;
     }
 }

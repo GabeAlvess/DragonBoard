@@ -10,7 +10,8 @@
             <button id="inventory-filter-favorites" class="inventory-filter active" title="Favorites"><img src="assets/Icons/favoriteIcon.png" /></button>
             <button id="inventory-filter-weapons" class="inventory-filter" title="Weapons"><img src="assets/Icons/weaponicon.png" /></button>
             <button id="inventory-filter-armor" class="inventory-filter" title="Armor"><img src="assets/Icons/armoricon.png" /></button>
-            <button id="inventory-filter-consumables" class="inventory-filter" title="Consumables"><img src="assets/Icons/consumiblesicon.png" /></button>
+            <button id="inventory-filter-potions" class="inventory-filter" title="Potions"><img src="assets/Icons/consumiblesicon.png" /></button>
+            <button id="inventory-filter-food" class="inventory-filter" title="Food"><img src="assets/Icons/foodincon.png" /></button>
             <button id="inventory-filter-quest" class="inventory-filter" title="Quest Items"><img src="assets/Icons/questicon.png" /></button>
             <button id="inventory-filter-books" class="inventory-filter" title="Books"><img src="assets/Icons/booksicon.png" /></button>
             <button id="inventory-filter-misc" class="inventory-filter" title="Miscellaneous"><img src="assets/Icons/miscicon.png" /></button>
