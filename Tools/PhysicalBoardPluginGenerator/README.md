@@ -1,6 +1,7 @@
 # Physical Board Plugin Generator
 
 Generates `Assets/DragonBoardVR.esp` with the physical DragonBoard carrier item.
+The generated plugin is ESL-flagged and uses compact-range local FormIDs.
 
 ```powershell
 dotnet run --project Tools/PhysicalBoardPluginGenerator -- Assets/DragonBoardVR.esp

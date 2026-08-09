@@ -31,6 +31,7 @@ var skyrim = SkyrimMod.CreateFromBinary(
 
 var modKey = ModKey.FromFileName(pluginName);
 var mod = new SkyrimMod(modKey, SkyrimRelease.SkyrimSE);
+mod.IsSmallMaster = true;
 mod.ModHeader.Author = "GabeAlvz";
 mod.ModHeader.Description =
     "Physical DragonBoard carrier used by the DragonBoardVR SKSE plugin.";
