@@ -2,6 +2,7 @@
 #include "VRUIButton.h"
 #include "ui/input/GripThumbScale.h"
 #include <algorithm>
+#include <chrono>
 #include <sstream>
 #include <cctype>
 #include <RE/B/BSLightingShaderProperty.h>
@@ -1100,13 +1101,19 @@ namespace vrui
                             }
                         }
 
-                        if (scaleStarted) {
-                            menuManager.triggerHaptic(true, 0.35f, 0.05f);
+                        if (settings.hapticOnPress && scaleStarted) {
+                            menuManager.triggerHaptic(
+                                true,
+                                settings.hapticIntensity * 0.7f,
+                                settings.hapticDuration * 0.75f);
                         }
-                        if (_isThumbScaling) {
+                        if (settings.hapticOnPress && _isThumbScaling) {
                             _scaleHapticTimer += deltaTime;
                             if (_scaleHapticTimer >= 0.12f) {
-                                menuManager.triggerHaptic(true, 0.15f, 0.025f);
+                                menuManager.triggerHaptic(
+                                    true,
+                                    settings.hapticIntensity * 0.35f,
+                                    settings.hapticDuration * 0.5f);
                                 _scaleHapticTimer = 0.0f;
                             }
                         } else {
@@ -1423,7 +1430,13 @@ namespace vrui
             _grabInitialEditableWorldRot = RE::NiMatrix3();
         }
         
-        VRMenuManager::get().triggerHaptic(true, 1.0f, 0.2f);
+        const auto& hapticSettings = VRUISettings::get();
+        if (hapticSettings.hapticOnPress) {
+            VRMenuManager::get().triggerHaptic(
+                true,
+                hapticSettings.hapticIntensity,
+                hapticSettings.hapticDuration);
+        }
         std::string msg = std::format("Grabbed Button: {}", _label);
         // RE::DebugNotification(msg.c_str());
     }
@@ -1434,7 +1447,13 @@ namespace vrui
         _grabTimer = 0.0f;
         _isThumbScaling = false;
         _scaleHapticTimer = 0.0f;
-        VRMenuManager::get().triggerHaptic(true, 1.0f, 0.2f);
+        const auto& hapticSettings = VRUISettings::get();
+        if (hapticSettings.hapticOnPress) {
+            VRMenuManager::get().triggerHaptic(
+                true,
+                hapticSettings.hapticIntensity * 0.8f,
+                hapticSettings.hapticDuration);
+        }
         
         if (_node) {
             if (_persistItemRotationOnGrab && _primaryVisualNode && _primaryVisualNode->parent) {
@@ -1498,6 +1517,7 @@ namespace vrui
             // Save local-space coordinates (relative to parent container), because
             // refreshFixedWidgets restores them via setLocalPosition/setLocalRotation.
             else if (!_layoutId.empty()) {
+                const auto persistenceStartedAt = std::chrono::steady_clock::now();
                 if (_worldLockedToHeadSpace) {
                     _lockedWorldPos = _node->world.translate;
                     _lockedWorldRot = _node->world.rotate;
@@ -1514,6 +1534,16 @@ namespace vrui
                 } else {
                     VRUILayoutManager::updateElementTransformAnywhere(_layoutId, 
                         _node->local.translate, _node->local.rotate, _node->local.scale);
+                }
+                if (_isDashboardPinned) {
+                    const auto persistenceMs = std::chrono::duration<double, std::milli>(
+                        std::chrono::steady_clock::now() - persistenceStartedAt).count();
+                    logger::info(
+                        "DragonBoardVR: pinned item '{}' position persisted in {:.3f} ms "
+                        "(worldLocked={}).",
+                        _layoutId,
+                        persistenceMs,
+                        _worldLockedToHeadSpace);
                 }
             }
             else if (_fixedWidgetIndex >= 0 && _fixedWidgetIndex < (int)settings.fixedWidgets.size()) {

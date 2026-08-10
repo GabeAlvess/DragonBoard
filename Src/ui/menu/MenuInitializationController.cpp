@@ -31,8 +31,9 @@ namespace dragonboard::ui::menu
         settings.load(iniPath);
         manager._boardPinState.Reset(settings.menuScale);
 
+        spdlog::set_level(
+            settings.verboseLogging ? spdlog::level::trace : spdlog::level::info);
         if (settings.verboseLogging) {
-            spdlog::set_level(spdlog::level::trace);
             logger::trace("DragonBoardVR: Verbose logging ENABLED (trace level)");
         }
 

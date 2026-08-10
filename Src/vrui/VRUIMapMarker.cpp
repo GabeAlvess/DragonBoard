@@ -395,7 +395,7 @@ namespace vrui
         _surfaceFailureLogged = false;
         if (!_surfacePlacementLogged) {
             const auto atlasUv = MapArtworkUvToAtlasUv(mapU, mapV);
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: {} map marker placement resolved: mapUV=({:.4f}, {:.4f}) atlasUV=({:.4f}, {:.4f}) panel=({:.3f}, {:.3f}, {:.3f}) normal=({:.3f}, {:.3f}, {:.3f}).",
                 galleryMarker ? "gallery photo" : (questMarker ? "quest objective" : "player"),
                 mapU, mapV, atlasUv.x, atlasUv.y,
@@ -494,7 +494,7 @@ namespace vrui
                     if (valid) _mapSurfaceTriangles.push_back(triangle);
                 }
 
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: indexed map surface geometry '{}' texture='{}' vertices={} triangles={}.",
                     geometry->name.c_str(), textureName, shapeData.vertexCount,
                     shapeData.triangleCount);
@@ -508,7 +508,7 @@ namespace vrui
             return false;
         }
 
-        logger::info(
+        logger::trace(
             "DragonBoardVR: texture-UV map marker ready with {} cached surface triangles.",
             _mapSurfaceTriangles.size());
         return true;

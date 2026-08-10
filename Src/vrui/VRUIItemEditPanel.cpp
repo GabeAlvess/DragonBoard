@@ -376,6 +376,14 @@ namespace vrui
             }
         }
         if (pinnedCopies >= static_cast<std::size_t>(inventoryCount)) {
+            if (VRUILayoutManager::findElementAnywhere(baseId)) {
+                logger::info(
+                    "DragonBoardVR: reusing existing pin '{}' for {:08X} '{}'.",
+                    baseId,
+                    static_cast<std::uint32_t>(_targetFormID),
+                    _targetItemName);
+                return baseId;
+            }
             logger::warn(
                 "DragonBoardVR: pin rejected for {:08X} '{}'; {} pinned copy/copies already use all {} inventory item(s).",
                 static_cast<std::uint32_t>(_targetFormID),

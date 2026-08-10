@@ -10,6 +10,7 @@
 #include "vrui/VRUISettings.h"
 #include "vrui/VRUIItemUtils.h"
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -140,27 +141,44 @@ namespace dragonboard::ui::widgets
             });
 
             const std::string elementID = element.id;
-            widget->setOnSecondaryLongPressHandler([elementID](vrui::VRUIButton* button, vrui::EquipHand) {
+            widget->setOnSecondaryPressHandler([elementID](vrui::VRUIButton* button, vrui::EquipHand) {
                 auto& currentSettings = vrui::VRUISettings::get();
-                if (!currentSettings.lockPins && currentSettings.editModeEnabled) {
+                if (button && button->isGrabbed() &&
+                    !currentSettings.lockPins && currentSettings.editModeEnabled) {
+                    const auto scheduledAt = std::chrono::steady_clock::now();
                     // Give immediate visual feedback without destroying the
                     // button while its own callback is still on the stack.
-                    if (button) {
-                        button->setVisible(false);
-                    }
+                    button->setVisible(false);
                     auto& menuManager = vrui::VRMenuManager::get();
                     dragonboard::ui::runtime::DeferredActionController::Schedule(
                         menuManager,
                         0.0f,
-                        [elementID]() {
+                        [elementID, scheduledAt]() {
                             if (vrui::VRUISettings::get().lockPins) {
                                 return;
                             }
+                            const auto startedAt = std::chrono::steady_clock::now();
                             auto& deferredManager = vrui::VRMenuManager::get();
                             deferredManager.clearHover();
                             deferredManager.clearGrabbedWidget(nullptr);
                             vrui::VRUILayoutManager::removeElementAnywhere(elementID);
+                            const auto layoutRemovedAt = std::chrono::steady_clock::now();
                             FixedWidgetPresenter::RefreshElement(deferredManager, elementID);
+                            const auto finishedAt = std::chrono::steady_clock::now();
+                            const auto layoutMs = std::chrono::duration<double, std::milli>(
+                                layoutRemovedAt - startedAt).count();
+                            const auto refreshMs = std::chrono::duration<double, std::milli>(
+                                finishedAt - layoutRemovedAt).count();
+                            const auto queueMs = std::chrono::duration<double, std::milli>(
+                                startedAt - scheduledAt).count();
+                            logger::info(
+                                "DragonBoardVR: pinned item '{}' removed in {:.3f} ms "
+                                "(queue={:.3f}, layout={:.3f}, scene={:.3f}).",
+                                elementID,
+                                layoutMs + refreshMs,
+                                queueMs,
+                                layoutMs,
+                                refreshMs);
                             RE::DebugNotification("DragonBoardVR: Pinned item removed.");
                         });
                 }

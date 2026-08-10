@@ -2,8 +2,11 @@
 
 #include "ui/rml/RmlPanelHost.h"
 #include "vrui/VRMenuManager.h"
+#include "vrui/VRUIButton.h"
 #include "vrui/VRUISettings.h"
 #include "vrui/VRUIWidget.h"
+
+#include <chrono>
 
 namespace dragonboard::ui::input
 {
@@ -111,11 +114,34 @@ namespace dragonboard::ui::input
         const bool secondaryOnRightHand = manager.isMenuHandLeft();
         const auto& panelSecondaryEvents = modsRmlActive ?
             dominantSecondaryEvents : secondaryEvents;
-        bool removedGrabbedSurface = false;
+        bool removedGrabbedTarget = false;
         if (!modsRmlActive &&
             (secondaryPressed || dominantSecondaryPressed)) {
-            removedGrabbedSurface = rmlHost.RequestGrabbedSurfaceRemoval();
-            if (removedGrabbedSurface && settings.hapticOnPress) {
+            if (settings.editModeEnabled && !settings.lockPins) {
+                const auto grabbedWidget = manager.getGrabbedWidget();
+                const auto grabbedButton = grabbedWidget ?
+                    std::dynamic_pointer_cast<vrui::VRUIButton>(grabbedWidget) : nullptr;
+                if (grabbedButton && grabbedButton->isGrabbed() &&
+                    grabbedButton->isDashboardPinned()) {
+                    const auto dispatchStartedAt = std::chrono::steady_clock::now();
+                    logger::info(
+                        "DragonBoardVR: pinned removal input accepted for '{}'.",
+                        grabbedButton->getButtonId());
+                    grabbedButton->onSecondaryPress();
+                    const auto dispatchFinishedAt = std::chrono::steady_clock::now();
+                    const auto dispatchMs = std::chrono::duration<double, std::milli>(
+                        dispatchFinishedAt - dispatchStartedAt).count();
+                    logger::info(
+                        "DragonBoardVR: pinned removal callback for '{}' returned in {:.3f} ms.",
+                        grabbedButton->getButtonId(),
+                        dispatchMs);
+                    removedGrabbedTarget = true;
+                }
+            }
+            if (!removedGrabbedTarget) {
+                removedGrabbedTarget = rmlHost.RequestGrabbedSurfaceRemoval();
+            }
+            if (removedGrabbedTarget && settings.hapticOnPress) {
                 const bool rightHand = dominantSecondaryPressed ?
                     !manager.isDominantHandLeft() : secondaryOnRightHand;
                 manager.triggerHaptic(
@@ -123,12 +149,12 @@ namespace dragonboard::ui::input
                     settings.hapticIntensity * 1.5f,
                     settings.hapticDuration * 2.0f);
             }
-            if (removedGrabbedSurface) {
+            if (removedGrabbedTarget) {
                 manager._secondaryButtonTracker.SuppressUntilRelease();
                 manager._dominantSecondaryButtonTracker.SuppressUntilRelease();
             }
         }
-        if (!removedGrabbedSurface && panelSecondaryEvents.longPress) {
+        if (!removedGrabbedTarget && panelSecondaryEvents.longPress) {
             if (modsRmlActive) {
                 if (rmlHost.RequestHoveredModRemoval() && settings.hapticOnPress) {
                     manager.triggerHaptic(
@@ -137,10 +163,16 @@ namespace dragonboard::ui::input
                         settings.hapticDuration * 2.0f);
                 }
             } else if (auto hovered = manager._interactionFocus.GetHovered()) {
-                hovered->onSecondaryLongPress();
-                if (settings.hapticOnPress) {
-                    manager.triggerHaptic(
-                        false, settings.hapticIntensity * 1.5f, settings.hapticDuration * 2.0f);
+                const auto hoveredButton =
+                    std::dynamic_pointer_cast<vrui::VRUIButton>(hovered);
+                if (!hoveredButton || !hoveredButton->isDashboardPinned()) {
+                    hovered->onSecondaryLongPress();
+                    if (settings.hapticOnPress) {
+                        manager.triggerHaptic(
+                            false,
+                            settings.hapticIntensity * 1.5f,
+                            settings.hapticDuration * 2.0f);
+                    }
                 }
             }
         }

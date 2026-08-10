@@ -61,7 +61,7 @@ namespace dragonboard::ui::rml
                     }
                 }
                 context->Unmap(staging, 0);
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: widget label '{}' target contains {} visible pixels "
                     "with max alpha {}.",
                     id,
@@ -176,7 +176,7 @@ namespace dragonboard::ui::rml
                 entry.sourceTexture = std::move(sourceTexture);
                 entry.originalRendererTexture = entry.sourceTexture->rendererTexture;
                 materialFound = true;
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: widget label '{}' attached property={} material={} "
                     "texture={}.",
                     id,
@@ -229,7 +229,7 @@ namespace dragonboard::ui::rml
                 entry.shaderProperty->DoClearRenderPasses();
             }
             entry.textureBound = true;
-            logger::info(
+            logger::trace(
                 "DragonBoardVR: widget label '{}' bound render texture {} (srv={}).",
                 id,
                 static_cast<const void*>(entry.renderTexture),
@@ -258,7 +258,7 @@ namespace dragonboard::ui::rml
                     static_cast<int>(kTextureWidth),
                     static_cast<int>(kTextureHeight))) {
                 entry.dirty = false;
-                logger::info(
+                logger::trace(
                     "DragonBoardVR: widget label '{}' rendered text '{}' to {}x{} target {}.",
                     id,
                     entry.text,

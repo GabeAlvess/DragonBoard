@@ -4,14 +4,76 @@
 #include "VRUIWidget.h"
 #include "VRUISettings.h"
 #include <nlohmann/json.hpp>
+#include <atomic>
 #include <fstream>
 #include <filesystem>
+#include <mutex>
+#include <thread>
 #include <RE/S/Script.h>
 
 namespace vrui {
 
     namespace
     {
+        std::atomic<std::uint64_t> layoutSaveGeneration{ 0 };
+        std::mutex layoutSaveIOMutex;
+
+        void WriteLayoutSnapshotAsync(std::string filePath, std::string payload)
+        {
+            const auto generation = ++layoutSaveGeneration;
+            std::thread([
+                filePath = std::move(filePath),
+                payload = std::move(payload),
+                generation]() {
+                std::lock_guard<std::mutex> ioLock(layoutSaveIOMutex);
+                if (generation != layoutSaveGeneration.load()) {
+                    return;
+                }
+
+                const std::filesystem::path target(filePath);
+                auto temporary = target;
+                temporary += ".tmp";
+                std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
+                if (!file.is_open()) {
+                    logger::error(
+                        "DragonBoardVR: Failed to open temporary layout JSON '{}'.",
+                        temporary.string());
+                    return;
+                }
+                file << payload;
+                file.flush();
+                file.close();
+                if (!file) {
+                    logger::error(
+                        "DragonBoardVR: Failed to write temporary layout JSON '{}'.",
+                        temporary.string());
+                    std::error_code error;
+                    std::filesystem::remove(temporary, error);
+                    return;
+                }
+
+                if (generation != layoutSaveGeneration.load()) {
+                    std::error_code error;
+                    std::filesystem::remove(temporary, error);
+                    return;
+                }
+
+                if (!MoveFileExW(
+                        temporary.c_str(),
+                        target.c_str(),
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+                    logger::error(
+                        "DragonBoardVR: Failed to replace layout JSON '{}' (Windows error {}).",
+                        target.string(),
+                        GetLastError());
+                    std::error_code error;
+                    std::filesystem::remove(temporary, error);
+                    return;
+                }
+                logger::trace("DragonBoardVR: Saved JSON layout in background.");
+            }).detach();
+        }
+
         std::string getDefaultContainerIdForElement(const std::string& elementId)
         {
             if (elementId.rfind("Slot", 0) == 0) {
@@ -310,12 +372,7 @@ namespace vrui {
 
             root["containers"] = containersArray;
 
-            // Keep layout persistence ordered with the in-memory mutations.
-            // Pin operations are batched, so this is now one bounded write
-            // instead of three full-file writes for a single action.
-            std::ofstream file(_filePath, std::ios::binary | std::ios::trunc);
-            file << root.dump(4);
-            logger::trace("DragonBoardVR: Successfully saved JSON layout.");
+            WriteLayoutSnapshotAsync(_filePath, root.dump(4));
         } catch (const std::exception& e) {
             logger::error("DragonBoardVR: Error saving layout JSON: {}", e.what());
         }

@@ -406,11 +406,6 @@ namespace dragonboard::integrations::vrik
         _holsterDrawCandidateSlot = assignedSlotIndex;
         _holsterDrawCandidateHandLeft = isLeft;
         _holsterDrawCandidateFrames = kHolsterDrawCandidateFrames;
-        logger::info(
-            "DragonBoardVR: latched VRIK slot {} draw from {} grip at {:.2f} units before pull.",
-            assignedSlotIndex + 1,
-            isLeft ? "left" : "right",
-            handDistance);
     }
 
     void VrikBoardProxyController::ClearHolsterDrawCandidate()
