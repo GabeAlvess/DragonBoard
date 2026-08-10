@@ -17,6 +17,9 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* loa
 
     REL::Module::reset();
     SKSE::Init(loadInterface);
+    if (!dragonboard::bootstrap::InitializeSerialization()) {
+        return false;
+    }
     dragonboard::bootstrap::LoadInitialSettings();
 
     const auto* papyrus = SKSE::GetPapyrusInterface();

@@ -1,26 +1,48 @@
 #include "GameMenuActions.h"
 
+#include <RE/I/IStackCallbackFunctor.h>
+#include <RE/V/VirtualMachine.h>
+
 namespace dragonboard::runtime::vr
 {
-    void QueueQuickSave()
+    namespace
+    {
+        class SaveRequestCallback final : public RE::BSScript::IStackCallbackFunctor
+        {
+        public:
+            void operator()(RE::BSScript::Variable) override
+            {
+                logger::info(
+                    "DragonBoardVR: Papyrus accepted the normal save request.");
+            }
+
+            void SetObject(
+                const RE::BSTSmartPointer<RE::BSScript::Object>&) override
+            {}
+        };
+    }
+
+    void QueueNewSave()
     {
         if (auto* taskInterface = SKSE::GetTaskInterface()) {
             taskInterface->AddTask([]() {
-                auto* inputManager = RE::BSInputDeviceManager::GetSingleton();
-                auto* userEvents = RE::UserEvents::GetSingleton();
-                if (!inputManager || !userEvents) return;
-
-                auto* down = RE::ButtonEvent::Create(
-                    RE::INPUT_DEVICE::kKeyboard, userEvents->quicksave, 0x3F, 1.0f, 0.0f);
-                if (down) {
-                    RE::InputEvent* event = down;
-                    inputManager->SendEvent(&event);
+                auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+                if (!vm) {
+                    logger::error(
+                        "DragonBoardVR: cannot request a new save because the Papyrus VM is unavailable.");
+                    return;
                 }
-                auto* up = RE::ButtonEvent::Create(
-                    RE::INPUT_DEVICE::kKeyboard, userEvents->quicksave, 0x3F, 0.0f, 0.1f);
-                if (up) {
-                    RE::InputEvent* event = up;
-                    inputManager->SendEvent(&event);
+
+                auto* args = RE::MakeFunctionArguments();
+                RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback(
+                    new SaveRequestCallback());
+                if (!vm->DispatchStaticCall(
+                        "Game",
+                        "RequestSave",
+                        args,
+                        callback)) {
+                    logger::error(
+                        "DragonBoardVR: Papyrus rejected RequestSave.");
                 }
             });
         }

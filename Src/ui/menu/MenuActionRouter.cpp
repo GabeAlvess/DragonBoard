@@ -126,7 +126,7 @@ namespace dragonboard::ui::menu
         }
         if (normalized == "quicksave" || normalized == "save") {
             manager.closeMenu();
-            dragonboard::runtime::vr::QueueQuickSave();
+            dragonboard::runtime::vr::QueueNewSave();
             return true;
         }
         if (normalized == "statsmenu" || normalized == "stats") {

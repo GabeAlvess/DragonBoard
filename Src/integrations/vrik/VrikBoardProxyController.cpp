@@ -39,6 +39,7 @@ namespace dragonboard::integrations::vrik
         constexpr std::uint32_t kHolsterDrawReleaseGraceFrames = 120;
         constexpr std::uint32_t kHolsterReassignmentStableFrames = 12;
         constexpr std::uint32_t kHolsterReassignmentTimeoutFrames = 300;
+        constexpr std::uint32_t kPhysicalGrabTimeoutFrames = 300;
 
         RE::BGSEquipSlot* GetHandEquipSlot(bool isLeft)
         {
@@ -170,6 +171,8 @@ namespace dragonboard::integrations::vrik
         _proxyWeaponCollisionHandLeft = false;
         _physicalBoardHeld = false;
         _activePhysicalReference.reset();
+        _pendingPhysicalGrabFrames = 0;
+        _pendingPhysicalGrabHandLeft = false;
         _pendingInitialHolsterReference.reset();
         _pendingInitialHolsterFrames = 0;
         _pendingInitialHolsterStashed = false;
@@ -217,6 +220,7 @@ namespace dragonboard::integrations::vrik
         }
 
         EnsureProxyInventory();
+        ProcessPendingPhysicalGrab();
         ProcessPendingInitialHolster();
         if (_holsterDrawCandidateFrames > 0) {
             --_holsterDrawCandidateFrames;
@@ -1031,42 +1035,42 @@ namespace dragonboard::integrations::vrik
         }
 
         _activePhysicalReference = reference->CreateRefHandle();
-        const auto handle = _activePhysicalReference;
-        if (auto* tasks = SKSE::GetTaskInterface()) {
-            tasks->AddTask([handle, isLeft]() {
-                const auto resolved = handle.get();
-                if (resolved && g_higgsInterface &&
-                    g_higgsInterface->CanGrabObject(resolved.get(), isLeft)) {
-                    g_higgsInterface->GrabObject(resolved.get(), isLeft);
-                    return;
-                }
+        _pendingPhysicalGrabFrames = kPhysicalGrabTimeoutFrames;
+        _pendingPhysicalGrabHandLeft = isLeft;
+    }
 
-                if (auto* retryTasks = SKSE::GetTaskInterface()) {
-                    retryTasks->AddTask([handle, isLeft]() {
-                        const auto retryReference = handle.get();
-                        if (retryReference && g_higgsInterface &&
-                            g_higgsInterface->CanGrabObject(retryReference.get(), isLeft)) {
-                            g_higgsInterface->GrabObject(retryReference.get(), isLeft);
-                            return;
-                        }
+    void VrikBoardProxyController::ProcessPendingPhysicalGrab()
+    {
+        if (_pendingPhysicalGrabFrames == 0) {
+            return;
+        }
 
-                        auto& controller = GetSingleton();
-                        auto* retryPlayer = RE::PlayerCharacter::GetSingleton();
-                        if (retryReference && retryPlayer) {
-                            retryPlayer->PickUpObject(
-                                retryReference.get(),
-                                1,
-                                false,
-                                false);
-                        }
-                        controller.SetSourceSlotVisible(true);
-                        controller._activeSlotIndex = -1;
-                        controller._activePhysicalReference.reset();
-                        logger::warn(
-                            "DragonBoardVR: HIGGS could not grab the board drawn from VRIK; it was returned to inventory.");
-                    });
-                }
-            });
+        const auto reference = _activePhysicalReference.get();
+        if (!reference || !g_higgsInterface) {
+            _pendingPhysicalGrabFrames = 0;
+            return;
+        }
+
+        if (g_higgsInterface->GetGrabbedObject(_pendingPhysicalGrabHandLeft) ==
+            reference.get()) {
+            _pendingPhysicalGrabFrames = 0;
+            return;
+        }
+
+        if (g_higgsInterface->CanGrabObject(
+                reference.get(), _pendingPhysicalGrabHandLeft)) {
+            g_higgsInterface->GrabObject(
+                reference.get(), _pendingPhysicalGrabHandLeft);
+            _pendingPhysicalGrabFrames = 0;
+            logger::info(
+                "DragonBoardVR: HIGGS grabbed the board drawn from VRIK after the proxy hand became ready.");
+            return;
+        }
+
+        --_pendingPhysicalGrabFrames;
+        if (_pendingPhysicalGrabFrames == 0) {
+            logger::warn(
+                "DragonBoardVR: HIGGS hand did not become ready for the VRIK board draw; the spawned board was left in the world instead of being removed.");
         }
     }
 
@@ -1131,6 +1135,7 @@ namespace dragonboard::integrations::vrik
 
         ClearHolsterDrawCandidate();
         _activePhysicalReference = reference->CreateRefHandle();
+        _pendingPhysicalGrabFrames = 0;
         _activeHandLeft = isLeft;
         _physicalBoardHeld = true;
         const auto suppressedSlot = _activeSlotIndex >= 0 ?
@@ -1147,11 +1152,13 @@ namespace dragonboard::integrations::vrik
             if (activeReference && activeReference.get() != reference) {
                 return;
             }
-        } else if (_activeSlotIndex < 0) {
+        } else if (_activeSlotIndex < 0 &&
+            (!stashed || (!_physicalBoardHeld && !_activePhysicalReference))) {
             return;
         }
 
         _physicalBoardHeld = false;
+        _pendingPhysicalGrabFrames = 0;
         SetHolsterSlotSuppressed(-1, false);
         if (_activeSlotIndex >= 0) {
             if (!stashed && TryStorePhysicalBoardAtHolster(reference)) {
@@ -1192,6 +1199,7 @@ namespace dragonboard::integrations::vrik
         _activeHandLeft = false;
         _physicalBoardHeld = false;
         _activePhysicalReference.reset();
+        _pendingPhysicalGrabFrames = 0;
         _holsterReassignmentArmed = false;
         _holsterReassignmentCandidate = -1;
         _holsterReassignmentStableFrames = 0;
@@ -1209,12 +1217,11 @@ namespace dragonboard::integrations::vrik
         _holsterReassignmentStableFrames = 0;
         _holsterReassignmentWaitFrames = 0;
         if (_activeSlotIndex < 0) {
-            if (!_activePhysicalReference) {
-                return;
-            }
-
+            const bool hadPhysicalBoardState =
+                _physicalBoardHeld || static_cast<bool>(_activePhysicalReference);
             _physicalBoardHeld = false;
             _activePhysicalReference.reset();
+            _pendingPhysicalGrabFrames = 0;
             auto* player = RE::PlayerCharacter::GetSingleton();
             auto* equipManager = RE::ActorEquipManager::GetSingleton();
             if (player && equipManager && _proxyBaseForm &&
@@ -1226,8 +1233,10 @@ namespace dragonboard::integrations::vrik
                     1,
                     GetHandEquipSlot(_activeHandLeft));
             }
-            logger::info(
-                "DragonBoardVR: initial physical board stored outside an assigned VRIK slot; invisible proxy cleared from the hand.");
+            if (hadPhysicalBoardState) {
+                logger::info(
+                    "DragonBoardVR: initial physical board stored outside an assigned VRIK slot; stale physical state and invisible proxy cleared.");
+            }
             return;
         }
 
@@ -1237,6 +1246,7 @@ namespace dragonboard::integrations::vrik
         _activeHandLeft = false;
         _physicalBoardHeld = false;
         _activePhysicalReference.reset();
+        _pendingPhysicalGrabFrames = 0;
         logger::info(
             "DragonBoardVR: physical board stored; VRIK slot {} proxy restored.",
             restoredSlot);

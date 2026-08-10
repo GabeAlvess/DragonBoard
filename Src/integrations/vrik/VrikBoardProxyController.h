@@ -53,6 +53,7 @@ namespace dragonboard::integrations::vrik
             bool proxyHandLeft);
         void BeginUnassignedPhysicalDraw(bool isLeft);
         void SpawnAndGrabPhysicalBoard(bool isLeft);
+        void ProcessPendingPhysicalGrab();
         void UpdateHolsterAnchor();
         void CaptureHolsterAnchor(std::int32_t slotIndex);
         void ClearHolsterAnchor();
@@ -95,6 +96,8 @@ namespace dragonboard::integrations::vrik
         bool _proxyWeaponCollisionHandLeft = false;
         bool _physicalBoardHeld = false;
         RE::ObjectRefHandle _activePhysicalReference;
+        std::uint32_t _pendingPhysicalGrabFrames = 0;
+        bool _pendingPhysicalGrabHandLeft = false;
         RE::ObjectRefHandle _pendingInitialHolsterReference;
         std::uint32_t _pendingInitialHolsterFrames = 0;
         bool _pendingInitialHolsterStashed = false;

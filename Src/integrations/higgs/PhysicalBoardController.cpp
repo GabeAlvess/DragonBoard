@@ -213,8 +213,7 @@ namespace dragonboard::integrations::higgs
         _mapStoreRestoreHand = false;
         ClearPinnedItemGrabPriority();
         auto& manager = vrui::VRMenuManager::get();
-        manager.closeMenu();
-        manager.clearPhysicalBoardAnchor();
+        manager.preparePhysicalBoardRemoval();
         _heldReference.reset();
         _heldLeft = false;
         _heldPlayerCellFormID = 0;
@@ -276,6 +275,7 @@ namespace dragonboard::integrations::higgs
 
             bool restoredToInventory = false;
             const auto staleReference = _heldReference.get();
+            vrui::VRMenuManager::get().preparePhysicalBoardRemoval();
             if (player && _configuredBaseForm && staleReference) {
                 const auto countBefore = player->GetItemCount(_configuredBaseForm);
                 player->PickUpObject(staleReference.get(), 1, false, false);
@@ -305,9 +305,6 @@ namespace dragonboard::integrations::higgs
             dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton()
                 .NotifyPhysicalBoardStored();
             ClearPinnedItemGrabPriority();
-            auto& manager = vrui::VRMenuManager::get();
-            manager.closeMenu();
-            manager.clearPhysicalBoardAnchor();
             _heldReference.reset();
             _heldLeft = false;
             _heldPlayerCellFormID = 0;
@@ -399,8 +396,7 @@ namespace dragonboard::integrations::higgs
 
         ClearPinnedItemGrabPriority();
         auto& manager = vrui::VRMenuManager::get();
-        manager.closeMenu();
-        manager.clearPhysicalBoardAnchor();
+        manager.preparePhysicalBoardRemoval();
 
         _mapStoreRestoreHand = !g_higgsInterface->IsDisabled(_mapStoreLeft);
         if (_mapStoreRestoreHand) {
@@ -704,13 +700,11 @@ namespace dragonboard::integrations::higgs
             }
         }
 
-        dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton()
-            .NotifyPhysicalBoardReleased(reference, stashed);
-
         ClearPinnedItemGrabPriority();
         auto& manager = vrui::VRMenuManager::get();
-        manager.closeMenu();
-        manager.clearPhysicalBoardAnchor();
+        manager.preparePhysicalBoardRemoval();
+        dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton()
+            .NotifyPhysicalBoardReleased(reference, stashed);
         _heldReference.reset();
         _heldLeft = false;
         _heldPlayerCellFormID = 0;

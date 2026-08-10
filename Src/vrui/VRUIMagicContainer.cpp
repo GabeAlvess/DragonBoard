@@ -76,9 +76,26 @@ namespace vrui
                 type == RE::MagicSystem::SpellType::kAddiction;
         }
 
+        bool isVisibleSpell(const RE::SpellItem* spell)
+        {
+            if (!spell || !spell->GetPlayable() || spell->IsDeleted() || spell->IsIgnored()) {
+                return false;
+            }
+            const char* name = spell->GetName();
+            if (!name || !*name) return false;
+
+            return std::any_of(
+                spell->effects.begin(), spell->effects.end(),
+                [](const RE::Effect* effect) {
+                    return effect && effect->baseEffect &&
+                        !effect->baseEffect->data.flags.all(
+                            RE::EffectSetting::EffectSettingData::Flag::kHideInUI);
+                });
+        }
+
         bool isSupportedSpell(const RE::SpellItem* spell)
         {
-            return spell &&
+            return isVisibleSpell(spell) &&
                 (spell->GetSpellType() == RE::MagicSystem::SpellType::kSpell ||
                  isPower(spell) ||
                  isPassive(spell));

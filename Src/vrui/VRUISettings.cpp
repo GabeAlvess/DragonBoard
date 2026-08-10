@@ -1539,7 +1539,7 @@ namespace vrui
         ini.SetValue("FixedButtons", "sSysLabel",     bSysLabel.c_str(),     "; Displayed name of the System button");
         ini.SetValue("FixedButtons", "sSysAction",    bSysAction.c_str(),    "; Action: Settings or menu name");
         ini.SetValue("FixedButtons", "sSaveLabel",    bSaveLabel.c_str(),    "; Displayed name of the Save button");
-        ini.SetValue("FixedButtons", "sSaveAction",   bSaveAction.c_str(),   "; Action: QuickSave");
+        ini.SetValue("FixedButtons", "sSaveAction",   bSaveAction.c_str(),   "; Action: Save");
         ini.SetValue("FixedButtons", "sModsLabel",    bModsLabel.c_str(),    "; Displayed name of the Mods button");
         ini.SetValue("FixedButtons", "sModsAction",   bModsAction.c_str(),   "; Action: ModsPanel");
         ini.SetValue("FixedButtons", "sFavLabel",     bFavLabel.c_str(),     "; Displayed name of the Journal button");

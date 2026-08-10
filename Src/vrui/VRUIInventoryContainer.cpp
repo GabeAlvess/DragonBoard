@@ -73,6 +73,15 @@ namespace vrui
             }
         }
 
+        bool isVisibleInventoryItem(const RE::TESBoundObject* item)
+        {
+            if (!item || !item->GetPlayable() || item->IsDeleted() || item->IsIgnored()) {
+                return false;
+            }
+            const char* name = item->GetName();
+            return name && *name;
+        }
+
         std::string resolveInventoryCategory(RE::TESBoundObject* item)
         {
             if (!item) return "Item";
@@ -512,6 +521,7 @@ namespace vrui
         if (!player) return;
 
         auto inventory = player->GetInventory([this](RE::TESBoundObject& a_obj) {
+            if (!isVisibleInventoryItem(&a_obj)) return false;
             if (_filter == InventoryFilterMode::QuestItems) return true;
             return a_obj.Is(RE::FormType::Weapon)
                 || a_obj.Is(RE::FormType::Armor)
@@ -528,7 +538,7 @@ namespace vrui
 
         std::vector<std::pair<RE::TESBoundObject*, std::pair<int32_t, RE::InventoryEntryData*>>> validItems;
         for (auto& [item, data] : inventory) {
-            if (!item || data.first <= 0) continue;
+            if (!isVisibleInventoryItem(item) || data.first <= 0) continue;
             if (!passesFilter(
                     item,
                     _filter,
@@ -698,7 +708,8 @@ namespace vrui
 
         auto inventory = player->GetInventory([this](RE::TESBoundObject& item) {
             return item.formID == kGoldFormID ||
-                (_filter == InventoryFilterMode::QuestItems ? true : isSupportedInventoryItem(item));
+                (isVisibleInventoryItem(&item) &&
+                 (_filter == InventoryFilterMode::QuestItems ? true : isSupportedInventoryItem(item)));
         });
         snapshot.items.reserve(inventory.size());
 
@@ -708,6 +719,7 @@ namespace vrui
                 snapshot.gold = data.first;
                 continue;
             }
+            if (!isVisibleInventoryItem(item)) continue;
             const bool favorited = data.second && data.second->IsFavorited();
             if (!passesFilter(item, _filter, favorited)) continue;
 
@@ -797,14 +809,16 @@ namespace vrui
 
         auto inventory = player->GetInventory([](RE::TESBoundObject& item) {
             return item.formID == kGoldFormID ||
-                isSupportedInventoryItem(item) ||
-                (item.formFlags & 0x400u) != 0;
+                (isVisibleInventoryItem(&item) &&
+                 (isSupportedInventoryItem(item) ||
+                  (item.formFlags & 0x400u) != 0));
         });
 
         std::vector<std::uint64_t> rows;
         rows.reserve(inventory.size());
         for (const auto& [item, data] : inventory) {
             if (!item || data.first <= 0) continue;
+            if (item->formID != kGoldFormID && !isVisibleInventoryItem(item)) continue;
             std::uint64_t row =
                 (static_cast<std::uint64_t>(item->formID) << 32) |
                 static_cast<std::uint32_t>(data.first);

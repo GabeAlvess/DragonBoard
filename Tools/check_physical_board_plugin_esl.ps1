@@ -18,6 +18,8 @@ $expectedRecords = @{
     'STAT' = 0x00000802
 }
 $foundRecords = @{}
+$containerOverrideCount = 0
+$leveledListOverrideCount = 0
 
 function Read-Records([int]$start, [int]$end) {
     $offset = $start
@@ -37,9 +39,16 @@ function Read-Records([int]$start, [int]$end) {
         if ($nextOffset -gt $end) {
             throw "DragonBoardVR.esp has an invalid $signature record at offset $offset"
         }
+        $localFormId =
+            [BitConverter]::ToUInt32($bytes, $offset + 12) -band 0x00FFFFFF
         if ($expectedRecords.ContainsKey($signature)) {
-            $foundRecords[$signature] =
-                [BitConverter]::ToUInt32($bytes, $offset + 12) -band 0x00FFFFFF
+            $foundRecords[$signature] = $localFormId
+        }
+        if ($signature -eq 'CONT') {
+            $script:containerOverrideCount++
+        }
+        if ($signature -eq 'LVLI') {
+            $script:leveledListOverrideCount++
         }
         $offset = $nextOffset
     }
@@ -59,4 +68,24 @@ foreach ($record in $expectedRecords.GetEnumerator()) {
     }
 }
 
+if ($containerOverrideCount -ne 0) {
+    throw "DragonBoardVR.esp contains $containerOverrideCount merchant container override(s)"
+}
+if ($leveledListOverrideCount -ne 0) {
+    throw "DragonBoardVR.esp contains $leveledListOverrideCount LVLI override(s); expected 0"
+}
+
+$skyPatcherConfig = Join-Path $PSScriptRoot `
+    '..\Assets\integrations\skypatcher\SKSE\Plugins\SkyPatcher\leveledList\DragonBoardVR\DragonBoardVR.esp.ini'
+$skyPatcherRule = @(Get-Content -LiteralPath $skyPatcherConfig |
+    Where-Object { $_ -and -not $_.TrimStart().StartsWith(';') })
+if ($skyPatcherRule.Count -ne 1 -or
+    -not $skyPatcherRule[0].StartsWith('filterByLLs=Skyrim.esm|0009AF0A:addToLLs=')) {
+    throw 'DragonBoardVR SkyPatcher leveled-list rule is missing or targets the wrong list'
+}
+$skyPatcherEntryCount =
+    ([regex]::Matches($skyPatcherRule[0], 'DragonBoardVRPhysicalBoard~1~1~0')).Count
+if ($skyPatcherEntryCount -ne 10) {
+    throw "DragonBoardVR SkyPatcher rule contains $skyPatcherEntryCount weighted entries; expected 10"
+}
 Write-Output 'physical board plugin ESL contract: ok'

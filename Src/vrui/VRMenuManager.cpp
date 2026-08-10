@@ -119,6 +119,13 @@ namespace vrui
         _refreshCoordinator.RequestTransforms();
     }
 
+    void VRMenuManager::preparePhysicalBoardRemoval()
+    {
+        dragonboard::ui::rml::RmlPanelHost::GetSingleton().Close();
+        dragonboard::ui::menu::MenuLifecycleController::ApplySafeClose(*this);
+        clearPhysicalBoardAnchor();
+    }
+
     void VRMenuManager::clearPhysicalBoardAnchor()
     {
         _physicalBoardAnchor.reset();

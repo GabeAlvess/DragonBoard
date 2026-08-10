@@ -125,6 +125,7 @@ namespace vrui
             RE::NiNode* anchor,
             bool heldInLeftHand,
             RE::FormID referenceFormID);
+        void preparePhysicalBoardRemoval();
         void clearPhysicalBoardAnchor();
         void openMenuForPhysicalBoard();
         bool isPhysicalBoardActive() const { return _physicalBoardAnchor != nullptr; }

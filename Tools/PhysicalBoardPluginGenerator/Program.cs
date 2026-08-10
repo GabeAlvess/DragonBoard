@@ -6,8 +6,6 @@ const uint physicalBoardLocalFormId = 0x000800;
 const uint vrikProxyLocalFormId = 0x000801;
 const uint vrikProxyFirstPersonLocalFormId = 0x000802;
 const uint ironDaggerFormId = 0x01397E;
-const uint belethorMerchantChestFormId = 0x09CAF8;
-const int belethorStockCount = 3;
 const string pluginName = "DragonBoardVR.esp";
 
 var outputPath = args.Length > 0
@@ -91,26 +89,6 @@ proxyBasicStats.Weight = 0.0f;
 proxyBasicStats.Damage = 0;
 proxyData.AnimationType = WeaponAnimationType.OneHandDagger;
 
-var belethorMerchantChest = skyrim.Containers.FirstOrDefault(
-    container => container.FormKey == new FormKey(skyrimModKey, belethorMerchantChestFormId));
-if (belethorMerchantChest is null)
-{
-    throw new InvalidOperationException(
-        $"Could not find Belethor's merchant chest 0x{belethorMerchantChestFormId:X6} in {skyrimMasterPath}.");
-}
-
-var belethorMerchantChestOverride = belethorMerchantChest.DeepCopy();
-belethorMerchantChestOverride.Items ??= [];
-belethorMerchantChestOverride.Items.Add(new ContainerEntry
-{
-    Item = new ContainerItem
-    {
-        Item = new FormLink<IItemGetter>(physicalBoard.FormKey),
-        Count = belethorStockCount
-    }
-});
-mod.Containers.Add(belethorMerchantChestOverride);
-
 mod.WriteToBinary(outputPath);
 
 Console.WriteLine($"Generated {outputPath}");
@@ -119,7 +97,6 @@ Console.WriteLine($"VRIK proxy local FormID: 0x{vrikProxyLocalFormId:X6}");
 Console.WriteLine($"VRIK visible setup first-person local FormID: 0x{vrikProxyFirstPersonLocalFormId:X6}");
 Console.WriteLine($"VRIK proxy equipment type: {vrikProxy.EquipmentType.FormKey}");
 Console.WriteLine($"Base value: {physicalBoard.Value} gold");
-Console.WriteLine($"Belethor stock: {belethorStockCount} per merchant chest reset");
 
 static string ResolveSkyrimMasterPath(string[] arguments)
 {

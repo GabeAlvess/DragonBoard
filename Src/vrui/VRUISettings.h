@@ -315,7 +315,7 @@ namespace vrui
         float bSysScale = 0.800000f;   
 
         std::string bSaveLabel  = "Save";      
-        std::string bSaveAction = "QuickSave";  
+    std::string bSaveAction = "Save";
         float bSavePosX = 14.000000f; float bSavePosY = 0.250000f; float bSavePosZ = 8.000000f;
         float bSaveRotX = 0.000000f; float bSaveRotY = 0.000000f; float bSaveRotZ = -20.000000f;
         float bSaveScale = 1.099043f;

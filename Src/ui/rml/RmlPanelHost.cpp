@@ -1248,6 +1248,7 @@ namespace dragonboard::ui::rml
 
     bool RmlPanelHost::OpenDeveloper()
     {
+        const auto openStart = std::chrono::steady_clock::now();
         if (!EnsurePresentHookInstalled()) {
             logger::error("DragonBoardVR: RmlUi Developer render hook unavailable.");
             return false;
@@ -1264,11 +1265,14 @@ namespace dragonboard::ui::rml
         ResetPanelInput();
         _activeExternalPanel.store(DragonBoardVR_API::InvalidPanel);
         _devInfoRefreshAccumulator = 0.0f;
-        _performanceMetrics.ResetPresentHistory();
         _localPanelMode.store(LocalPanelMode::kDeveloper);
         _rmlDeveloperSyncPending.store(true);
         _rmlDeveloperInfoSyncPending.store(true);
         _visible.store(true);
+        logger::info(
+            "DragonBoardVR: Developer panel game-thread preparation completed in {:.3f} ms.",
+            std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - openStart).count());
         return true;
     }
 
@@ -4729,10 +4733,11 @@ namespace dragonboard::ui::rml
         const bool welcomeRmlActive = panelMode == LocalPanelMode::kWelcome &&
             _rmlUi && _rmlUi->IsWelcomeReady();
         const auto externalPanel = _activeExternalPanel.load();
-        if (!_lastRmlPanelModePresentThread ||
+        const bool panelChanged = !_lastRmlPanelModePresentThread ||
             *_lastRmlPanelModePresentThread != panelMode ||
             (panelMode == LocalPanelMode::kExternal &&
-             _lastRmlExternalPanelPresentThread != externalPanel)) {
+             _lastRmlExternalPanelPresentThread != externalPanel);
+        if (panelChanged) {
             _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
             _lastRmlPanelModePresentThread = panelMode;
             _lastRmlExternalPanelPresentThread = externalPanel;
@@ -4759,6 +4764,7 @@ namespace dragonboard::ui::rml
                     _renderScheduler.MarkDirty(RmlDirtyReason::kData);
                 }
             } else if (developerRmlActive) {
+                const auto developerSyncStart = std::chrono::steady_clock::now();
                 _rmlUi->ShowDeveloper();
                 if (_rmlDeveloperSyncPending.exchange(false)) {
                     SyncRmlDeveloperCommands();
@@ -4766,10 +4772,16 @@ namespace dragonboard::ui::rml
                 }
                 _developerInfoPresentAccumulator += std::clamp(deltaTime, 0.0f, 0.1f);
                 if (_rmlDeveloperInfoSyncPending.exchange(false) ||
-                    _developerInfoPresentAccumulator >= 0.25f) {
+                    _developerInfoPresentAccumulator >= 1.0f) {
                     _developerInfoPresentAccumulator = 0.0f;
                     SyncRmlDeveloperInfo();
                     _renderScheduler.MarkDirty(RmlDirtyReason::kData);
+                }
+                if (panelChanged) {
+                    logger::info(
+                        "DragonBoardVR: Developer panel first Present sync completed in {:.3f} ms.",
+                        std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - developerSyncStart).count());
                 }
             } else if (itemEditRmlActive) {
                 _rmlUi->ShowItemEdit();
@@ -5387,6 +5399,16 @@ namespace dragonboard::ui::rml
                 const float frameSeconds =
                     std::clamp(deltaTime, 1.0f / 240.0f, 0.1f);
                 const auto& timing = _rmlUi->GetLastRenderTiming();
+                if (developerRmlActive && panelChanged) {
+                    logger::info(
+                        "DragonBoardVR: Developer panel first render completed in {:.3f} ms "
+                        "(update={:.3f}, render={:.3f}, dx11={:.3f}, elements={}).",
+                        timing.totalMs,
+                        timing.updateMs,
+                        timing.renderMs,
+                        timing.dx11StateMs + timing.dx11ResourcesMs,
+                        timing.domElements);
+                }
                 RmlPerformanceMetrics::RenderTiming metricsTiming;
                 metricsTiming.updateMs = timing.updateMs;
                 metricsTiming.beginFrameMs = timing.beginFrameMs;

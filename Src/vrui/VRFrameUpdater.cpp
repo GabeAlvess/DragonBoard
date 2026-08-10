@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "bootstrap/PluginLifecycle.h"
 #include "VRFrameUpdater.h"
 #include "VRMenuManager.h"
 #include "VRUISettings.h"
@@ -101,6 +102,7 @@ namespace vrui
                     }
 
                     VRMenuManager::get().onFrameUpdate(deltaTime);
+                    dragonboard::bootstrap::UpdateGameThread();
                     dragonboard::ui::rml::RmlPanelHost::GetSingleton().UpdateGameThread(deltaTime);
                     ModActionManager::get().update(deltaTime);
                 });

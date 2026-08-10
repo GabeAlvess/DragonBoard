@@ -78,6 +78,9 @@ target('DragonBoardVR')
     add_installfiles('Assets/integrations/spellwheel/SKSE/Plugins/SpellWheelVR_CustomConsoleCommand_DragonBoardVR.ini', {
         prefixdir = 'SKSE/Plugins'
     })
+    add_installfiles('Assets/integrations/skypatcher/SKSE/Plugins/SkyPatcher/leveledList/DragonBoardVR/DragonBoardVR.esp.ini', {
+        prefixdir = 'SKSE/Plugins/SkyPatcher/leveledList/DragonBoardVR'
+    })
     add_installfiles('Assets/meshes/DragonBoardVR/RmlUIScreen.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
@@ -134,6 +137,17 @@ target('DragonBoardVR')
         local vrikProxyNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy.nif')
         local vrikProxyHiddenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy_hidden.nif')
         local physicalBoardPlugin = path.join(os.projectdir(), 'Assets', 'DragonBoardVR.esp')
+        local skyPatcherLeveledList = path.join(
+            os.projectdir(),
+            'Assets',
+            'integrations',
+            'skypatcher',
+            'SKSE',
+            'Plugins',
+            'SkyPatcher',
+            'leveledList',
+            'DragonBoardVR',
+            'DragonBoardVR.esp.ini')
         local iconPlaneNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'iconplane.nif')
         local categoryMarkerNifs = path.join(
             os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'DBMarker*.nif')
@@ -186,6 +200,11 @@ target('DragonBoardVR')
         os.cp(vrikProxyNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy.nif'))
         os.cp(vrikProxyHiddenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy_hidden.nif'))
         os.cp(physicalBoardPlugin, path.join(installRoot, 'DragonBoardVR.esp'))
+        local installedSkyPatcherDir = path.join(
+            outputDir, 'SkyPatcher', 'leveledList', 'DragonBoardVR')
+        os.mkdir(installedSkyPatcherDir)
+        os.cp(skyPatcherLeveledList, path.join(
+            installedSkyPatcherDir, 'DragonBoardVR.esp.ini'))
         os.cp(iconPlaneNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'iconplane.nif'))
         os.cp(categoryMarkerNifs, path.join(installRoot, 'meshes', 'DragonBoardVR'))
         os.cp(

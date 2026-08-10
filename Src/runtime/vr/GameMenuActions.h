@@ -4,6 +4,6 @@
 
 namespace dragonboard::runtime::vr
 {
-    void QueueQuickSave();
+    void QueueNewSave();
     void ShowGameMenu(const std::string& menuName);
 }
