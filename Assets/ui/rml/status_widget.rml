@@ -5,7 +5,14 @@
 </head>
 <body>
     <div class="status-panel">
-        <div id="status-location" class="location">SKYRIM</div>
+        <div class="stat-block name-block">
+            <span id="status-name" class="value player-name">DRAGONBORN</span>
+        </div>
+        <div class="separator"></div>
+        <div class="stat-block level-block">
+            <span class="label">LEVEL</span>
+            <span id="status-level" class="value">1</span>
+        </div>
         <div class="separator"></div>
         <div class="stat-block gold-block">
             <span class="label">GOLD</span>
@@ -14,7 +21,9 @@
         <div class="separator"></div>
         <div class="stat-block weight-block">
             <span class="label">WEIGHT</span>
-            <span id="status-weight" class="value">0 / 0</span>
+            <span id="status-weight-current" class="value">0</span>
+            <span class="value weight-divider"> / </span>
+            <span id="status-weight-capacity" class="value">0</span>
         </div>
         <div id="vr-cursor"></div>
     </div>

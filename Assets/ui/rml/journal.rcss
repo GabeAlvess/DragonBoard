@@ -416,6 +416,36 @@
     font-size: 28px;
 }
 
+.journal-skill-values {
+    width: 58%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.journal-skills-card .journal-skill-values .journal-skill-level {
+    width: 70px;
+    color: #70c878;
+    font-size: 31px;
+    text-align: right;
+}
+
+.journal-skill-experience {
+    width: 198px;
+    margin-left: 16px;
+    overflow: hidden;
+    color: #b8b9b9;
+    font-size: 25px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.journal-number-value {
+    color: #70c878;
+}
+
 .journal-footer {
     position: relative;
     width: 1448px;
@@ -1223,6 +1253,10 @@
     font-size: 25px;
 }
 
+.journal-app.lang-ru .journal-skills-card .journal-skill-values {
+    width: 52%;
+}
+
 .journal-app .last-info-card .journal-stat-label {
     width: 84%;
 }
@@ -1244,4 +1278,129 @@
 .journal-app.lang-ru .journal-track-button span {
     width: 100%;
     white-space: nowrap;
+}
+
+/* Full-page Statistics composition aligned to Statistics.jpg ornaments. */
+.journal-statistics-background {
+    display: none;
+}
+
+.journal-app.journal-statistics-mode .journal-quests-background {
+    display: none;
+}
+
+.journal-app.journal-statistics-mode .journal-statistics-background {
+    display: block;
+}
+
+.journal-top-tabs {
+    left: auto;
+    right: 95px;
+}
+
+.journal-app.journal-statistics-mode .journal-footer {
+    display: none;
+}
+
+.journal-app.journal-statistics-mode .journal-sidebar {
+    position: absolute;
+    z-index: 2;
+    left: 0;
+    top: 0;
+    width: 468px;
+    height: 145px;
+    display: block;
+    background-color: transparent;
+    border: 0px transparent;
+}
+
+.journal-app.journal-statistics-mode .journal-quest-filters,
+.journal-app.journal-statistics-mode .journal-quest-list {
+    display: none;
+}
+
+.journal-app.journal-statistics-mode .journal-shell,
+.journal-app.journal-statistics-mode .journal-header,
+.journal-app.journal-statistics-mode .journal-main {
+    width: 1920px;
+}
+
+.journal-app.journal-statistics-mode .journal-shell {
+    height: 1080px;
+}
+
+.journal-app.journal-statistics-mode .journal-header {
+    height: 145px;
+}
+
+.journal-app.journal-statistics-mode .journal-main {
+    height: 935px;
+    padding: 24px 95px 32px;
+}
+
+.journal-app.journal-statistics-mode #journal-page-stats,
+.journal-app.journal-statistics-mode .journal-stats-grid {
+    width: 1730px;
+    height: 879px;
+}
+
+.journal-app.journal-statistics-mode .journal-stats-grid {
+    justify-content: center;
+}
+
+.journal-app.journal-statistics-mode .journal-stat-card {
+    width: 450px;
+    height: 879px;
+    min-height: 879px;
+    margin-right: 20px;
+    padding: 26px 30px;
+    background-color: rgba(8, 9, 9, 158);
+    border: 1px rgba(100, 102, 102, 120);
+}
+
+.journal-app.journal-statistics-mode .journal-skills-card {
+    width: 760px;
+}
+
+.journal-app.journal-statistics-mode .last-info-card {
+    width: 480px;
+    margin-right: 0;
+}
+
+.journal-app.journal-statistics-mode .journal-stat-card .subheading {
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    font-size: 42px;
+}
+
+.journal-app.journal-statistics-mode .journal-stat-row,
+.journal-app.journal-statistics-mode .journal-skills-card .journal-skill-level {
+    font-size: 42px;
+}
+
+.journal-app.journal-statistics-mode .journal-skills-card .journal-stat-label {
+    width: 45%;
+}
+
+.journal-app.journal-statistics-mode .journal-skill-values {
+    width: 55%;
+}
+
+.journal-app.journal-statistics-mode .journal-skill-experience {
+    width: 250px;
+    font-size: 34px;
+}
+
+.journal-sidebar .brand-name {
+    position: absolute;
+    z-index: 2;
+    left: 96px;
+    top: 72px;
+    width: 450px;
+    height: 62px;
+    align-items: flex-end;
+    justify-content: flex-start;
+    color: #eeeeee;
+    font-size: 66px;
+    text-align: left;
 }

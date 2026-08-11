@@ -414,6 +414,7 @@ namespace dragonboard::ui::rml
         {
             std::string label;
             std::string value;
+            std::string secondaryValue;
         };
 
         struct JournalInfo
@@ -644,6 +645,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] HapticCue ResolveClickHaptic(const char* id) const;
         void UpdateSliderValueLabel(const char* id, float value);
         void SelectSettingsPage(const char* page);
+        void SelectTutorialPage(const char* page);
         void SelectDeveloperPage(const char* page);
         void SelectItemEditPage(const char* page);
         void SelectJournalPage(const char* page);

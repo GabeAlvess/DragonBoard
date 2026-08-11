@@ -13,7 +13,7 @@ body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; color: #d8d8d
 .gallery-meta { min-height: 68px; margin-top: 8px; overflow: hidden; color: #d0d1d1; font-size: 42px; line-height: 1.08; }
 .gallery-stage { display: flex; align-items: center; justify-content: center; width: 820px; height: 820px; background-color: transparent; border-right: 1px rgba(104, 108, 108, 150); }
 .gallery-preview-shell { display: flex; align-items: center; justify-content: center; width: 790px; height: 790px; background-color: transparent; border: 2px rgba(150, 154, 154, 170); }
-.gallery-preview { width: 770px; height: 770px; object-fit: contain; background-color: transparent; }
+.gallery-preview { width: 770px; height: 770px; display: none; object-fit: contain; background-color: transparent; }
 .gallery-actions-sidebar { position: relative; display: flex; flex-direction: column; width: 550px; height: 820px; padding: 34px 30px 24px; overflow: hidden; background-color: transparent; }
 button { display: flex; align-items: center; justify-content: center; padding: 0 14px; color: #d0d1d1; font-family: DragonBoard; font-size: 25px; line-height: 1.0; text-align: center; background-color: rgba(26, 27, 27, 224); border: 1px rgba(128, 132, 132, 180); border-radius: 2px; tab-index: auto; }
 button span { display: block; width: 100%; text-align: center; pointer-events: none; }

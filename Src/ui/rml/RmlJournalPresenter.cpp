@@ -129,7 +129,7 @@ namespace dragonboard::ui::rml
                 std::vector<DragonBoardRmlUi::JournalStatInfo>& target) {
                 target.reserve(source.size());
                 for (const auto& entry : source) {
-                    target.push_back({ entry.label, entry.value });
+                    target.push_back({ entry.label, entry.value, entry.secondaryValue });
                 }
             };
             copyStats(_characterStats, info.characterStats);

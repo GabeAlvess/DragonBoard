@@ -20,12 +20,19 @@
                 <span>You'll use this to move pinned items, adjust items in the inventory, and change the position of the buttons.</span>
             </div>
             <div id="welcome-scale-instruction" class="welcome-copy welcome-card welcome-scale-instruction">
-                <span>Use both grips to scale the items. Move your hands apart to make them larger, and bring them closer together to make them smaller.</span>
+                <span>Use Grip + thumb to scale itens and widgets.</span>
             </div>
             <button id="welcome-next-2" class="welcome-next disabled"><span>Next</span></button>
         </section>
 
         <section id="welcome-page-3" class="welcome-page welcome-image-page welcome-page-three">
+            <div class="welcome-copy welcome-card welcome-remove-copy">
+                <span>Grab the item or widget and press<br />B or Y to delete it, depending on which hand you’re using.</span>
+            </div>
+            <button id="welcome-next-3" class="welcome-next"><span>Next</span></button>
+        </section>
+
+        <section id="welcome-page-4" class="welcome-page welcome-image-page welcome-page-four">
             <div class="welcome-copy welcome-card welcome-instruction welcome-inventory-copy">
                 <span>You can use either the pointer or finger touch. Try opening the inventory by pressing the trigger or touching this button.</span>
             </div>

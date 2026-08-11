@@ -354,10 +354,6 @@ h1 {
     border-bottom: 1px #d2c2a8;
 }
 
-.setting-row:last-child {
-    border-bottom-width: 0;
-}
-
 .setting-row:hover,
 .setting-row.featured:hover {
     background-color: #f1e2c9;
@@ -1406,12 +1402,13 @@ footer {
 
 .brand-copy {
     width: 468px;
+    margin-top: 24px;
     text-align: center;
 }
 
 .brand-name {
     color: #eeeeee;
-    font-size: 54px;
+    font-size: 66px;
 }
 
 .section-label {
@@ -1464,9 +1461,70 @@ footer {
 }
 
 header {
+    position: relative;
     height: 145px;
+    overflow: hidden;
     padding: 0 72px 0 96px;
-    border-bottom: 1px rgba(120, 122, 122, 90);
+    border-bottom: 0px transparent;
+}
+
+.settings-top-tabs {
+    position: absolute;
+    right: 108px;
+    top: 38px;
+    display: none;
+}
+
+.settings-top-tab {
+    width: 310px;
+    min-width: 310px;
+    height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 18px;
+    padding: 0;
+    color: #e5dcde;
+    font-size: 42px;
+    line-height: 1.0;
+    text-align: center;
+    background-color: #1a0a0d;
+    border: 1px #382026;
+    border-radius: 3px;
+}
+
+.settings-top-tab span {
+    display: block;
+}
+
+.settings-top-tab:hover,
+.settings-top-tab.active {
+    color: #fff1f2;
+    background-color: #2c0d12;
+    border-color: #452027;
+}
+
+.tutorial-header-title {
+    position: absolute;
+    z-index: 5;
+    left: 52px;
+    top: 45px;
+    width: 1310px;
+    height: 90px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #eeeeee;
+    font-size: 58px;
+    line-height: 1.0;
+    text-align: center;
+}
+
+.tutorial-header-title span {
+    display: block;
+    width: 100%;
+    text-align: center;
+    pointer-events: none;
 }
 
 .breadcrumb {
@@ -1485,7 +1543,7 @@ header {
 
 main {
     height: 781px;
-    padding: 28px 42px 24px 96px;
+    padding: 0 42px 24px;
 }
 
 .page,
@@ -1510,6 +1568,150 @@ h1 {
 .settings-card {
     background-color: transparent;
     border-color: rgba(100, 102, 102, 120);
+}
+
+.tutorial-card-grid {
+    width: 1310px;
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 24px;
+}
+
+.tutorial-card {
+    position: relative;
+    z-index: 2;
+    width: 638px;
+    height: 152px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 34px 24px 0;
+    padding: 20px 30px;
+    color: #eeeeee;
+    font-size: 60px;
+    line-height: 1.15;
+    text-align: center;
+    background-color: rgba(16, 17, 17, 145);
+    border: 1px rgba(90, 92, 92, 105);
+    border-radius: 3px;
+    pointer-events: auto;
+    tab-index: auto;
+}
+
+.tutorial-card-right {
+    margin-right: 0;
+}
+
+#tutorial-card-journal,
+#tutorial-card-gallery {
+    border-top: 2px rgba(90, 92, 92, 145);
+}
+
+.tutorial-card:hover,
+.tutorial-card:active {
+    color: #ffffff;
+    background-color: rgba(44, 13, 18, 205);
+    border-color: #5d343c;
+}
+
+.tutorial-card span,
+.tutorial-back span {
+    pointer-events: none;
+}
+
+.tutorial-detail-page {
+    position: relative;
+    width: 1310px;
+    min-height: 757px;
+    height: auto;
+    display: none;
+    padding-bottom: 120px;
+}
+
+.tutorial-back {
+    position: absolute;
+    z-index: 3;
+    right: 0;
+    bottom: -7px;
+    width: 210px;
+    height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e5dcde;
+    font-size: 36px;
+    background-color: #2c0d12;
+    border: 1px #452027;
+    border-radius: 3px;
+    pointer-events: auto;
+    tab-index: auto;
+}
+
+.tutorial-back:hover,
+.tutorial-back:active {
+    color: #fff1f2;
+    background-color: #3b1218;
+    border-color: #5d343c;
+}
+
+.tutorial-instruction-list {
+    width: 1310px;
+}
+
+.tutorial-instruction-card {
+    width: 1310px;
+    min-height: 188px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    padding: 26px 38px;
+    color: #c8caca;
+    text-align: center;
+    background-color: rgba(16, 17, 17, 145);
+    border: 1px rgba(90, 92, 92, 105);
+    border-top: 2px rgba(90, 92, 92, 145);
+    border-radius: 3px;
+}
+
+.tutorial-instruction-label {
+    display: block;
+    width: 100%;
+    color: #ffffff;
+    font-size: 64px;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.tutorial-instruction-description {
+    display: block;
+    width: 100%;
+    margin-top: 18px;
+    color: #c8caca;
+    font-size: 40px;
+    line-height: 1.24;
+    text-align: center;
+}
+
+.tutorial-keyword {
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.tutorial-color-red {
+    color: #d44747;
+    font-weight: bold;
+}
+
+.tutorial-color-blue {
+    color: #5c9ee8;
+    font-weight: bold;
+}
+
+.tutorial-color-yellow {
+    color: #e7c84a;
+    font-weight: bold;
 }
 
 .setting-row {
@@ -1538,6 +1740,79 @@ h1 {
     color: #dedede;
     background-color: rgba(0, 0, 0, 150);
     border-color: #555757;
+}
+
+.item-scale-row .setting-copy {
+    width: 440px;
+}
+
+.item-scale-row input.range {
+    width: 570px;
+    margin-left: 0;
+    margin-right: 12px;
+}
+
+.scale-stepper {
+    position: relative;
+    z-index: 4;
+    width: 210px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    background-color: rgba(0, 0, 0, 150);
+    border: 1px #555757;
+    border-radius: 5px;
+}
+
+.scale-stepper .value {
+    width: 122px;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+    border: 0px transparent;
+    border-radius: 0;
+}
+
+.scale-step-button {
+    position: relative;
+    z-index: 5;
+    width: 44px;
+    min-width: 44px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #dedede;
+    font-size: 42px;
+    line-height: 1.0;
+    text-align: center;
+    pointer-events: auto;
+    tab-index: auto;
+    background-color: transparent;
+    border: 0px transparent;
+}
+
+.scale-step-button span {
+    display: block;
+    width: 44px;
+    text-align: center;
+    pointer-events: none;
+}
+
+.scale-stepper:hover {
+    color: #ffffff;
+    background-color: #2c0d12;
+    border-color: #8b8d8d;
+}
+
+.scale-step-button:hover,
+.scale-step-button:active {
+    color: #ffffff;
+    background-color: transparent;
+    border-color: transparent;
 }
 
 input.range slidertrack {
@@ -1698,8 +1973,20 @@ input.range sliderbar:active {
 
 footer {
     height: 150px;
+    align-items: flex-start;
     padding: 0 72px 0 96px;
     border-top: 1px rgba(120, 122, 122, 70);
+}
+
+#save {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+#save span {
+    margin-top: 4px;
 }
 
 main scrollbarvertical {

@@ -12,8 +12,8 @@ namespace dragonboard::ui::rml
     namespace
     {
         constexpr const char* kContextName = "dragonboard_status_surface";
-        constexpr int kLogicalWidth = 250;
-        constexpr int kLogicalHeight = 32;
+        constexpr int kLogicalWidth = 950;
+        constexpr int kLogicalHeight = 80;
         constexpr std::array<const char*, 3> kDocumentCandidates{
             "Data/SKSE/Plugins/DragonBoardVR/ui/status_widget.rml",
             "SKSE/Plugins/DragonBoardVR/ui/status_widget.rml",
@@ -61,15 +61,23 @@ namespace dragonboard::ui::rml
     }
 
     void StatusWidget::SetData(
-        std::int32_t gold, float weight, float capacity, std::string location)
+        std::string name,
+        std::uint16_t level,
+        std::int32_t gold,
+        float weight,
+        float capacity)
     {
         auto* document = _surface.GetDocument();
+        SetText(document, "status-name", EscapeRml(name.empty() ? "DRAGONBORN" : name));
+        SetText(document, "status-level", std::to_string(level));
         SetText(document, "status-gold", std::to_string(gold));
-        SetText(document, "status-weight", Rml::CreateString("%.1f / %.0f", weight, capacity));
-        SetText(
-            document,
-            "status-location",
-            EscapeRml(location.empty() ? "SKYRIM" : location));
+        SetText(document, "status-weight-current", Rml::CreateString("%.0f", weight));
+        SetText(document, "status-weight-capacity", Rml::CreateString("%.0f", capacity));
+        if (document) {
+            if (auto* currentWeight = document->GetElementById("status-weight-current")) {
+                currentWeight->SetClass("overloaded", weight > capacity);
+            }
+        }
         _surface.MarkDirty();
     }
 

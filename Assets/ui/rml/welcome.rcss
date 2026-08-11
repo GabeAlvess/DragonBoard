@@ -41,7 +41,15 @@ body {
     decorator: image("assets/Tutorials/Welcome2_tutorial.jpg" fill);
 }
 
+.welcome-page-two.scale-instruction {
+    decorator: image("assets/Tutorials/Scale Instructions.jpg" fill);
+}
+
 .welcome-page-three {
+    decorator: image("assets/Tutorials/remove.jpg" fill);
+}
+
+.welcome-page-four {
     decorator: image("assets/Tutorials/Welcome3_tutorial.jpg" fill);
 }
 
@@ -124,6 +132,15 @@ body {
     top: 330px;
     width: 820px;
     height: 420px;
+    font-size: 40px;
+    line-height: 1.26;
+}
+
+.welcome-remove-copy {
+    left: 690px;
+    top: 360px;
+    width: 540px;
+    height: 360px;
     font-size: 40px;
     line-height: 1.26;
 }

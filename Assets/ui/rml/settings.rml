@@ -8,30 +8,29 @@
         <aside>
             <div class="brand">
                 <div class="brand-copy">
-                    <div class="brand-name">DragonBoard</div>
+                    <div class="brand-name">Settings</div>
                 </div>
             </div>
 
-            <div class="section-label">SETTINGS</div>
             <button id="tab-general" class="nav-item"><i class="fade-layer"></i><span>General</span></button>
             <button id="tab-visuals" class="nav-item"><i class="fade-layer"></i><span>Visuals</span></button>
-            <button id="tab-items" class="nav-item"><i class="fade-layer"></i><span>Item scale</span></button>
             <button id="tab-widgets" class="nav-item"><i class="fade-layer"></i><span>Widgets</span></button>
             <button id="tab-tutorials" class="nav-item"><i class="fade-layer"></i><span>Tutorials</span></button>
         </aside>
 
         <div class="content-shell">
             <header>
-                <div class="breadcrumb"><span class="breadcrumb-muted">Configuration</span><span class="breadcrumb-slash">/</span><span>DragonBoard</span></div>
+                <div id="visuals-top-tabs" class="settings-top-tabs">
+                    <button id="tab-items" class="settings-top-tab"><span>Item scale</span></button>
+                </div>
+                <div id="tutorial-header-title" class="tutorial-header-title"><span id="tutorial-header-title-text"></span></div>
             </header>
 
             <main id="page-scroll">
                 <section id="page-general" class="page">
-                    <h1>General</h1>
-                    <p class="lead">Adjust the overall size and spacing of your board.</p>
                     <div class="settings-card">
                         <div class="setting-row toggle-setting">
-                            <div class="setting-copy"><span class="setting-label">Lock Pins</span><span class="setting-help">Prevent pinned items from being edited, grabbed or removed</span></div>
+                            <div class="setting-copy"><span class="setting-label">Lock Pins</span></div>
                             <div class="toggle-space"></div>
                             <button id="toggle-lock-pins" class="toggle-button">
                                 <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -39,67 +38,60 @@
                             </button>
                         </div>
                         <div class="setting-row toggle-setting">
-                            <div class="setting-copy"><span class="setting-label">Developer panel</span><span class="setting-help">Show the Dev button on DragonBoard</span></div>
+                            <div class="setting-copy"><span class="setting-label">Developer panel</span></div>
                             <div class="toggle-space"></div>
                             <button id="toggle-dev-panel" class="toggle-button">
                                 <span class="toggle-track"><span class="toggle-knob"></span></span>
                                 <span id="toggle-dev-state" class="toggle-state">Disabled</span>
                             </button>
                         </div>
+                        <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Lock DragonBoard</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-world-pin" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-world-pin-state" class="toggle-state">Off</span>
+                            </button>
+                        </div>
                         <div class="setting-row language-setting">
-                            <div class="setting-copy"><span class="setting-label">Interface language</span><span class="setting-help">Applied after saving and reopening DragonBoard</span></div>
+                            <div class="setting-copy"><span class="setting-label">Interface language</span></div>
                             <div class="language-picker">
                                 <button id="language-previous" class="language-arrow"><span>&lt;</span></button>
                                 <span id="language-current" class="language-current">English</span>
                                 <button id="language-next" class="language-arrow"><span>&gt;</span></button>
                             </div>
                         </div>
-                        <div class="setting-row toggle-setting">
-                            <div class="setting-copy"><span class="setting-label">Pin board to world</span><span class="setting-help">Keep the whole DragonBoard at its current world position</span></div>
-                            <div class="toggle-space"></div>
-                            <button id="toggle-world-pin" class="toggle-button">
-                                <span class="toggle-track"><span class="toggle-knob"></span></span>
-                                <span id="toggle-world-pin-state" class="toggle-state">Hand</span>
-                            </button>
-                        </div>
                         <div class="setting-row">
-                            <div class="setting-copy"><span class="setting-label">Restart DragonBoard</span><span class="setting-help">Recreate all components after a player skeleton change</span></div>
+                            <div class="setting-copy"><span class="setting-label">Restart DragonBoard</span></div>
                             <button id="restart-dragonboard" class="save-button restart-button"><span>Restart now</span></button>
                         </div>
-                        <div class="setting-row featured">
-                            <div class="setting-copy"><span class="setting-label">Position adjustment</span><span id="position-adjustment-help" class="setting-help">Grab with the laser hand; hold both grips and move the controllers apart or together to scale</span></div>
-                            <button id="position-adjustment" class="save-button position-adjustment-button"><span id="position-adjustment-state">Start adjustment</span></button>
-                        </div>
                     </div>
-                    <div class="hint"><span class="hint-icon">i</span><span>Position is stored relative to the menu hand. Save when the board feels comfortable.</span></div>
                 </section>
 
                 <section id="page-visuals" class="page">
-                    <h1>Visuals</h1>
-                    <p class="lead">Fine-tune the scale of the board's 3D elements.</p>
                     <div class="settings-card">
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Reticle scale</span><span class="setting-help">Laser pointer impact marker</span></div><input id="reticleScale" type="range" class="range" min="0.1" max="10" step="0.05" value="2.5" /><span id="value-reticleScale" class="value">2.50</span></div>
+                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Reticle scale</span></div><input id="reticleScale" type="range" class="range" min="0.1" max="10" step="0.05" value="2.5" /><span id="value-reticleScale" class="value">2.50</span></div>
+                        <div class="setting-row">
+                            <div class="setting-copy"><span class="setting-label">Position adjustment</span><span id="position-adjustment-help" class="setting-help">Grab it and use the thumbstick up and down.</span></div>
+                            <button id="position-adjustment" class="save-button position-adjustment-button"><span id="position-adjustment-state">Start adjustment</span></button>
+                        </div>
                     </div>
                 </section>
 
                 <section id="page-items" class="page">
-                    <h1>Item scale</h1>
-                    <p class="lead">Set a comfortable display size for each item category.</p>
                     <div class="settings-card">
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Weapons</span><span class="setting-help">Swords, bows and staves</span></div><input id="itemWeaponScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemWeaponScale" class="value">1.00</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Armor</span><span class="setting-help">Apparel, shields and jewelry</span></div><input id="itemArmorScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemArmorScale" class="value">1.00</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Potions</span><span class="setting-help">Potions and poisons</span></div><input id="itemPotionScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemPotionScale" class="value">1.00</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Food</span><span class="setting-help">Food and ingredients</span></div><input id="itemFoodScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemFoodScale" class="value">1.00</span></div>
-                        <div class="setting-row"><div class="setting-copy"><span class="setting-label">Miscellaneous</span><span class="setting-help">Books, keys and other objects</span></div><input id="itemMiscScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><span id="value-itemMiscScale" class="value">1.00</span></div>
+                        <div class="setting-row item-scale-row"><div class="setting-copy"><span class="setting-label">Weapons</span><span class="setting-help">Swords, bows and staves</span></div><input id="itemWeaponScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><div class="scale-stepper"><button id="itemWeaponScale-decrease" class="scale-step-button" data-haptic="none"><span>&lt;</span></button><span id="value-itemWeaponScale" class="value">1.00</span><button id="itemWeaponScale-increase" class="scale-step-button" data-haptic="none"><span>&gt;</span></button></div></div>
+                        <div class="setting-row item-scale-row"><div class="setting-copy"><span class="setting-label">Armor</span><span class="setting-help">Apparel, shields and jewelry</span></div><input id="itemArmorScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><div class="scale-stepper"><button id="itemArmorScale-decrease" class="scale-step-button" data-haptic="none"><span>&lt;</span></button><span id="value-itemArmorScale" class="value">1.00</span><button id="itemArmorScale-increase" class="scale-step-button" data-haptic="none"><span>&gt;</span></button></div></div>
+                        <div class="setting-row item-scale-row"><div class="setting-copy"><span class="setting-label">Potions</span><span class="setting-help">Potions and poisons</span></div><input id="itemPotionScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><div class="scale-stepper"><button id="itemPotionScale-decrease" class="scale-step-button" data-haptic="none"><span>&lt;</span></button><span id="value-itemPotionScale" class="value">1.00</span><button id="itemPotionScale-increase" class="scale-step-button" data-haptic="none"><span>&gt;</span></button></div></div>
+                        <div class="setting-row item-scale-row"><div class="setting-copy"><span class="setting-label">Food</span><span class="setting-help">Food and ingredients</span></div><input id="itemFoodScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><div class="scale-stepper"><button id="itemFoodScale-decrease" class="scale-step-button" data-haptic="none"><span>&lt;</span></button><span id="value-itemFoodScale" class="value">1.00</span><button id="itemFoodScale-increase" class="scale-step-button" data-haptic="none"><span>&gt;</span></button></div></div>
+                        <div class="setting-row item-scale-row"><div class="setting-copy"><span class="setting-label">Miscellaneous</span><span class="setting-help">Books, keys and other objects</span></div><input id="itemMiscScale" type="range" class="range" min="0.1" max="5" step="0.01" value="1" /><div class="scale-stepper"><button id="itemMiscScale-decrease" class="scale-step-button" data-haptic="none"><span>&lt;</span></button><span id="value-itemMiscScale" class="value">1.00</span><button id="itemMiscScale-increase" class="scale-step-button" data-haptic="none"><span>&gt;</span></button></div></div>
                     </div>
                 </section>
 
                 <section id="page-widgets" class="page">
-                    <h1>Widgets</h1>
-                    <p class="lead">Choose which widgets appear with DragonBoard.</p>
                     <div class="settings-card">
                         <div class="setting-row toggle-setting">
-                            <div class="setting-copy"><span class="setting-label">Status</span><span class="setting-help">Show the Status widget; disabling it resets its saved position</span></div>
+                            <div class="setting-copy"><span class="setting-label">Status</span><span class="setting-help">Name, level, gold and weight</span></div>
                             <div class="toggle-space"></div>
                             <button id="toggle-status-widget" class="toggle-button">
                                 <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -110,16 +102,71 @@
                 </section>
 
                 <section id="page-tutorials" class="page">
-                    <h1>Tutorials</h1>
-                    <p class="lead">Control the guided panels shown by DragonBoard.</p>
-                    <div class="settings-card">
-                        <div class="setting-row toggle-setting">
-                            <div class="setting-copy"><span class="setting-label">Show tutorials</span><span class="setting-help">Show tutorial panels; enabling this again resets their progress and position</span></div>
-                            <div class="toggle-space"></div>
-                            <button id="toggle-show-tutorials" class="toggle-button">
-                                <span class="toggle-track"><span class="toggle-knob"></span></span>
-                                <span id="toggle-show-tutorials-state" class="toggle-state">Enabled</span>
-                            </button>
+                    <div id="tutorial-list-view">
+                        <div class="settings-card">
+                            <div class="setting-row toggle-setting">
+                                <div class="setting-copy"><span class="setting-label">Show tutorials</span></div>
+                                <div class="toggle-space"></div>
+                                <button id="toggle-show-tutorials" class="toggle-button">
+                                    <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                    <span id="toggle-show-tutorials-state" class="toggle-state">Enabled</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tutorial-card-grid">
+                            <button id="tutorial-card-general-use" class="tutorial-card"><span>General use</span></button>
+                            <button id="tutorial-card-pin-items" class="tutorial-card tutorial-card-right"><span>Pin items and widgets</span></button>
+                            <button id="tutorial-card-inventory-magic" class="tutorial-card"><span>Inventory and Magic Panel</span></button>
+                            <button id="tutorial-card-mods" class="tutorial-card tutorial-card-right"><span>Mods Panel</span></button>
+                            <button id="tutorial-card-journal" class="tutorial-card"><span>Journal</span></button>
+                            <button id="tutorial-card-gallery" class="tutorial-card tutorial-card-right"><span>Gallery</span></button>
+                        </div>
+                    </div>
+
+                    <div id="tutorial-page-general-use" class="tutorial-detail-page">
+                        <button id="tutorial-back-general-use" class="tutorial-back"><span>Back</span></button>
+                        <div class="tutorial-instruction-list">
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Scroll lists</span><span class="tutorial-instruction-description">Use Grab on a list and move the controller, or touch it with your finger and drag.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Move items, buttons, and widgets</span><span class="tutorial-instruction-description">Hold Grab for 1 second on the item you want to move. Move the item, then release to save its position.</span></div>
+                        </div>
+                    </div>
+                    <div id="tutorial-page-pin-items" class="tutorial-detail-page">
+                        <button id="tutorial-back-pin-items" class="tutorial-back"><span>Back</span></button>
+                        <div class="tutorial-instruction-list">
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Pin items</span><span class="tutorial-instruction-description">Click <span class="tutorial-keyword">PIN</span> in the inventory or magic panel, and the item will be added to the DragonBoard home page.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Scale items</span><span class="tutorial-instruction-description">Hold <span class="tutorial-keyword">Grab</span> for 1 second on the pinned item, then move the thumbstick up or down to change its scale.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Delete items</span><span class="tutorial-instruction-description">Hold <span class="tutorial-keyword">Grab</span> for 1 second, then press <span class="tutorial-keyword">Y</span> or <span class="tutorial-keyword">B</span>, depending on which controller you are using to Grab the item.</span></div>
+                        </div>
+                    </div>
+                    <div id="tutorial-page-inventory-magic" class="tutorial-detail-page">
+                        <button id="tutorial-back-inventory-magic" class="tutorial-back"><span>Back</span></button>
+                        <div class="tutorial-instruction-list">
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Equip</span><span class="tutorial-instruction-description">Click the item preview or <span class="tutorial-keyword">EQUIP</span> with the controller of the hand you want to equip it to.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Favorite</span><span class="tutorial-instruction-description">Hold <span class="tutorial-keyword">TRIGGER</span> for 1 second on the item you want to favorite.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Adjust item preview</span><span class="tutorial-instruction-description">Hold <span class="tutorial-keyword">Grab</span> for 1 second, then adjust the item’s position and scale. Release to save.</span></div>
+                        </div>
+                    </div>
+                    <div id="tutorial-page-mods" class="tutorial-detail-page">
+                        <button id="tutorial-back-mods" class="tutorial-back"><span>Back</span></button>
+                        <div class="tutorial-instruction-list">
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Actions</span><span class="tutorial-instruction-description">Click <span class="tutorial-keyword">RECORD</span> and perform an action within 10 seconds. It will be saved to this panel.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Recommended actions</span><span class="tutorial-instruction-description">Powers, mod actions that use powers or spells for activation, Campfire, VRIK adjustments, and more.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">INI Editor</span><span class="tutorial-instruction-description">Click <span class="tutorial-keyword">SCAN</span> to scan all your INI files. You can edit and save them. If an option supports hot reload, the change will take effect immediately; otherwise, you will need to restart the game.</span></div>
+                        </div>
+                    </div>
+                    <div id="tutorial-page-journal" class="tutorial-detail-page">
+                        <button id="tutorial-back-journal" class="tutorial-back"><span>Back</span></button>
+                        <div class="tutorial-instruction-list">
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Track Quest</span><span class="tutorial-instruction-description">Click <span class="tutorial-keyword">TRACK QUEST</span> to track the quest on the map. Main quests are <span class="tutorial-color-red">RED</span>, side quests are <span class="tutorial-color-blue">BLUE</span>, and miscellaneous quests are <span class="tutorial-color-yellow">YELLOW</span>.</span></div>
+                        </div>
+                    </div>
+                    <div id="tutorial-page-gallery" class="tutorial-detail-page">
+                        <button id="tutorial-back-gallery" class="tutorial-back"><span>Back</span></button>
+                        <div class="tutorial-instruction-list">
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Snapshot</span><span class="tutorial-instruction-description">Take a snapshot.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Timer</span><span class="tutorial-instruction-description">Set the delay before taking the snapshot: <span class="tutorial-keyword">3s, 5s, or 10s</span>.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Marker on Map</span><span class="tutorial-instruction-description">Places a photo icon at the exact location on the map. Clicking it directly on the map will open the gallery with that photo selected.</span></div>
+                            <div class="tutorial-instruction-card"><span class="tutorial-instruction-label">Pin</span><span class="tutorial-instruction-description">Pins the photo to the DragonBoard home page. Remove it with <span class="tutorial-keyword">Grip + Y</span> or <span class="tutorial-keyword">B</span>.</span></div>
                         </div>
                     </div>
                 </section>
@@ -128,7 +175,6 @@
 
             <footer>
                 <div class="footer-spacer"></div>
-                <div class="save-status">Ready to save</div>
                 <button id="save" class="save-button"><span>Save changes</span></button>
             </footer>
         </div>

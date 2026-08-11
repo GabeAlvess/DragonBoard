@@ -260,6 +260,16 @@ namespace dragonboard::ui::rml
             "general", "visuals", "items", "widgets", "tutorials"
         };
 
+        constexpr std::array<const char*, 6> kTutorialPages{
+            "general-use", "pin-items", "inventory-magic",
+            "mods", "journal", "gallery"
+        };
+
+        constexpr std::array<const char*, 6> kTutorialPageTitles{
+            "General use", "Pin items and widgets", "Inventory and Magic Panel",
+            "Mods Panel", "Journal", "Gallery"
+        };
+
         constexpr std::array<const char*, 6> kSliders{
             "reticleScale", "itemWeaponScale", "itemArmorScale",
             "itemPotionScale", "itemFoodScale", "itemMiscScale"
@@ -597,7 +607,13 @@ namespace dragonboard::ui::rml
                     const std::string tabId = std::string("tab-") + page;
                     BindClick(_settingsDocument, tabId.c_str());
                 }
-                for (const auto* slider : kSliders) BindSlider(_settingsDocument, slider);
+                for (const auto* slider : kSliders) {
+                    BindSlider(_settingsDocument, slider);
+                    if (std::string_view(slider).starts_with("item")) {
+                        BindClick(_settingsDocument, (std::string(slider) + "-decrease").c_str());
+                        BindClick(_settingsDocument, (std::string(slider) + "-increase").c_str());
+                    }
+                }
                 BindClick(_settingsDocument, "save");
                 BindClick(_settingsDocument, "position-adjustment");
                 BindClick(_settingsDocument, "toggle-lock-pins");
@@ -608,6 +624,10 @@ namespace dragonboard::ui::rml
                 BindClick(_settingsDocument, "language-next");
                 BindClick(_settingsDocument, "toggle-world-pin");
                 BindClick(_settingsDocument, "restart-dragonboard");
+                for (const auto* tutorial : kTutorialPages) {
+                    BindClick(_settingsDocument, (std::string("tutorial-card-") + tutorial).c_str());
+                    BindClick(_settingsDocument, (std::string("tutorial-back-") + tutorial).c_str());
+                }
                 SelectSettingsPage("general");
                 _settingsDocument->Hide();
                 logger::trace("DragonBoardVR: external RmlUi settings loaded from '{}'.", path);
@@ -723,7 +743,6 @@ namespace dragonboard::ui::rml
             if (_journalDocument) {
                 for (const auto* id : {
                          "journal-tab-quests", "journal-tab-stats",
-                         "journal-settings",
                          "journal-toggle-tracking", "journal-filter-all",
                          "journal-filter-main", "journal-filter-side",
                          "journal-filter-misc" }) {
@@ -758,6 +777,7 @@ namespace dragonboard::ui::rml
                 BindClick(_welcomeDocument, "welcome-close");
                 BindClick(_welcomeDocument, "welcome-next-1");
                 BindClick(_welcomeDocument, "welcome-next-2");
+                BindClick(_welcomeDocument, "welcome-next-3");
                 SetWelcomePage(1, false);
                 _welcomeDocument->Hide();
                 logger::trace(
@@ -3575,6 +3595,7 @@ namespace dragonboard::ui::rml
         setText("gallery-location", selected ? selected->location : "Location");
         setText("gallery-date", selected ? (selected->skyrimDate.empty() ? selected->capturedAt : selected->skyrimDate) : "Date");
         if (auto* preview = _galleryDocument->GetElementById("gallery-preview")) {
+            preview->SetProperty("display", selected ? "block" : "none");
             if (selected) preview->SetAttribute("src", selected->imagePath);
             else preview->RemoveAttribute("src");
         }
@@ -3610,12 +3631,23 @@ namespace dragonboard::ui::rml
                 element->SetInnerRML(EscapeRml(value));
             }
         };
-        const auto buildStatRows = [this](const std::vector<JournalStatInfo>& stats) {
+        const auto buildStatRows = [this](
+                                           const std::vector<JournalStatInfo>& stats,
+                                           std::string_view valueClass = {}) {
             std::string markup;
             for (const auto& stat : stats) {
                 markup += "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">" +
-                    EscapeRml(stat.label) + "</span><span class=\"journal-stat-value\">" +
-                    EscapeRml(stat.value) + "</span></div>";
+                    EscapeRml(stat.label) + "</span>";
+                if (stat.secondaryValue.empty()) {
+                    markup += "<span class=\"journal-stat-value" +
+                        std::string(valueClass) + "\">" + EscapeRml(stat.value) + "</span>";
+                } else {
+                    markup += "<span class=\"journal-skill-values\"><span class=\"journal-stat-value journal-skill-level\">" +
+                        EscapeRml(stat.value) +
+                        "</span><span class=\"journal-skill-experience\">" +
+                        EscapeRml(stat.secondaryValue) + "</span></span>";
+                }
+                markup += "</div>";
             }
             if (markup.empty()) {
                 markup = "<div class=\"journal-empty\">" +
@@ -3844,7 +3876,7 @@ namespace dragonboard::ui::rml
             skills->SetInnerRML(buildStatRows(info.skills));
         }
         if (auto* general = _journalDocument->GetElementById("journal-general-stats")) {
-            general->SetInnerRML(buildStatRows(info.generalStats));
+            general->SetInnerRML(buildStatRows(info.generalStats, " journal-number-value"));
         }
     }
 
@@ -4022,14 +4054,14 @@ namespace dragonboard::ui::rml
         bool grabCompleted)
     {
         if (!_welcomeDocument) return;
-        page = std::clamp<std::uint8_t>(page, 1, 4);
+        page = std::clamp<std::uint8_t>(page, 1, 5);
         if (auto* pinTutorial =
                 _welcomeDocument->GetElementById("pin-tutorial-page")) {
             pinTutorial->SetClass("active", false);
             pinTutorial->SetProperty("display", "none");
         }
-        const auto visiblePage = page == 4 ? 3 : std::min<std::uint8_t>(page, 2);
-        for (std::uint8_t candidate = 1; candidate <= 3; ++candidate) {
+        const auto visiblePage = page <= 2 ? page : static_cast<std::uint8_t>(page - 1);
+        for (std::uint8_t candidate = 1; candidate <= 4; ++candidate) {
             const auto id = "welcome-page-" + std::to_string(candidate);
             if (auto* element = _welcomeDocument->GetElementById(id)) {
                 const bool active = candidate == visiblePage;
@@ -4040,6 +4072,10 @@ namespace dragonboard::ui::rml
         const bool showGrabInstruction = page == 2 && !grabCompleted;
         const bool showGrabResult = page == 2 && grabCompleted;
         const bool showScaleInstruction = page == 3;
+        if (auto* pageTwo =
+                _welcomeDocument->GetElementById("welcome-page-2")) {
+            pageTwo->SetClass("scale-instruction", showScaleInstruction);
+        }
         if (auto* instruction =
                 _welcomeDocument->GetElementById("welcome-grab-instruction")) {
             instruction->SetClass("completed", grabCompleted);
@@ -4064,7 +4100,7 @@ namespace dragonboard::ui::rml
     void DragonBoardRmlUi::SetPinTutorial()
     {
         if (!_welcomeDocument) return;
-        for (std::uint8_t candidate = 1; candidate <= 3; ++candidate) {
+        for (std::uint8_t candidate = 1; candidate <= 4; ++candidate) {
             const auto id = "welcome-page-" + std::to_string(candidate);
             if (auto* element = _welcomeDocument->GetElementById(id)) {
                 element->SetClass("active", false);
@@ -4085,7 +4121,7 @@ namespace dragonboard::ui::rml
             toggle->SetClass("enabled", pinned);
         }
         if (auto* state = _settingsDocument->GetElementById("toggle-world-pin-state")) {
-            state->SetInnerRML(EscapeRml(Tr(pinned ? "World" : "Hand")));
+            state->SetInnerRML(EscapeRml(Tr(pinned ? "On" : "Off")));
         }
     }
 
@@ -4318,9 +4354,31 @@ namespace dragonboard::ui::rml
                 panel, PanelEventType::kClick, id, std::move(value), 0.0f });
             return;
         }
-        if (value == "welcome-close" || value == "pin-tutorial-close") {
+        if (value.ends_with("-decrease") || value.ends_with("-increase")) {
+            const bool increase = value.ends_with("-increase");
+            const auto suffixLength = increase ? std::string_view("-increase").size() :
+                std::string_view("-decrease").size();
+            const std::string sliderId(value.substr(0, value.size() - suffixLength));
+            if (auto* slider = _settingsDocument ?
+                    _settingsDocument->GetElementById(sliderId) : nullptr) {
+                try {
+                    const float minimum = std::stof(slider->GetAttribute<Rml::String>("min", "0"));
+                    const float maximum = std::stof(slider->GetAttribute<Rml::String>("max", "1"));
+                    const float step = std::stof(slider->GetAttribute<Rml::String>("step", "0.01"));
+                    const float current = std::stof(slider->GetAttribute<Rml::String>("value", "0"));
+                    const float next = std::clamp(current + (increase ? step : -step), minimum, maximum);
+                    _synchronizingSliderValues = true;
+                    slider->SetAttribute("value", Rml::CreateString("%.6f", next));
+                    _synchronizingSliderValues = false;
+                    HandleSliderChange(sliderId.c_str(), next);
+                } catch (...) {
+                    logger::warn("DragonBoardVR: invalid stepper value for '{}'.", sliderId);
+                }
+            }
+        } else if (value == "welcome-close" || value == "pin-tutorial-close") {
             _welcomeCloseRequested = true;
-        } else if (value == "welcome-next-1" || value == "welcome-next-2") {
+        } else if (value == "welcome-next-1" || value == "welcome-next-2" ||
+                   value == "welcome-next-3") {
             _welcomeNextRequested = true;
         } else if (value == "close" || value == "dev-close") {
             _closeRequested = true;
@@ -4498,8 +4556,6 @@ namespace dragonboard::ui::rml
             }
         } else if (value == "journal-close") {
             _journalAction = JournalAction::kClose;
-        } else if (value == "journal-settings") {
-            _journalAction = JournalAction::kSettings;
         } else if (value == "journal-toggle-tracking") {
             _journalActionFormID = _journalSelectedFormID;
             _journalActionInstanceID = _journalSelectedInstanceID;
@@ -4601,6 +4657,10 @@ namespace dragonboard::ui::rml
             _worldPinToggleRequested = true;
         } else if (value == "restart-dragonboard") {
             _restartRequested = true;
+        } else if (value.starts_with("tutorial-card-")) {
+            SelectTutorialPage(id + 14);
+        } else if (value.starts_with("tutorial-back-")) {
+            SelectTutorialPage(nullptr);
         } else if (value.starts_with("tab-")) {
             SelectSettingsPage(id + 4);
         } else if (value.starts_with("dev-tab-")) {
@@ -4717,14 +4777,62 @@ namespace dragonboard::ui::rml
     void DragonBoardRmlUi::SelectSettingsPage(const char* selectedPage)
     {
         if (!_settingsDocument || !selectedPage) return;
+        const bool visualsContext =
+            std::string_view(selectedPage) == "visuals" ||
+            std::string_view(selectedPage) == "items";
         for (const auto* page : kPages) {
             const bool active = std::string_view(page) == selectedPage;
             const std::string tabId = std::string("tab-") + page;
             const std::string pageId = std::string("page-") + page;
-            if (auto* tab = _settingsDocument->GetElementById(tabId)) tab->SetClass("active", active);
+            if (auto* tab = _settingsDocument->GetElementById(tabId)) {
+                tab->SetClass("active", active || (std::string_view(page) == "visuals" && visualsContext));
+            }
             if (auto* content = _settingsDocument->GetElementById(pageId)) {
                 content->SetProperty("display", active ? "block" : "none");
             }
+        }
+        if (auto* tabs = _settingsDocument->GetElementById("visuals-top-tabs")) {
+            tabs->SetProperty("display", visualsContext ? "flex" : "none");
+        }
+        if (std::string_view(selectedPage) == "tutorials") {
+            SelectTutorialPage(nullptr);
+        } else if (auto* title =
+                       _settingsDocument->GetElementById("tutorial-header-title")) {
+            title->SetProperty("display", "none");
+        }
+    }
+
+    void DragonBoardRmlUi::SelectTutorialPage(const char* selectedPage)
+    {
+        if (!_settingsDocument) return;
+        if (auto* list = _settingsDocument->GetElementById("tutorial-list-view")) {
+            list->SetProperty("display", selectedPage ? "none" : "block");
+        }
+        if (auto* title =
+                _settingsDocument->GetElementById("tutorial-header-title")) {
+            if (selectedPage) {
+                for (std::size_t index = 0; index < kTutorialPages.size(); ++index) {
+                    if (std::string_view(kTutorialPages[index]) == selectedPage) {
+                        if (auto* text = _settingsDocument->GetElementById(
+                                "tutorial-header-title-text")) {
+                            text->SetInnerRML(EscapeRml(Tr(kTutorialPageTitles[index])));
+                        }
+                        break;
+                    }
+                }
+            }
+            title->SetProperty("display", selectedPage ? "flex" : "none");
+        }
+        for (const auto* page : kTutorialPages) {
+            if (auto* content = _settingsDocument->GetElementById(
+                    std::string("tutorial-page-") + page)) {
+                content->SetProperty(
+                    "display",
+                    selectedPage && std::string_view(page) == selectedPage ? "block" : "none");
+            }
+        }
+        if (auto* scroll = _settingsDocument->GetElementById("page-scroll")) {
+            scroll->SetScrollTop(0.0f);
         }
     }
 
@@ -4807,6 +4915,9 @@ namespace dragonboard::ui::rml
     {
         if (!_journalDocument || !selectedPage) return;
         const bool questsSelected = std::string_view(selectedPage) == "quests";
+        if (auto* app = _journalDocument->GetElementById("app")) {
+            app->SetClass("journal-statistics-mode", !questsSelected);
+        }
         for (const auto* page : { "quests", "stats" }) {
             const bool active = std::string_view(page) == selectedPage;
             const std::string tabId = std::string("journal-tab-") + page;

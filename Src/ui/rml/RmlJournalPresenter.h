@@ -42,6 +42,7 @@ namespace dragonboard::ui::rml
         {
             std::string label;
             std::string value;
+            std::string secondaryValue;
         };
 
         struct PlayerInfo

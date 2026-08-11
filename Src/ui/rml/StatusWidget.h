@@ -16,7 +16,12 @@ namespace dragonboard::ui::rml
 
         bool Initialize(DragonBoardRmlRenderer* renderer);
         void Shutdown();
-        void SetData(std::int32_t gold, float weight, float capacity, std::string location);
+        void SetData(
+            std::string name,
+            std::uint16_t level,
+            std::int32_t gold,
+            float weight,
+            float capacity);
         void SetPointer(float u, float v, bool visible);
         [[nodiscard]] bool IsDirty() const { return _surface.IsDirty(); }
         bool Render(ID3D11RenderTargetView* target, int width, int height);

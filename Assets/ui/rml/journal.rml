@@ -7,7 +7,8 @@
 </head>
 <body>
     <div id="app" class="dev-app journal-app">
-        <img class="journal-background" src="assets/Background/Journal.jpg" />
+        <img class="journal-background journal-quests-background" src="assets/Background/Journal.jpg" />
+        <img class="journal-background journal-statistics-background" src="assets/Background/Statistics.jpg" />
         <aside class="dev-sidebar journal-sidebar">
             <div class="brand">
                 <div class="brand-copy">
@@ -32,7 +33,6 @@
                 <div class="journal-top-tabs">
                     <button id="journal-tab-quests" class="journal-top-tab active"><span>Quests</span></button>
                     <button id="journal-tab-stats" class="journal-top-tab"><span>Statistics</span></button>
-                    <button id="journal-settings" class="journal-top-tab journal-config"><span>Settings</span></button>
                 </div>
             </header>
 

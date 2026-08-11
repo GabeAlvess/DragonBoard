@@ -58,7 +58,15 @@ namespace
     constexpr std::array<std::size_t, 3> kSyntheticDatasetSizes{ 25, 250, 1000 };
 
     constexpr std::array<const char*, 5> kSettingsPages{
-        "general", "position", "visuals", "items", "labels"
+        "general", "visuals", "items", "widgets", "tutorials"
+    };
+    constexpr std::array<const char*, 6> kTutorialPages{
+        "general-use", "pin-items", "inventory-magic",
+        "mods", "journal", "gallery"
+    };
+    constexpr std::array<const char*, 6> kTutorialPageTitles{
+        "General use", "Pin items and widgets", "Inventory and Magic Panel",
+        "Mods Panel", "Journal", "Gallery"
     };
     constexpr std::array<const char*, 2> kDeveloperPages{
         "commands", "info"
@@ -482,18 +490,20 @@ namespace
                 _suppressNextClick = false;
                 return;
             }
-            if (id.starts_with("tab-")) {
-                SelectPage(kSettingsPages, "tab-", "page-", id.substr(4));
+            if (id.ends_with("-decrease") || id.ends_with("-increase")) {
+                AdjustPreviewSlider(id);
+            } else if (id.starts_with("tutorial-card-")) {
+                SelectTutorialPreviewPage(id.substr(14));
+            } else if (id.starts_with("tutorial-back-")) {
+                SelectTutorialPreviewPage({});
+            } else if (id.starts_with("tab-")) {
+                SelectSettingsPreviewPage(id.substr(4));
             } else if (id.starts_with("dev-tab-")) {
                 SelectPage(kDeveloperPages, "dev-tab-", "dev-page-", id.substr(8));
             } else if (id == "journal-tab-quests") {
                 SelectJournalPreviewPage("quests");
             } else if (id == "journal-tab-stats") {
                 SelectJournalPreviewPage("stats");
-            } else if (id == "journal-settings") {
-                SetJournalQuestNavigationVisible(false);
-                SelectPage(kJournalPages, "journal-tab-", "journal-page-", "");
-                SetStatus("Settings replaces Journal in game");
             } else if (id == "mods-tab-actions") {
                 SelectModsPreviewPage(false);
             } else if (id == "mods-tab-ini") {
@@ -514,6 +524,12 @@ namespace
                 if (auto* state = _document->GetElementById("toggle-dev-state")) {
                     state->SetInnerRML(_developerButtonEnabled ? "Enabled" : "Disabled");
                 }
+            } else if (id == "toggle-world-pin") {
+                _worldPinned = !_worldPinned;
+                element->SetClass("enabled", _worldPinned);
+                if (auto* state = _document->GetElementById("toggle-world-pin-state")) {
+                    state->SetInnerRML(_worldPinned ? "On" : "Off");
+                }
             } else if (id == "toggle-edit-mode") {
                 _editModeEnabled = !_editModeEnabled;
                 element->SetClass("enabled", _editModeEnabled);
@@ -526,6 +542,7 @@ namespace
                     page->SetProperty("display", "none");
                 }
                 if (auto* page = _document->GetElementById("welcome-page-2")) {
+                    page->SetClass("scale-instruction", false);
                     page->SetClass("active", true);
                     page->SetProperty("display", "block");
                 }
@@ -548,6 +565,9 @@ namespace
                         result->SetClass("revealed", false);
                         result->SetProperty("display", "none");
                     }
+                    if (auto* page = _document->GetElementById("welcome-page-2")) {
+                        page->SetClass("scale-instruction", true);
+                    }
                     scale->SetClass("revealed", true);
                     scale->SetProperty("display", "flex");
                     SetStatus("Welcome page 2 - scale instruction");
@@ -560,8 +580,18 @@ namespace
                         page->SetClass("active", true);
                         page->SetProperty("display", "block");
                     }
-                    SetStatus("Welcome page 3 preview");
+                    SetStatus("Remove items and widgets preview");
                 }
+            } else if (id == "welcome-next-3") {
+                if (auto* page = _document->GetElementById("welcome-page-3")) {
+                    page->SetClass("active", false);
+                    page->SetProperty("display", "none");
+                }
+                if (auto* page = _document->GetElementById("welcome-page-4")) {
+                    page->SetClass("active", true);
+                    page->SetProperty("display", "block");
+                }
+                SetStatus("Welcome page 3 preview");
             } else if (id == "dev-add-command") {
                 SetStatus("SteamVR command keyboard opens in game");
             } else if (id == "dev-execute") {
@@ -889,13 +919,13 @@ namespace
 
             const auto fileName = _documentPath.filename().string();
             if (fileName == "settings.rml") {
-                SelectPage(kSettingsPages, "tab-", "page-", "general");
+                SelectSettingsPreviewPage("general");
             } else if (fileName == "dev.rml") {
                 PopulateDeveloperDocument();
                 SelectPage(kDeveloperPages, "dev-tab-", "dev-page-", "commands");
             } else if (fileName == "journal.rml") {
                 PopulateJournalDocument();
-                SelectJournalPreviewPage("quests");
+                SelectJournalPreviewPage("stats");
             } else if (fileName == "edit.rml") {
                 PopulateItemEditDocument();
                 SelectPage(kItemEditPages, "edit-tab-", "edit-page-", "position");
@@ -905,6 +935,20 @@ namespace
                 PopulateInventoryDocument();
             } else if (fileName == "magic.rml") {
                 PopulateMagicDocument();
+            } else if (fileName == "status_widget.rml") {
+                PopulateStatusWidgetDocument();
+            }
+        }
+
+        void PopulateStatusWidgetDocument()
+        {
+            SetText("status-name", "Dovahkiin");
+            SetText("status-level", "42");
+            SetText("status-gold", "1250");
+            SetText("status-weight-current", "346");
+            SetText("status-weight-capacity", "300");
+            if (auto* currentWeight = _document->GetElementById("status-weight-current")) {
+                currentWeight->SetClass("overloaded", true);
             }
         }
 
@@ -951,6 +995,23 @@ namespace
                     "<span class=\"journal-objective-text\">Speak to Arngeir</span>"
                     "<span class=\"journal-map-marker\"></span></button>");
             }
+            if (auto* stats = _document->GetElementById("journal-character-stats")) {
+                stats->SetInnerRML(
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">Level</span><span class=\"journal-stat-value\">42</span></div>"
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">Health</span><span class=\"journal-stat-value\">320 / 320</span></div>");
+            }
+            if (auto* skills = _document->GetElementById("journal-skill-stats")) {
+                skills->SetInnerRML(
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">One-Handed</span><span class=\"journal-skill-values\"><span class=\"journal-stat-value journal-skill-level\">67</span><span class=\"journal-skill-experience\">320/850 XP</span></span></div>"
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">Archery</span><span class=\"journal-skill-values\"><span class=\"journal-stat-value journal-skill-level\">54</span><span class=\"journal-skill-experience\">180/620 XP</span></span></div>"
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">Sneak</span><span class=\"journal-skill-values\"><span class=\"journal-stat-value journal-skill-level\">81</span><span class=\"journal-skill-experience\">410/940 XP</span></span></div>");
+            }
+            if (auto* stats = _document->GetElementById("journal-general-stats")) {
+                stats->SetInnerRML(
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">Journal Quests</span><span class=\"journal-stat-value journal-number-value\">18</span></div>"
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">Tracked Quests</span><span class=\"journal-stat-value journal-number-value\">3</span></div>"
+                    "<div class=\"journal-stat-row\"><span class=\"journal-stat-label\">Completed Quests</span><span class=\"journal-stat-value journal-number-value\">9</span></div>");
+            }
         }
 
         void SetJournalQuestNavigationVisible(bool visible)
@@ -977,6 +1038,9 @@ namespace
                 "journal-tab-",
                 "journal-page-",
                 selected);
+            if (auto* app = _document->GetElementById("app")) {
+                app->SetClass("journal-statistics-mode", selected == "stats");
+            }
             SetJournalQuestNavigationVisible(selected == "quests");
         }
 
@@ -1411,7 +1475,7 @@ namespace
         void ShowPinTutorialPreview()
         {
             if (!_document) return;
-            for (std::uint8_t candidate = 1; candidate <= 3; ++candidate) {
+            for (std::uint8_t candidate = 1; candidate <= 4; ++candidate) {
                 const auto id = "welcome-page-" + std::to_string(candidate);
                 if (auto* page = _document->GetElementById(id)) {
                     page->SetClass("active", false);
@@ -1562,6 +1626,81 @@ namespace
                 if (auto* content = _document->GetElementById(std::string(pagePrefix) + page)) {
                     content->SetProperty("display", active ? "block" : "none");
                 }
+            }
+        }
+
+        void SelectSettingsPreviewPage(std::string_view selected)
+        {
+            SelectPage(kSettingsPages, "tab-", "page-", selected);
+            const bool visualsContext = selected == "visuals" || selected == "items";
+            if (auto* tab = _document->GetElementById("tab-visuals")) {
+                tab->SetClass("active", visualsContext);
+            }
+            if (auto* tabs = _document->GetElementById("visuals-top-tabs")) {
+                tabs->SetProperty("display", visualsContext ? "flex" : "none");
+            }
+            if (selected == "tutorials") {
+                SelectTutorialPreviewPage({});
+            } else if (auto* title =
+                           _document->GetElementById("tutorial-header-title")) {
+                title->SetProperty("display", "none");
+            }
+        }
+
+        void SelectTutorialPreviewPage(std::string_view selected)
+        {
+            if (auto* list = _document->GetElementById("tutorial-list-view")) {
+                list->SetProperty("display", selected.empty() ? "block" : "none");
+            }
+            if (auto* title = _document->GetElementById("tutorial-header-title")) {
+                if (!selected.empty()) {
+                    for (std::size_t index = 0; index < kTutorialPages.size(); ++index) {
+                        if (selected == kTutorialPages[index]) {
+                            if (auto* text = _document->GetElementById(
+                                    "tutorial-header-title-text")) {
+                                text->SetInnerRML(kTutorialPageTitles[index]);
+                            }
+                            break;
+                        }
+                    }
+                }
+                title->SetProperty("display", selected.empty() ? "none" : "flex");
+            }
+            for (const auto* page : kTutorialPages) {
+                if (auto* content = _document->GetElementById(
+                        std::string("tutorial-page-") + page)) {
+                    content->SetProperty("display", selected == page ? "block" : "none");
+                }
+            }
+            if (auto* scroll = _document->GetElementById("page-scroll")) {
+                scroll->SetScrollTop(0.0f);
+            }
+            SetStatus(selected.empty() ?
+                "Tutorial list preview" :
+                "Tutorial page: " + std::string(selected));
+        }
+
+        void AdjustPreviewSlider(std::string_view controlId)
+        {
+            const bool increase = controlId.ends_with("-increase");
+            const auto suffixLength = increase ? std::string_view("-increase").size() :
+                std::string_view("-decrease").size();
+            const std::string sliderId(controlId.substr(0, controlId.size() - suffixLength));
+            auto* slider = _document->GetElementById(sliderId);
+            if (!slider) return;
+            try {
+                const float minimum = std::stof(slider->GetAttribute<Rml::String>("min", "0"));
+                const float maximum = std::stof(slider->GetAttribute<Rml::String>("max", "1"));
+                const float step = std::stof(slider->GetAttribute<Rml::String>("step", "0.01"));
+                const float current = std::stof(slider->GetAttribute<Rml::String>("value", "0"));
+                const float next = std::clamp(current + (increase ? step : -step), minimum, maximum);
+                slider->SetAttribute("value", Rml::CreateString("%.6f", next));
+                if (auto* label = _document->GetElementById("value-" + sliderId)) {
+                    label->SetInnerRML(Rml::CreateString("%.2f", next));
+                }
+                SetStatus("Changed " + sliderId);
+            } catch (...) {
+                SetStatus("Invalid slider value for " + sliderId);
             }
         }
 
@@ -1730,6 +1869,7 @@ namespace
         bool _syntheticEmptySearch = false;
         bool _poolViolationReported = false;
         bool _developerButtonEnabled = true;
+        bool _worldPinned = false;
         bool _editModeEnabled = true;
         bool _rmlInitialized = false;
         bool _debuggerInitialized = false;

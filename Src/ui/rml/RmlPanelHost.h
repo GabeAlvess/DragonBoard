@@ -757,10 +757,11 @@ namespace dragonboard::ui::rml
         bool _scenePanelVisible = false;
         struct StatusSurfaceSnapshot
         {
+            std::string name = "DRAGONBORN";
+            std::uint16_t level = 1;
             std::int32_t gold = 0;
             float weight = 0.0f;
             float capacity = 0.0f;
-            std::string location = "SKYRIM";
         };
         std::mutex _statusSurfaceMutex;
         StatusSurfaceSnapshot _statusSurfaceSnapshot;

@@ -46,7 +46,9 @@ namespace dragonboard::ui::rml
         constexpr float kSceneScreenSizeScale = 0.85f;
         constexpr float kScenePlaneExtent = 170.666656f;
         constexpr float kSceneScreenSurfaceDepth = 0.50f;
-        constexpr float kStatusSurfaceWidth = 7.8125f;
+        constexpr std::uint32_t kStatusSurfaceTextureWidth = 950;
+        constexpr std::uint32_t kStatusSurfaceTextureHeight = 80;
+        constexpr float kStatusSurfaceWidth = 11.875f;
         constexpr float kPhysicalBoardAuthoredScale = 1.55f;
         constexpr const char* kRmlSurfaceLayoutContainer = "RmlUiSurfaces";
         constexpr const char* kBoardWidgetLayoutContainer = "BoardWidgets";
@@ -1381,7 +1383,7 @@ namespace dragonboard::ui::rml
                 LocalPanelMode::kWelcome &&
             _activeTutorial.load(std::memory_order_acquire) ==
                 ActiveTutorial::kWelcome &&
-            _welcomePage.load(std::memory_order_acquire) == 4) {
+            _welcomePage.load(std::memory_order_acquire) == 5) {
             CompleteActiveTutorialGameThread();
         }
         if (!EnsurePresentHookInstalled()) {
@@ -2210,7 +2212,7 @@ namespace dragonboard::ui::rml
                 ActiveTutorial::kWelcome) {
             const auto page = _welcomePage.load(std::memory_order_acquire);
             auto nextPage = page;
-            if (page == 1 || page == 3 ||
+            if (page == 1 || page == 3 || page == 4 ||
                 (page == 2 &&
                  _welcomeGrabCompleted.load(std::memory_order_acquire))) {
                 nextPage = static_cast<std::uint8_t>(page + 1);
@@ -3547,6 +3549,10 @@ namespace dragonboard::ui::rml
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) return;
         StatusSurfaceSnapshot snapshot;
+        if (const char* name = player->GetName(); name && *name) {
+            snapshot.name = name;
+        }
+        snapshot.level = player->GetLevel();
         if (auto* gold = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F)) {
             snapshot.gold = player->GetItemCount(gold);
         }
@@ -3556,8 +3562,6 @@ namespace dragonboard::ui::rml
             snapshot.weight = player->GetActorValue(RE::ActorValue::kInventoryWeight);
         }
         snapshot.capacity = player->GetActorValue(RE::ActorValue::kCarryWeight);
-        snapshot.location = dragonboard::ui::gallery::GalleryCaptureService::
-            ResolveLocationNameGameThread(*player);
         {
             std::scoped_lock lock(_statusSurfaceMutex);
             _statusSurfaceSnapshot = std::move(snapshot);
@@ -3827,7 +3831,9 @@ namespace dragonboard::ui::rml
             surface.node->name = "DragonBoardVR_StatusSurfaceRoot";
             surface.visualNode->name = "DragonBoardVR_StatusSurfaceVisual";
             const float width = kStatusSurfaceWidth;
-            const float height = width * (32.0f / 250.0f);
+            const float height = width *
+                (static_cast<float>(kStatusSurfaceTextureHeight) /
+                 static_cast<float>(kStatusSurfaceTextureWidth));
             ApplyTabletSurfaceRotation(
                 surface.visualNode.get(), backgroundNode, width, height);
             surface.tabletRootNode = backgroundNode;
@@ -3889,7 +3895,9 @@ namespace dragonboard::ui::rml
         }
         if (surface.tabletRootNode != backgroundNode) {
             const float width = kStatusSurfaceWidth;
-            const float height = width * (32.0f / 250.0f);
+            const float height = width *
+                (static_cast<float>(kStatusSurfaceTextureHeight) /
+                 static_cast<float>(kStatusSurfaceTextureWidth));
             ApplyTabletSurfaceRotation(
                 surface.visualNode.get(), backgroundNode, width, height);
             surface.tabletRootNode = backgroundNode;
@@ -4348,8 +4356,8 @@ namespace dragonboard::ui::rml
         }
         if (!_device || !_rmlUi || !_rmlUi->GetRenderer()) return false;
 
-        constexpr std::uint32_t width = 250;
-        constexpr std::uint32_t height = 32;
+        constexpr std::uint32_t width = kStatusSurfaceTextureWidth;
+        constexpr std::uint32_t height = kStatusSurfaceTextureHeight;
         D3D11_TEXTURE2D_DESC desc{};
         desc.Width = width;
         desc.Height = height;
@@ -4436,10 +4444,11 @@ namespace dragonboard::ui::rml
                 snapshot = _statusSurfaceSnapshot;
             }
             _statusWidget->SetData(
+                std::move(snapshot.name),
+                snapshot.level,
                 snapshot.gold,
                 snapshot.weight,
-                snapshot.capacity,
-                std::move(snapshot.location));
+                snapshot.capacity);
         }
         auto& surface = StatusSceneSurface();
         if (surface.pointer) {
@@ -6506,18 +6515,21 @@ namespace dragonboard::ui::rml
             for (std::size_t index = 0; index < skillNames.size(); ++index) {
                 const auto& skill = skillData.skills[index];
                 auto value = std::format("{:.0f}", skill.level);
+                std::string experience;
                 if (skill.levelThreshold > 0.0f) {
-                    value += std::format(
-                        "  {:.0f}/{:.0f} XP",
+                    experience = std::format(
+                        "{:.0f}/{:.0f} XP",
                         skill.xp,
                         skill.levelThreshold);
                 }
                 if (skillData.legendaryLevels[index] > 0) {
-                    value += std::format(
-                        "  Legendary {}",
+                    if (!experience.empty()) experience += "  ";
+                    experience += std::format(
+                        "Legendary {}",
                         skillData.legendaryLevels[index]);
                 }
-                skills.push_back({ skillNames[index], std::move(value) });
+                skills.push_back({
+                    skillNames[index], std::move(value), std::move(experience) });
             }
         }
 
