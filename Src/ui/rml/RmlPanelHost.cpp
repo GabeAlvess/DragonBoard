@@ -33,6 +33,7 @@
 #include <cmath>
 #include <fstream>
 #include <format>
+#include <nlohmann/json.hpp>
 #include <Windows.h>
 
 #include <d3d11.h>
@@ -43,6 +44,78 @@ namespace dragonboard::ui::rml
 {
     namespace
     {
+        constexpr auto kPrismaPanelCatalogPath =
+            "Data/SKSE/Plugins/DragonBoardVR/PrismaPanels.json";
+        constexpr auto kPrismaExternalCleanupScript = R"JS(
+            (() => {
+                if (window.__dragonboardPointerMoveHandler) document.removeEventListener("mousemove", window.__dragonboardPointerMoveHandler, true);
+                if (window.__dragonboardPointerDownHandler) document.removeEventListener("mousedown", window.__dragonboardPointerDownHandler, true);
+                if (window.__dragonboardPointerUpHandler) document.removeEventListener("mouseup", window.__dragonboardPointerUpHandler, true);
+                if (window.__dragonboardKeyboardFocusHandler) document.removeEventListener("focusin", window.__dragonboardKeyboardFocusHandler, true);
+                document.getElementById("dragonboard-external-pointer")?.remove();
+                document.querySelectorAll("[data-dragonboard-keyboard-token]").forEach(element => element.removeAttribute("data-dragonboard-keyboard-token"));
+                delete window.__dragonboardExternalPointerInstalled;
+                delete window.__dragonboardPointerMoveHandler;
+                delete window.__dragonboardPointerDownHandler;
+                delete window.__dragonboardPointerUpHandler;
+                delete window.__dragonboardKeyboardInstalled;
+                delete window.__dragonboardKeyboardFocusHandler;
+                delete window.__dragonboardKeyboardFinished;
+            })();
+        )JS";
+
+        std::string NormalizePrismaViewPath(std::string path)
+        {
+            constexpr std::string_view prefix = "file:///views/";
+            if (path.starts_with(prefix)) path.erase(0, prefix.size());
+            return path;
+        }
+
+        void LoadPrismaPanelCatalog(std::unordered_set<std::string>& paths)
+        {
+            std::ifstream stream(kPrismaPanelCatalogPath);
+            if (!stream) return;
+            try {
+                const auto document = nlohmann::json::parse(stream);
+                for (const auto& value : document.value("panels", nlohmann::json::array())) {
+                    if (value.is_string()) paths.insert(value.get<std::string>());
+                }
+            } catch (const std::exception& error) {
+                logger::warn("DragonBoardVR: failed to load PrismaUI panel catalog: {}", error.what());
+            }
+        }
+
+        bool ScanPrismaPanelFolders(std::unordered_set<std::string>& paths)
+        {
+            bool changed = false;
+            const std::filesystem::path viewsRoot = "Data/PrismaUI/views";
+            std::error_code error;
+            for (std::filesystem::directory_iterator iterator(viewsRoot, error), end;
+                 !error && iterator != end; iterator.increment(error)) {
+                if (!iterator->is_directory(error)) continue;
+                const auto indexPath = iterator->path() / "index.html";
+                if (!std::filesystem::is_regular_file(indexPath, error)) continue;
+                changed |= paths.insert(
+                    iterator->path().filename().generic_string() + "/index.html").second;
+            }
+            return changed;
+        }
+
+        void SavePrismaPanelCatalog(const std::unordered_set<std::string>& paths)
+        {
+            try {
+                std::filesystem::create_directories(
+                    std::filesystem::path(kPrismaPanelCatalogPath).parent_path());
+                std::vector<std::string> sorted(paths.begin(), paths.end());
+                std::sort(sorted.begin(), sorted.end());
+                std::ofstream stream(kPrismaPanelCatalogPath, std::ios::trunc);
+                if (!stream) return;
+                stream << nlohmann::json{ { "version", 1 }, { "panels", sorted } }.dump(2);
+            } catch (const std::exception& error) {
+                logger::warn("DragonBoardVR: failed to save PrismaUI panel catalog: {}", error.what());
+            }
+        }
+
         constexpr float kSceneScreenSizeScale = 0.85f;
         constexpr float kScenePlaneExtent = 170.666656f;
         constexpr float kSceneScreenSurfaceDepth = 0.50f;
@@ -683,6 +756,7 @@ namespace dragonboard::ui::rml
         _sceneSurfaces.emplace(
             kKeyboardSurfaceHandle,
             SurfaceState{ "DragonBoardVR.Keyboard" });
+        KeyboardSceneSurface().boardWidget = true;
         _sceneSurfaces.emplace(
             kWelcomeSurfaceHandle,
             SurfaceState{ "DragonBoardVR.WelcomeTutorial" });
@@ -1183,6 +1257,7 @@ namespace dragonboard::ui::rml
 
     RmlPanelHost::~RmlPanelHost()
     {
+        ClosePrismaUiPresentThread();
         _widgetLabelAtlas.reset();
         _statusWidget.reset();
         for (auto& [handle, sceneSurface] : _sceneSurfaces) {
@@ -1777,6 +1852,9 @@ namespace dragonboard::ui::rml
 
     void RmlPanelHost::Close()
     {
+        if (_prismaActive || _prismaView) {
+            _prismaClosePending.store(true, std::memory_order_release);
+        }
         if (_localPanelMode.load(std::memory_order_acquire) ==
             LocalPanelMode::kWelcome) {
             _welcomeResetPending.store(true, std::memory_order_release);
@@ -1822,6 +1900,9 @@ namespace dragonboard::ui::rml
 
     void RmlPanelHost::ResetPanelInput()
     {
+        if (_prismaActive || _prismaView) {
+            _prismaClosePending.store(true, std::memory_order_release);
+        }
         _inputBridge.Reset();
     }
 
@@ -3080,7 +3161,7 @@ namespace dragonboard::ui::rml
             if (!surface.node) {
                 surface.node = RE::NiPointer<RE::NiNode>(RE::NiNode::Create(1));
                 surface.visualNode = vrui::VRUIWidget::loadModelFromNif(
-                    "DragonBoardVR\\RmlUIScreen.nif", false);
+                    "DragonBoardVR\\GalleryPhotoSurface.nif", false);
                 if (!surface.node || !surface.visualNode) {
                     surface.node = nullptr;
                     surface.visualNode = nullptr;
@@ -3104,7 +3185,7 @@ namespace dragonboard::ui::rml
                         if (!geometry) {
                             return RE::BSVisit::BSVisitControl::kContinue;
                         }
-                        auto binding = IsolateRmlSurfaceMaterial(*geometry);
+                        auto binding = IsolateRmlSurfaceMaterial(*geometry, false);
                         if (!binding) {
                             return RE::BSVisit::BSVisitControl::kContinue;
                         }
@@ -3117,8 +3198,6 @@ namespace dragonboard::ui::rml
                         materialFound = true;
                         return RE::BSVisit::BSVisitControl::kStop;
                     });
-                vrui::VRUIWidget::normalizePhysicalMaterialLighting(
-                    surface.visualNode.get(), true);
                 if (!materialFound || !surface.sourceTexture) {
                     logger::error(
                         "DragonBoardVR: gallery photo '{}' has no isolated surface material.",
@@ -3134,7 +3213,7 @@ namespace dragonboard::ui::rml
                 surface.textureBridge->resourceView = surface.shaderResource;
                 surface.sourceTexture->rendererTexture = surface.textureBridge.get();
                 if (surface.shaderProperty) {
-                    ConfigureRmlSurfaceFullbright(*surface.shaderProperty);
+                    ConfigureRmlSurfaceShadowReceiver(*surface.shaderProperty);
                 }
                 surface.node->AttachChild(surface.visualNode.get());
 
@@ -4066,33 +4145,12 @@ namespace dragonboard::ui::rml
         }
 
         if (!surface.node) {
-            RE::BSGeometry* boardGeometry = nullptr;
-            RE::BSVisit::TraverseScenegraphGeometries(
-                backgroundNode,
-                [&](RE::BSGeometry* geometry) -> RE::BSVisit::BSVisitControl {
-                    if (geometry && geometry->name == "DragonBoard") {
-                        boardGeometry = geometry;
-                        return RE::BSVisit::BSVisitControl::kStop;
-                    }
-                    return RE::BSVisit::BSVisitControl::kContinue;
-                });
-
             RE::NiTransform boardRelative{};
             bool hasBoardRelativeTransform = false;
-            if (boardGeometry) {
-                boardRelative = boardGeometry->local;
-                auto* ancestor = boardGeometry->parent;
-                while (ancestor && ancestor != backgroundNode) {
-                    boardRelative.translate = ancestor->local.translate +
-                        (ancestor->local.rotate * boardRelative.translate) *
-                            ancestor->local.scale;
-                    boardRelative.rotate = ancestor->local.rotate * boardRelative.rotate;
-                    boardRelative.scale *= ancestor->local.scale;
-                    ancestor = ancestor->parent;
-                }
-                hasBoardRelativeTransform = ancestor == backgroundNode;
-            }
-            if (!hasBoardRelativeTransform) {
+            if (const auto resolved = ResolveBoardRelativeTransform(backgroundNode)) {
+                boardRelative = *resolved;
+                hasBoardRelativeTransform = true;
+            } else {
                 hasBoardRelativeTransform =
                     TryGetConfiguredRmlSurfaceTransform(boardRelative);
             }
@@ -4111,10 +4169,9 @@ namespace dragonboard::ui::rml
 
             constexpr float width = 15.0f;
             constexpr float height = width * 9.0f / 16.0f;
-            RE::NiMatrix3 fit{};
-            fit.entry[0][0] = width / kScenePlaneExtent;
-            fit.entry[1][1] = height / kScenePlaneExtent;
-            surface.visualNode->local.rotate = fit;
+            ApplyTabletSurfaceRotation(
+                surface.visualNode.get(), backgroundNode, width, height);
+            surface.tabletRootNode = backgroundNode;
             surface.visualNode->local.translate = {};
             surface.visualNode->local.scale = 1.0f;
 
@@ -4157,25 +4214,35 @@ namespace dragonboard::ui::rml
             }
             surface.node->AttachChild(surface.visualNode.get());
 
-            const RE::NiPoint3 offset{ 0.0f, -12.0f, 1.2f };
+            const RE::NiPoint3 offset{
+                0.0f, 0.0f, kSceneScreenSurfaceDepth + 0.35f };
             if (hasBoardRelativeTransform) {
                 surface.node->local.translate = boardRelative.translate +
                     (boardRelative.rotate * offset) * boardRelative.scale;
                 surface.node->local.rotate = boardRelative.rotate;
                 surface.node->local.scale = boardRelative.scale;
             } else {
-                surface.node->local.translate = offset;
-                surface.node->local.rotate = RE::NiMatrix3{};
-                surface.node->local.scale = 1.0f;
+                surface.node->local = BoardWidgetDefaultTransform(1.0f);
+                surface.node->local.translate.z += 0.35f;
             }
-            RegisterAndApplySurfaceTransform(surface);
+            surface.defaultTransform = surface.node->local;
+            surface.hasDefaultTransform = true;
             backgroundNode->AttachChild(surface.node.get());
+            RegisterAndApplySurfaceTransform(surface);
             logger::trace(
                 "DragonBoardVR: independent keyboard surface attached.");
         } else if (surface.node->parent != backgroundNode &&
                    !surface.grabController.IsGrabbed()) {
             if (surface.node->parent) surface.node->parent->DetachChild(surface.node.get());
             backgroundNode->AttachChild(surface.node.get());
+        }
+        if (surface.tabletRootNode != backgroundNode) {
+            constexpr float width = 15.0f;
+            constexpr float height = width * 9.0f / 16.0f;
+            ApplyTabletSurfaceRotation(
+                surface.visualNode.get(), backgroundNode, width, height);
+            surface.tabletRootNode = backgroundNode;
+            RegisterAndApplySurfaceTransform(surface);
         }
 
         if (!surface.sceneVisible) {
@@ -4275,6 +4342,9 @@ namespace dragonboard::ui::rml
 
     void RmlPanelHost::RenderPresentThread(float deltaTime)
     {
+        if (_prismaClosePending.exchange(false, std::memory_order_acq_rel)) {
+            ClosePrismaUiPresentThread();
+        }
         UpdateSharedKeyboardPresentThread();
         if (_languageReloadPending.exchange(false, std::memory_order_acq_rel)) {
             ReloadLocalizationPresentThread();
@@ -4345,6 +4415,547 @@ namespace dragonboard::ui::rml
             _widgetLabelAtlas->RenderPresentThread(
                 _device, _rmlUi->GetRenderer());
         }
+    }
+
+    void RmlPanelHost::OnPrismaDomReady(PrismaView view)
+    {
+        logger::info("DragonBoardVR: PrismaUI view {} DOM is ready.", view);
+        auto& host = GetSingleton();
+        if (view == host._prismaLauncherView) {
+            host._prismaLauncherDomReadyPending.store(true, std::memory_order_release);
+            host._prismaLauncherRefreshPending.store(true, std::memory_order_release);
+        }
+    }
+
+    void RmlPanelHost::OnPrismaClose(const char*)
+    {
+        GetSingleton()._prismaClosePending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::OnPrismaOpenView(const char* argument)
+    {
+        if (!argument || !*argument) return;
+        PrismaView view = 0;
+        const auto end = argument + std::char_traits<char>::length(argument);
+        const auto [position, error] = std::from_chars(argument, end, view);
+        if (error != std::errc{} || position != end || !view) return;
+        GetSingleton()._prismaOpenViewPending.store(view, std::memory_order_release);
+    }
+
+    void RmlPanelHost::OnPrismaKeyboardRequest(const char* argument)
+    {
+        if (!argument || !*argument) return;
+        auto& host = GetSingleton();
+        {
+            std::scoped_lock lock(host._prismaKeyboardRequestMutex);
+            host._prismaKeyboardRequestPayload = argument;
+        }
+        host._prismaKeyboardRequestPending.store(true, std::memory_order_release);
+    }
+
+    void RmlPanelHost::OnPrismaConsole(
+        PrismaView view,
+        PRISMA_UI_API::ConsoleMessageLevel level,
+        const char* message)
+    {
+        if (level != PRISMA_UI_API::ConsoleMessageLevel::Error) return;
+        logger::error(
+            "DragonBoardVR: PrismaUI view {} reported: {}",
+            view,
+            message ? message : "unknown page error");
+        GetSingleton()._inputBridge.SetHaptic(static_cast<std::uint8_t>(
+            DragonBoardRmlUi::HapticCue::kError));
+    }
+
+    bool RmlPanelHost::OpenPrismaUiPresentThread()
+    {
+        if (_prismaActive) return true;
+        if (!_prismaUi) {
+            _prismaUi = PRISMA_UI_API::RequestPluginAPI<PRISMA_UI_API::IVPrismaUI3>();
+        }
+        if (!_prismaUi) {
+            logger::error(
+                "DragonBoardVR: PrismaUI V3 is unavailable; install the external-surface build.");
+            RE::DebugNotification("DragonBoardVR: PrismaUI V3 is unavailable.");
+            _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                DragonBoardRmlUi::HapticCue::kError));
+            return false;
+        }
+
+        if (!_prismaCatalogLoaded) {
+            LoadPrismaPanelCatalog(_prismaKnownPaths);
+            _prismaCatalogLoaded = true;
+        }
+        if (ScanPrismaPanelFolders(_prismaKnownPaths)) {
+            SavePrismaPanelCatalog(_prismaKnownPaths);
+        }
+
+        _prismaLauncherView = _prismaUi->CreateView(
+            "DragonBoardVR/index.html", &RmlPanelHost::OnPrismaDomReady);
+        if (!_prismaLauncherView ||
+            !_prismaUi->SetExternalSurfaceHost(_prismaLauncherView, true)) {
+            logger::error(
+                "DragonBoardVR: PrismaUI could not create the launcher page.");
+            RE::DebugNotification("DragonBoardVR: PrismaUI launcher could not be opened.");
+            _inputBridge.SetHaptic(static_cast<std::uint8_t>(
+                DragonBoardRmlUi::HapticCue::kError));
+            if (_prismaLauncherView) _prismaUi->Destroy(_prismaLauncherView);
+            _prismaLauncherView = 0;
+            _prismaView = 0;
+            return false;
+        }
+
+        _prismaUi->RegisterJSListener(
+            _prismaLauncherView, "dragonboardClose", &RmlPanelHost::OnPrismaClose);
+        _prismaUi->RegisterJSListener(
+            _prismaLauncherView, "dragonboardOpenPrismaView", &RmlPanelHost::OnPrismaOpenView);
+        _prismaUi->RegisterConsoleCallback(
+            _prismaLauncherView, &RmlPanelHost::OnPrismaConsole);
+        _prismaView = _prismaLauncherView;
+        _prismaActive = true;
+        _prismaPointerDown = false;
+        _prismaScrollActive = false;
+        _prismaSurfaceRefreshSeconds = 0.0f;
+        _prismaLauncherRefreshSeconds = 0.0f;
+        _prismaViewSwitchGraceSeconds = 0.0f;
+        _prismaLauncherRefreshPending.store(true, std::memory_order_release);
+        _inputBridge.ResetPresentTracking();
+        logger::info(
+            "DragonBoardVR: PrismaUI launcher view {} opened as an external board surface.",
+            _prismaLauncherView);
+        return true;
+    }
+
+    void RmlPanelHost::RefreshPrismaLauncherPresentThread()
+    {
+        if (!_prismaUi || !_prismaLauncherView ||
+            !_prismaUi->IsValid(_prismaLauncherView)) return;
+
+        try {
+            // ponytail: 64 live Prisma panels is the practical ceiling; paginate the API only if a real setup exceeds it.
+            std::array<PRISMA_UI_API::ViewDescriptor, 64> descriptors{};
+            const auto total = _prismaUi->EnumerateViews(
+                descriptors.data(), static_cast<std::uint32_t>(descriptors.size()));
+            const auto count = std::min<std::uint32_t>(
+                total, static_cast<std::uint32_t>(descriptors.size()));
+
+            std::unordered_map<std::string, const PRISMA_UI_API::ViewDescriptor*> liveViews;
+            for (std::uint32_t index = 0; index < count; ++index) {
+                const auto& descriptor = descriptors[index];
+                if (!descriptor.view || descriptor.view == _prismaLauncherView) continue;
+
+                const auto path = NormalizePrismaViewPath(descriptor.htmlPath);
+                if (path == "DragonBoardVR/index.html") continue;
+
+                liveViews[path] = &descriptor;
+                if (_prismaKnownPaths.insert(path).second) {
+                    SavePrismaPanelCatalog(_prismaKnownPaths);
+                }
+
+            }
+
+            ScanPrismaPanelFolders(_prismaKnownPaths);
+            std::vector<std::string> sortedPaths(
+                _prismaKnownPaths.begin(), _prismaKnownPaths.end());
+            std::sort(sortedPaths.begin(), sortedPaths.end());
+            nlohmann::json panels = nlohmann::json::array();
+            for (const auto& path : sortedPaths) {
+                const auto live = liveViews.find(path);
+                panels.push_back({
+                    { "id", live == liveViews.end() ? "" :
+                        std::to_string(live->second->view) },
+                    { "path", path },
+                    { "live", live != liveViews.end() }
+                });
+            }
+
+            const auto payload = panels.dump();
+            if (payload == _prismaLauncherPayload) return;
+            _prismaLauncherPayload = payload;
+            const auto script = std::format(
+                "window.dragonboardSetViews && window.dragonboardSetViews({});",
+                payload);
+            _prismaUi->Invoke(_prismaLauncherView, script.c_str());
+            logger::info(
+                "DragonBoardVR: PrismaUI launcher listed {} panel(s) from {} live view(s).",
+                panels.size(),
+                total);
+        } catch (const std::exception& error) {
+            logger::error(
+                "DragonBoardVR: PrismaUI launcher refresh failed: {}",
+                error.what());
+        }
+    }
+
+    bool RmlPanelHost::SwitchPrismaViewPresentThread(PrismaView view)
+    {
+        if (!_prismaUi || !view || view == _prismaLauncherView ||
+            !_prismaUi->IsValid(view)) return false;
+
+        if (_prismaSurface.texture || _prismaSurface.shaderResourceView) {
+            _prismaUi->ReleaseSurface(&_prismaSurface);
+        }
+        if (_prismaView && _prismaView != _prismaLauncherView) {
+            _prismaUi->Unfocus(_prismaView);
+            _prismaUi->Hide(_prismaView);
+        } else if (_prismaLauncherView) {
+            _prismaUi->Hide(_prismaLauncherView);
+        }
+
+        _prismaUi->SetExternalSurfaceHost(view, true);
+        _prismaUi->Unfocus(view);
+        _prismaUi->Show(view);
+        _prismaUi->RegisterJSListener(
+            view, "dragonboardRequestKeyboard", &RmlPanelHost::OnPrismaKeyboardRequest);
+        auto integrationScript = std::string(R"JS(
+            (() => {
+                const pointerId = "dragonboard-external-pointer";
+                const ensurePointer = () => {
+                    let pointer = document.getElementById(pointerId);
+                    if (pointer) return pointer;
+                    pointer = document.createElement("div");
+                    pointer.id = pointerId;
+                    pointer.setAttribute("aria-hidden", "true");
+                    Object.assign(pointer.style, {
+                        position: "fixed",
+                        left: "-100px",
+                        top: "-100px",
+                        zIndex: "2147483647",
+                        width: "38px",
+                        height: "38px",
+                        border: "4px solid #fff",
+                        borderRadius: "50%",
+                        background: "rgba(83,103,219,.28)",
+                        boxShadow: "0 0 0 3px rgba(17,22,51,.8),0 0 18px rgba(154,170,255,.9)",
+                        pointerEvents: "none",
+                        opacity: "0",
+                        transform: "translate(-50%,-50%)"
+                    });
+                    document.documentElement.appendChild(pointer);
+                    return pointer;
+                };
+                if (!window.__dragonboardExternalPointerInstalled) {
+                    window.__dragonboardExternalPointerInstalled = true;
+                    window.__dragonboardPointerMoveHandler = event => {
+                        const pointer = ensurePointer();
+                        pointer.style.left = `${event.clientX}px`;
+                        pointer.style.top = `${event.clientY}px`;
+                        pointer.style.opacity = "1";
+                    };
+                    window.__dragonboardPointerDownHandler = () => {
+                        const pointer = ensurePointer();
+                        pointer.style.background = "rgba(114,133,239,.8)";
+                        pointer.style.transform = "translate(-50%,-50%) scale(.82)";
+                    };
+                    window.__dragonboardPointerUpHandler = () => {
+                        const pointer = ensurePointer();
+                        pointer.style.background = "rgba(83,103,219,.28)";
+                        pointer.style.transform = "translate(-50%,-50%)";
+                    };
+                    document.addEventListener("mousemove", window.__dragonboardPointerMoveHandler, true);
+                    document.addEventListener("mousedown", window.__dragonboardPointerDownHandler, true);
+                    document.addEventListener("mouseup", window.__dragonboardPointerUpHandler, true);
+                }
+                if (!window.__dragonboardKeyboardInstalled) {
+                    window.__dragonboardKeyboardInstalled = true;
+                    window.__dragonboardKeyboardSequence = 0;
+                    window.__dragonboardKeyboardFinished = ({ token, text, accepted }) => {
+                        const element = document.querySelector(`[data-dragonboard-keyboard-token="${token}"]`);
+                        if (element && accepted) {
+                            if (element.isContentEditable) element.textContent = text;
+                            else element.value = text;
+                            element.dispatchEvent(new Event("input", { bubbles: true }));
+                            element.dispatchEvent(new Event("change", { bubbles: true }));
+                            element.focus();
+                        }
+                        if (element) element.removeAttribute("data-dragonboard-keyboard-token");
+                    };
+                    window.__dragonboardKeyboardFocusHandler = event => {
+                        const element = event.target;
+                        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ||
+                              element?.isContentEditable)) return;
+                        const inputType = (element.type || "text").toLowerCase();
+                        if (["button", "checkbox", "color", "file", "hidden", "radio", "range", "reset", "submit"].includes(inputType)) return;
+                        const token = `db-${++window.__dragonboardKeyboardSequence}`;
+                        element.setAttribute("data-dragonboard-keyboard-token", token);
+                        dragonboardRequestKeyboard(JSON.stringify({
+                            view: "__DRAGONBOARD_VIEW__",
+                            token,
+                            value: element.value || element.textContent || "",
+                            prompt: element.placeholder || element.getAttribute("aria-label") || "Enter text",
+                            maxLength: element.maxLength > 0 ? element.maxLength : 4096
+                        }));
+                    };
+                    document.addEventListener("focusin", window.__dragonboardKeyboardFocusHandler, true);
+                }
+                ensurePointer();
+            })();
+        )JS");
+        integrationScript.replace(
+            integrationScript.find("__DRAGONBOARD_VIEW__"),
+            std::char_traits<char>::length("__DRAGONBOARD_VIEW__"),
+            std::to_string(view));
+        _prismaUi->Invoke(view, integrationScript.c_str());
+        _prismaView = view;
+        _prismaSurface = {};
+        _prismaSurfaceGeneration = 0;
+        _prismaSurfaceRefreshSeconds = 0.0f;
+        _prismaViewSwitchGraceSeconds = 1.0f;
+        _prismaPointerDown = false;
+        _prismaScrollActive = false;
+        _inputBridge.ResetPresentTracking();
+        logger::info("DragonBoardVR: hosting PrismaUI consumer view {}.", view);
+        return true;
+    }
+
+    void RmlPanelHost::ShowPrismaLauncherPresentThread()
+    {
+        if (!_prismaUi || !_prismaLauncherView ||
+            !_prismaUi->IsValid(_prismaLauncherView)) return;
+
+        if (_prismaSurface.texture || _prismaSurface.shaderResourceView) {
+            _prismaUi->ReleaseSurface(&_prismaSurface);
+        }
+        if (_prismaView && _prismaView != _prismaLauncherView &&
+            _prismaUi->IsValid(_prismaView)) {
+            _prismaUi->Unfocus(_prismaView);
+            _prismaUi->Invoke(_prismaView, kPrismaExternalCleanupScript);
+            _prismaUi->Hide(_prismaView);
+            _prismaUi->SetExternalSurfaceHost(_prismaView, false);
+        }
+        _prismaUi->Show(_prismaLauncherView);
+        _prismaView = _prismaLauncherView;
+        _prismaSurface = {};
+        _prismaSurfaceGeneration = 0;
+        _prismaSurfaceRefreshSeconds = 0.0f;
+        _prismaLauncherRefreshSeconds = 0.0f;
+        _prismaViewSwitchGraceSeconds = 0.0f;
+        _prismaPointerDown = false;
+        _prismaScrollActive = false;
+        _prismaLauncherRefreshPending.store(true, std::memory_order_release);
+        _inputBridge.ResetPresentTracking();
+        logger::info("DragonBoardVR: returned to PrismaUI launcher.");
+    }
+
+    void RmlPanelHost::RefreshPrismaSurfacePresentThread()
+    {
+        if (!_prismaUi || !_prismaView) return;
+
+        auto& mainSurface = MainSceneSurface();
+        if (mainSurface.textureBridge) {
+            mainSurface.textureBridge->texture = _panelRenderTexture;
+            mainSurface.textureBridge->resourceView = _panelShaderResource;
+        }
+        if (_prismaSurface.texture || _prismaSurface.shaderResourceView) {
+            _prismaUi->ReleaseSurface(&_prismaSurface);
+        }
+
+        if (!_prismaUi->AcquireSurface(_prismaView, &_prismaSurface)) return;
+        if (mainSurface.textureBridge) {
+            mainSurface.textureBridge->texture = _prismaSurface.texture;
+            mainSurface.textureBridge->resourceView =
+                _prismaSurface.shaderResourceView;
+        }
+        if (_prismaSurfaceGeneration != _prismaSurface.generation) {
+            logger::info(
+                "DragonBoardVR: PrismaUI surface generation {} bound at {}x{}.",
+                _prismaSurface.generation,
+                _prismaSurface.width,
+                _prismaSurface.height);
+            _prismaSurfaceGeneration = _prismaSurface.generation;
+        }
+    }
+
+    void RmlPanelHost::UpdatePrismaUiPresentThread(float deltaTime)
+    {
+        if (_prismaKeyboardRequestPending.exchange(false, std::memory_order_acq_rel)) {
+            std::string requestPayload;
+            {
+                std::scoped_lock lock(_prismaKeyboardRequestMutex);
+                requestPayload = std::move(_prismaKeyboardRequestPayload);
+                _prismaKeyboardRequestPayload.clear();
+            }
+            try {
+                const auto request = nlohmann::json::parse(requestPayload);
+                PrismaView requestedView = 0;
+                const auto viewText = request.value("view", std::string{});
+                const auto [end, error] = std::from_chars(
+                    viewText.data(), viewText.data() + viewText.size(), requestedView);
+                const auto token = request.value("token", std::string{});
+                if (error == std::errc{} && end == viewText.data() + viewText.size() &&
+                    requestedView == _prismaView && requestedView != _prismaLauncherView &&
+                    !token.empty() && _sharedKeyboardPurpose == SharedKeyboardPurpose::kNone) {
+                    const auto prompt = request.value("prompt", std::string("Enter text"));
+                    const auto value = request.value("value", std::string{});
+                    const auto maximumLength = std::clamp(
+                        request.value("maxLength", 4096), 1, 4096);
+                    if (_rmlUi && _rmlUi->OpenKeyboard(prompt, value, maximumLength)) {
+                        if (_prismaPointerDown) {
+                            _prismaUi->SendPointerButton(
+                                _prismaView,
+                                _prismaPointerX,
+                                _prismaPointerY,
+                                PRISMA_UI_API::PointerButton::Left,
+                                false);
+                        }
+                        _prismaPointerDown = false;
+                        _prismaScrollActive = false;
+                        _inputBridge.ResetPresentTracking();
+                        _prismaKeyboardView = requestedView;
+                        _prismaKeyboardElementToken = token;
+                        _sharedKeyboardPurpose = SharedKeyboardPurpose::kPrismaUi;
+                        _keyboardSurfaceVisible.store(true, std::memory_order_release);
+                        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
+                    }
+                }
+            } catch (const std::exception& error) {
+                logger::warn(
+                    "DragonBoardVR: invalid PrismaUI keyboard request: {}",
+                    error.what());
+            }
+        }
+
+        if (const auto requestedView =
+                _prismaOpenViewPending.exchange(0, std::memory_order_acq_rel)) {
+            SwitchPrismaViewPresentThread(requestedView);
+        }
+
+        _prismaViewSwitchGraceSeconds = std::max(
+            0.0f, _prismaViewSwitchGraceSeconds - std::clamp(deltaTime, 0.0f, 0.1f));
+        if (_prismaView && _prismaView != _prismaLauncherView &&
+            _prismaViewSwitchGraceSeconds <= 0.0f &&
+            (!_prismaUi->IsValid(_prismaView) || _prismaUi->IsHidden(_prismaView))) {
+            ShowPrismaLauncherPresentThread();
+        }
+
+        if (_prismaView == _prismaLauncherView) {
+            _prismaLauncherRefreshSeconds += std::clamp(deltaTime, 0.0f, 0.1f);
+            const bool domReady = _prismaLauncherDomReadyPending.exchange(
+                false, std::memory_order_acq_rel);
+            if (domReady) _prismaLauncherPayload.clear();
+            if (domReady ||
+                _prismaLauncherRefreshPending.exchange(false, std::memory_order_acq_rel) ||
+                _prismaLauncherRefreshSeconds >= 1.0f) {
+                _prismaLauncherRefreshSeconds = 0.0f;
+                RefreshPrismaLauncherPresentThread();
+            }
+        }
+
+        _prismaSurfaceRefreshSeconds += std::clamp(deltaTime, 0.0f, 0.1f);
+        if (!_prismaSurface.texture || _prismaSurfaceRefreshSeconds >= 1.0f) {
+            _prismaSurfaceRefreshSeconds = 0.0f;
+            RefreshPrismaSurfacePresentThread();
+        }
+        if (!_prismaSurface.texture || _prismaSurface.width == 0 ||
+            _prismaSurface.height == 0) {
+            return;
+        }
+
+        if (_sharedKeyboardPurpose == SharedKeyboardPurpose::kPrismaUi &&
+            _keyboardSurfaceVisible.load(std::memory_order_acquire)) {
+            return;
+        }
+
+        const auto input = _inputBridge.CapturePresentUpdate(
+            static_cast<int>(_prismaSurface.width),
+            static_cast<int>(_prismaSurface.height));
+        const int pointerX = std::clamp(
+            static_cast<int>(std::lround(
+                std::clamp(input.state.pointerU, 0.0f, 1.0f) *
+                static_cast<float>(_prismaSurface.width))),
+            0,
+            static_cast<int>(_prismaSurface.width) - 1);
+        const int pointerY = std::clamp(
+            static_cast<int>(std::lround(
+                std::clamp(input.state.pointerV, 0.0f, 1.0f) *
+                static_cast<float>(_prismaSurface.height))),
+            0,
+            static_cast<int>(_prismaSurface.height) - 1);
+
+        if (input.state.pointerOnPanel &&
+            (input.pointerChanged || pointerX != _prismaPointerX ||
+             pointerY != _prismaPointerY)) {
+            _prismaUi->SendPointerMove(_prismaView, pointerX, pointerY);
+        }
+
+        const bool pointerDown = input.state.triggerDown &&
+            (input.state.pointerOnPanel || _prismaPointerDown);
+        if (pointerDown != _prismaPointerDown) {
+            _prismaUi->SendPointerButton(
+                _prismaView,
+                pointerX,
+                pointerY,
+                PRISMA_UI_API::PointerButton::Left,
+                pointerDown);
+            _prismaPointerDown = pointerDown;
+        }
+
+        const bool scrolling = input.state.gripDown && !input.state.triggerDown &&
+            input.state.pointerOnPanel;
+        if (scrolling) {
+            if (_prismaScrollActive) {
+                const int deltaX = pointerX - _prismaPointerX -
+                    static_cast<int>(std::lround(
+                        input.state.stickX * 900.0f * deltaTime));
+                const int deltaY = pointerY - _prismaPointerY +
+                    static_cast<int>(std::lround(
+                        input.state.stickY * 900.0f * deltaTime));
+                if (deltaX != 0 || deltaY != 0) {
+                    _prismaUi->SendPointerScroll(_prismaView, deltaX, deltaY);
+                }
+            }
+            _prismaScrollActive = true;
+        } else {
+            _prismaScrollActive = false;
+        }
+
+        _prismaPointerX = pointerX;
+        _prismaPointerY = pointerY;
+    }
+
+    void RmlPanelHost::ClosePrismaUiPresentThread()
+    {
+        auto& mainSurface = MainSceneSurface();
+        if (mainSurface.textureBridge) {
+            mainSurface.textureBridge->texture = _panelRenderTexture;
+            mainSurface.textureBridge->resourceView = _panelShaderResource;
+        }
+        if (_prismaUi &&
+            (_prismaSurface.texture || _prismaSurface.shaderResourceView)) {
+            _prismaUi->ReleaseSurface(&_prismaSurface);
+        }
+        if (_prismaUi && _prismaView && _prismaView != _prismaLauncherView &&
+            _prismaUi->IsValid(_prismaView)) {
+            _prismaUi->Unfocus(_prismaView);
+            _prismaUi->Invoke(_prismaView, kPrismaExternalCleanupScript);
+            _prismaUi->Hide(_prismaView);
+            _prismaUi->SetExternalSurfaceHost(_prismaView, false);
+        }
+        if (_prismaUi && _prismaLauncherView) {
+            _prismaUi->RegisterConsoleCallback(_prismaLauncherView, nullptr);
+            _prismaUi->SetExternalSurfaceHost(_prismaLauncherView, false);
+            _prismaUi->Destroy(_prismaLauncherView);
+            logger::info("DragonBoardVR: PrismaUI external surface closed.");
+        }
+        _prismaLauncherView = 0;
+        _prismaView = 0;
+        _prismaSurface = {};
+        _prismaSurfaceGeneration = 0;
+        _prismaActive = false;
+        _prismaPointerDown = false;
+        _prismaScrollActive = false;
+        _prismaSurfaceRefreshSeconds = 0.0f;
+        _prismaLauncherRefreshSeconds = 0.0f;
+        _prismaViewSwitchGraceSeconds = 0.0f;
+        _prismaLauncherPayload.clear();
+        _prismaLauncherRefreshPending.store(false, std::memory_order_release);
+        _prismaLauncherDomReadyPending.store(false, std::memory_order_release);
+        _prismaOpenViewPending.store(0, std::memory_order_release);
+        _prismaKeyboardRequestPending.store(false, std::memory_order_release);
+        _prismaKeyboardView = 0;
+        _prismaKeyboardElementToken.clear();
+        _inputBridge.ResetPresentTracking();
+        _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
     }
 
     bool RmlPanelHost::EnsureStatusRenderTargetPresentThread()
@@ -4707,6 +5318,13 @@ namespace dragonboard::ui::rml
     void RmlPanelHost::RenderPanel(float deltaTime)
     {
         if (!_visible.load() || !InitializeRenderer()) return;
+        if (_prismaActive) {
+            UpdatePrismaUiPresentThread(deltaTime);
+            if (!_rmlUi || !_rmlUi->IsKeyboardOpen() ||
+                _sharedKeyboardPurpose != SharedKeyboardPurpose::kPrismaUi) {
+                return;
+            }
+        }
         const auto& settings = vrui::VRUISettings::get();
         const auto requestedWidth = static_cast<std::uint32_t>(settings.rmlRenderWidth);
         const auto requestedHeight = static_cast<std::uint32_t>(settings.rmlRenderHeight);
@@ -4914,6 +5532,19 @@ namespace dragonboard::ui::rml
                         "DragonBoardVR: pinned item lock {} from RmlUi settings.",
                         locked ? "enabled" : "disabled");
                 }
+                if (_rmlUi->ConsumeAlwaysOnDisplayToggleRequested()) {
+                    bool enabled = false;
+                    {
+                        std::scoped_lock lock(_draftMutex);
+                        _draft.alwaysOnDisplay = !_draft.alwaysOnDisplay;
+                        enabled = _draft.alwaysOnDisplay;
+                    }
+                    _rmlUi->SetAlwaysOnDisplayEnabled(enabled);
+                    _applyPending.store(true);
+                    logger::info(
+                        "DragonBoardVR: physical board always-on display {} from RmlUi settings.",
+                        enabled ? "enabled" : "disabled");
+                }
                 if (_rmlUi->ConsumePositionAdjustmentRequested()) {
                     _positionAdjustmentTogglePending.store(
                         true, std::memory_order_release);
@@ -5037,7 +5668,9 @@ namespace dragonboard::ui::rml
             } else if (modsRmlActive) {
                 const auto [action, index] = _rmlUi->ConsumeModsAction();
                 using ModsAction = dragonboard::ui::rml::DragonBoardRmlUi::ModsAction;
-                if (action == ModsAction::kAdd) _modsAddPending.store(true);
+                if (action == ModsAction::kOpenPrismaUi) {
+                    OpenPrismaUiPresentThread();
+                } else if (action == ModsAction::kAdd) _modsAddPending.store(true);
                 else if (action == ModsAction::kClose) _modsClosePending.store(true);
                 else if (action == ModsAction::kActivate) _modsActivatePending.store(index);
                 else if (action == ModsAction::kRefreshIni) _iniScanPending.store(true);
@@ -5507,6 +6140,7 @@ namespace dragonboard::ui::rml
         _rmlUi->SetSliderValue("labelYOffset", _draft.labelYOffset);
         _rmlUi->SetSliderValue("labelZOffset", _draft.labelZOffset);
         _rmlUi->SetPinsLocked(_draft.lockPins);
+        _rmlUi->SetAlwaysOnDisplayEnabled(_draft.alwaysOnDisplay);
         _rmlUi->SetDeveloperButtonEnabled(_draft.showDevButton);
         _rmlUi->SetShowTutorialsEnabled(_draft.showTutorials);
         _rmlUi->SetStatusWidgetEnabled(_draft.statusWidgetVisible);
@@ -7559,8 +8193,25 @@ namespace dragonboard::ui::rml
 
         const auto purpose = _sharedKeyboardPurpose;
         if (!result->accepted) {
+            if (purpose == SharedKeyboardPurpose::kPrismaUi && _prismaUi &&
+                _prismaKeyboardView && _prismaUi->IsValid(_prismaKeyboardView)) {
+                const auto payload = nlohmann::json{
+                    { "token", _prismaKeyboardElementToken },
+                    { "text", "" },
+                    { "accepted", false }
+                }.dump();
+                const auto script = std::format(
+                    "window.__dragonboardKeyboardFinished && window.__dragonboardKeyboardFinished({});",
+                    payload);
+                _prismaUi->Invoke(_prismaKeyboardView, script.c_str());
+            }
+            _prismaKeyboardView = 0;
+            _prismaKeyboardElementToken.clear();
             _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
             _keyboardSurfaceVisible.store(false, std::memory_order_release);
+            _prismaPointerDown = false;
+            _prismaScrollActive = false;
+            _inputBridge.ResetPresentTracking();
             _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
             return;
         }
@@ -7631,10 +8282,26 @@ namespace dragonboard::ui::rml
                 }
                 _rmlModsSyncPending.store(true, std::memory_order_release);
             }
+        } else if (purpose == SharedKeyboardPurpose::kPrismaUi && _prismaUi &&
+                   _prismaKeyboardView && _prismaUi->IsValid(_prismaKeyboardView)) {
+            const auto payload = nlohmann::json{
+                { "token", _prismaKeyboardElementToken },
+                { "text", result->text },
+                { "accepted", true }
+            }.dump();
+            const auto script = std::format(
+                "window.__dragonboardKeyboardFinished && window.__dragonboardKeyboardFinished({});",
+                payload);
+            _prismaUi->Invoke(_prismaKeyboardView, script.c_str());
         }
 
+        _prismaKeyboardView = 0;
+        _prismaKeyboardElementToken.clear();
         _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
         _keyboardSurfaceVisible.store(false, std::memory_order_release);
+        _prismaPointerDown = false;
+        _prismaScrollActive = false;
+        _inputBridge.ResetPresentTracking();
         _renderScheduler.MarkDirty(RmlDirtyReason::kDocument);
     }
 

@@ -18,7 +18,9 @@ namespace dragonboard::ui::rml
     [[nodiscard]] RE::NiPointer<RE::NiSourceTexture> CreateIsolatedSourceTexture(
         const RE::NiSourceTexture& source);
     [[nodiscard]] RmlSurfaceMaterialBinding IsolateRmlSurfaceMaterial(
-        RE::BSGeometry& geometry);
+        RE::BSGeometry& geometry,
+        bool configureFullbright = true);
     void ConfigureRmlSurfaceFullbright(RE::BSShaderProperty& property);
+    void ConfigureRmlSurfaceShadowReceiver(RE::BSShaderProperty& property);
     void RefreshRmlSurfaceShader(RE::BSShaderProperty& property);
 }

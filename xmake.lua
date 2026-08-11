@@ -57,6 +57,12 @@ target('DragonBoardVR')
     add_installfiles('Assets/ui/rml/assets/(**)', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/ui/assets'
     })
+    add_installfiles('Assets/ui/prisma/index.html', {
+        prefixdir = 'PrismaUI/views/DragonBoardVR'
+    })
+    add_installfiles('Assets/ui/rml/assets/Background/(Statistics.jpg)', {
+        prefixdir = 'PrismaUI/views/DragonBoardVR'
+    })
     add_installfiles('Assets/ui/translations/*.json', {
         prefixdir = 'SKSE/Plugins/DragonBoardVR/translations'
     })
@@ -82,6 +88,9 @@ target('DragonBoardVR')
         prefixdir = 'SKSE/Plugins/SkyPatcher/leveledList/DragonBoardVR'
     })
     add_installfiles('Assets/meshes/DragonBoardVR/RmlUIScreen.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
+    add_installfiles('Assets/meshes/DragonBoardVR/GalleryPhotoSurface.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
     add_installfiles('Assets/meshes/DragonBoardVR/dragonboard.nif', {
@@ -132,6 +141,8 @@ target('DragonBoardVR')
         local installFile = path.join(outputDir, path.filename(targetFile))
         os.cp(targetFile, installFile)
         local screenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif')
+        local galleryPhotoNif = path.join(
+            os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'GalleryPhotoSurface.nif')
         local spellWheelNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard.nif')
         local physicalBoardNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard_physical.nif')
         local vrikProxyNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy.nif')
@@ -161,6 +172,8 @@ target('DragonBoardVR')
         os.mkdir(path.join(installRoot, 'meshes', 'Magic'))
         os.mkdir(path.join(installRoot, 'textures'))
         os.cp(screenNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif'))
+        os.cp(galleryPhotoNif, path.join(
+            installRoot, 'meshes', 'DragonBoardVR', 'GalleryPhotoSurface.nif'))
         os.vrunv('powershell', {
             '-NoProfile',
             '-ExecutionPolicy', 'Bypass',
@@ -237,6 +250,13 @@ target('DragonBoardVR')
         os.cp(path.join(rmlUiAssetsDir, '**'), installedRmlUiAssetsDir, {
             rootdir = rmlUiAssetsDir
         })
+        local prismaView = path.join(os.projectdir(), 'Assets', 'ui', 'prisma', 'index.html')
+        local installedPrismaViewDir = path.join(installRoot, 'PrismaUI', 'views', 'DragonBoardVR')
+        os.mkdir(installedPrismaViewDir)
+        os.cp(prismaView, path.join(installedPrismaViewDir, 'index.html'))
+        os.cp(
+            path.join(rmlUiDir, 'assets', 'Background', 'Statistics.jpg'),
+            path.join(installedPrismaViewDir, 'Statistics.jpg'))
         local translationDir = path.join(os.projectdir(), 'Assets', 'ui', 'translations')
         local installedTranslationDir = path.join(outputDir, 'DragonBoardVR', 'translations')
         os.mkdir(installedTranslationDir)

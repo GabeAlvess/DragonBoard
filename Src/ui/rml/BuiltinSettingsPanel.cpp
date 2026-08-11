@@ -80,6 +80,7 @@ namespace dragonboard::ui::rml
         auto& settings = vrui::VRUISettings::get();
         std::scoped_lock lock(_draftMutex);
         _draft.lockPins = settings.lockPins;
+        _draft.alwaysOnDisplay = settings.alwaysOnDisplay;
         _draft.showDevButton = settings.showDevButton;
         _draft.showTutorials = settings.showTutorials;
         _draft.statusWidgetVisible = settings.statusWidgetVisible;
@@ -117,6 +118,7 @@ namespace dragonboard::ui::rml
         const bool tutorialsReenabled =
             !settings.showTutorials && _draft.showTutorials;
         settings.lockPins = _draft.lockPins;
+        settings.alwaysOnDisplay = _draft.alwaysOnDisplay;
         settings.showDevButton = _draft.showDevButton;
         settings.showTutorials = _draft.showTutorials;
         settings.statusWidgetVisible = _draft.statusWidgetVisible;

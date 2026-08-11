@@ -617,6 +617,7 @@ namespace dragonboard::ui::rml
                 BindClick(_settingsDocument, "save");
                 BindClick(_settingsDocument, "position-adjustment");
                 BindClick(_settingsDocument, "toggle-lock-pins");
+                BindClick(_settingsDocument, "toggle-always-on-display");
                 BindClick(_settingsDocument, "toggle-dev-panel");
                 BindClick(_settingsDocument, "toggle-show-tutorials");
                 BindClick(_settingsDocument, "toggle-status-widget");
@@ -682,6 +683,7 @@ namespace dragonboard::ui::rml
             const auto* path = loadDocument(kModsDocumentCandidates, _modsDocument, "Mods");
             loadedDocument = _modsDocument;
             if (_modsDocument) {
+                BindClick(_modsDocument, "mods-prismaui");
                 BindClick(_modsDocument, "mods-add");
                 BindClick(_modsDocument, "mods-tab-actions");
                 BindClick(_modsDocument, "mods-tab-ini");
@@ -2483,6 +2485,11 @@ namespace dragonboard::ui::rml
         return std::exchange(_lockPinsToggleRequested, false);
     }
 
+    bool DragonBoardRmlUi::ConsumeAlwaysOnDisplayToggleRequested()
+    {
+        return std::exchange(_alwaysOnDisplayToggleRequested, false);
+    }
+
     bool DragonBoardRmlUi::ConsumeShowTutorialsToggleRequested()
     {
         return std::exchange(_showTutorialsToggleRequested, false);
@@ -3973,6 +3980,19 @@ namespace dragonboard::ui::rml
         }
     }
 
+    void DragonBoardRmlUi::SetAlwaysOnDisplayEnabled(bool enabled)
+    {
+        if (!_settingsDocument) return;
+        if (auto* toggle =
+                _settingsDocument->GetElementById("toggle-always-on-display")) {
+            toggle->SetClass("enabled", enabled);
+        }
+        if (auto* state = _settingsDocument->GetElementById(
+                "toggle-always-on-display-state")) {
+            state->SetInnerRML(EscapeRml(Tr(enabled ? "On" : "Off")));
+        }
+    }
+
     void DragonBoardRmlUi::SetPositionAdjustmentActive(bool active)
     {
         if (!_settingsDocument) return;
@@ -4398,6 +4418,8 @@ namespace dragonboard::ui::rml
             _itemEditAction = ItemEditAction::kPinRightHand;
         } else if (value == "edit-toggle-label") {
             _itemEditAction = ItemEditAction::kToggleLabel;
+        } else if (value == "mods-prismaui") {
+            _modsAction = ModsAction::kOpenPrismaUi;
         } else if (value == "mods-add") {
             _modsAction = ModsAction::kAdd;
         } else if (value == "mods-close") {
@@ -4637,6 +4659,8 @@ namespace dragonboard::ui::rml
             _positionAdjustmentRequested = true;
         } else if (value == "toggle-lock-pins") {
             _lockPinsToggleRequested = true;
+        } else if (value == "toggle-always-on-display") {
+            _alwaysOnDisplayToggleRequested = true;
         } else if (value == "toggle-dev-panel") {
             _developerPanelToggleRequested = true;
         } else if (value == "toggle-show-tutorials") {

@@ -273,6 +273,8 @@ namespace vrui
         verboseLogging = ini.GetBoolValue("General", "bVerboseLogging", verboseLogging);
         editModeEnabled = ini.GetBoolValue("General", "bEditModeEnabled", editModeEnabled);
         lockPins = ini.GetBoolValue("General", "bLockPins", lockPins);
+        alwaysOnDisplay = ini.GetBoolValue(
+            "General", "bAlwaysOnDisplay", alwaysOnDisplay);
         uiLanguage = ini.GetValue("Interface", "sLanguage", uiLanguage.c_str());
         showTutorials = ini.GetBoolValue(
             "General", "bShowTutorials", showTutorials);
@@ -1232,6 +1234,9 @@ namespace vrui
         ini.SetBoolValue("General", "bVerboseLogging", verboseLogging, "; Enable trace-level logging (default: false, very spammy)");
         ini.SetBoolValue("General", "bEditModeEnabled", editModeEnabled, "; Enable Pin to Dashboard and widget editing features");
         ini.SetBoolValue("General", "bLockPins", lockPins, "; Prevent pinned items from being edited, grabbed, or removed");
+        ini.SetBoolValue(
+            "General", "bAlwaysOnDisplay", alwaysOnDisplay,
+            "; Keep physical DragonBoard panels active after releasing the board");
 
         // [Combat]
         ini.SetBoolValue(
@@ -1653,7 +1658,7 @@ namespace vrui
 
         copyKeys(mainOut, "General", {
             "bVerboseLogging", "bEditModeEnabled", "bLockPins",
-            "bShowTutorials"
+            "bAlwaysOnDisplay", "bShowTutorials"
         });
         copyKeys(mainOut, "Interface", { "sLanguage" });
         copyKeys(mainOut, "MapMarker", {

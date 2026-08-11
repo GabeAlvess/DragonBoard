@@ -530,6 +530,13 @@ namespace
                 if (auto* state = _document->GetElementById("toggle-world-pin-state")) {
                     state->SetInnerRML(_worldPinned ? "On" : "Off");
                 }
+            } else if (id == "toggle-always-on-display") {
+                _alwaysOnDisplay = !_alwaysOnDisplay;
+                element->SetClass("enabled", _alwaysOnDisplay);
+                if (auto* state = _document->GetElementById(
+                        "toggle-always-on-display-state")) {
+                    state->SetInnerRML(_alwaysOnDisplay ? "On" : "Off");
+                }
             } else if (id == "toggle-edit-mode") {
                 _editModeEnabled = !_editModeEnabled;
                 element->SetClass("enabled", _editModeEnabled);
@@ -1870,6 +1877,7 @@ namespace
         bool _poolViolationReported = false;
         bool _developerButtonEnabled = true;
         bool _worldPinned = false;
+        bool _alwaysOnDisplay = false;
         bool _editModeEnabled = true;
         bool _rmlInitialized = false;
         bool _debuggerInitialized = false;

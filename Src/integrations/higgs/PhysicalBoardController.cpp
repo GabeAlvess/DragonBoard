@@ -13,6 +13,19 @@ namespace dragonboard::integrations::higgs
 {
     namespace
     {
+        constexpr bool ShouldRetainReleasedDisplay(
+            bool enabled,
+            bool stashed,
+            bool referenceInWorld,
+            bool hasRoot)
+        {
+            return enabled && !stashed && referenceInWorld && hasRoot;
+        }
+
+        static_assert(ShouldRetainReleasedDisplay(true, false, true, true));
+        static_assert(!ShouldRetainReleasedDisplay(false, false, true, true));
+        static_assert(!ShouldRetainReleasedDisplay(true, true, true, true));
+
         struct PhysicalModelPart
         {
             RE::BSGeometry* geometry = nullptr;
@@ -216,6 +229,7 @@ namespace dragonboard::integrations::higgs
         manager.preparePhysicalBoardRemoval();
         _heldReference.reset();
         _heldLeft = false;
+        _heldByHiggs = false;
         _heldPlayerCellFormID = 0;
         _missingHeldBoardAfterCellChangeFrames = 0;
     }
@@ -257,6 +271,42 @@ namespace dragonboard::integrations::higgs
         const auto currentPlayerCellFormID =
             player && player->parentCell ? player->parentCell->GetFormID() : 0;
         if (!heldReference) {
+            if (_heldReference && !_heldByHiggs) {
+                const auto activeReference = _heldReference.get();
+                auto* rootObject = activeReference ? activeReference->Get3D() : nullptr;
+                auto* rootNode = rootObject ? rootObject->AsNode() : nullptr;
+                const bool playerChangedCell =
+                    _heldPlayerCellFormID != 0 && currentPlayerCellFormID != 0 &&
+                    currentPlayerCellFormID != _heldPlayerCellFormID;
+                if (!vrui::VRUISettings::get().alwaysOnDisplay ||
+                    !activeReference || !activeReference->parentCell || !rootNode ||
+                    playerChangedCell) {
+                    ClearPinnedItemGrabPriority();
+                    vrui::VRMenuManager::get().preparePhysicalBoardRemoval();
+                    _heldReference.reset();
+                    _heldLeft = false;
+                    _heldByHiggs = false;
+                    _heldPlayerCellFormID = 0;
+                    _missingHeldBoardAfterCellChangeFrames = 0;
+                    logger::info(
+                        "DragonBoardVR: released physical board display closed{}.",
+                        playerChangedCell ? " after player cell change" : "");
+                    return;
+                }
+
+                auto& manager = vrui::VRMenuManager::get();
+                if (!manager.isPhysicalBoardActive() ||
+                    manager.getPhysicalBoardAnchorNode() != rootNode) {
+                    manager.setPhysicalBoardAnchor(
+                        rootNode,
+                        _heldLeft,
+                        activeReference->GetFormID());
+                    manager.openMenuForPhysicalBoard();
+                }
+                _missingHeldBoardAfterCellChangeFrames = 0;
+                return;
+            }
+
             const bool playerChangedCell =
                 _heldReference && _heldPlayerCellFormID != 0 &&
                 currentPlayerCellFormID != 0 &&
@@ -307,6 +357,7 @@ namespace dragonboard::integrations::higgs
             ClearPinnedItemGrabPriority();
             _heldReference.reset();
             _heldLeft = false;
+            _heldByHiggs = false;
             _heldPlayerCellFormID = 0;
             _missingHeldBoardAfterCellChangeFrames = 0;
             return;
@@ -336,6 +387,7 @@ namespace dragonboard::integrations::higgs
 
         _heldReference = currentHandle;
         _heldLeft = heldLeft;
+        _heldByHiggs = true;
         manager.setPhysicalBoardAnchor(
             rootNode,
             heldLeft,
@@ -666,6 +718,7 @@ namespace dragonboard::integrations::higgs
 
         _heldReference = reference->CreateRefHandle();
         _heldLeft = isLeft;
+        _heldByHiggs = true;
         const auto* player = RE::PlayerCharacter::GetSingleton();
         _heldPlayerCellFormID =
             player && player->parentCell ? player->parentCell->GetFormID() : 0;
@@ -702,11 +755,38 @@ namespace dragonboard::integrations::higgs
 
         ClearPinnedItemGrabPriority();
         auto& manager = vrui::VRMenuManager::get();
+        auto& vrikController =
+            dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton();
+        const bool alwaysOnDisplay = vrui::VRUISettings::get().alwaysOnDisplay;
+        if (!stashed && reference && alwaysOnDisplay) {
+            vrikController.NotifyPhysicalBoardReleased(reference, false);
+            auto* rootObject = reference->Get3D();
+            auto* rootNode = rootObject ? rootObject->AsNode() : nullptr;
+            if (ShouldRetainReleasedDisplay(
+                    alwaysOnDisplay,
+                    stashed,
+                    reference->parentCell != nullptr,
+                    rootNode != nullptr)) {
+                // ponytail: This retains boards activated through HIGGS; add loaded-cell discovery only if untouched world boards must self-activate.
+                _heldByHiggs = false;
+                manager.setPhysicalBoardAnchor(
+                    rootNode,
+                    _heldLeft,
+                    reference->GetFormID());
+                manager.openMenuForPhysicalBoard();
+                logger::info(
+                    "DragonBoardVR: physical board {:08X} released; UI remains active on the world board.",
+                    reference->GetFormID());
+                return;
+            }
+        } else {
+            vrikController.NotifyPhysicalBoardReleased(reference, stashed);
+        }
+
         manager.preparePhysicalBoardRemoval();
-        dragonboard::integrations::vrik::VrikBoardProxyController::GetSingleton()
-            .NotifyPhysicalBoardReleased(reference, stashed);
         _heldReference.reset();
         _heldLeft = false;
+        _heldByHiggs = false;
         _heldPlayerCellFormID = 0;
         _missingHeldBoardAfterCellChangeFrames = 0;
 

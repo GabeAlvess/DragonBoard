@@ -86,6 +86,7 @@ namespace vrui
         bool verboseLogging = false;        // Enable trace-level logging (very spammy)
         bool editModeEnabled = true;        // Master switch for item editing (MCM)
         bool lockPins = false;               // Prevent pinned items from being edited, grabbed, or removed
+        bool alwaysOnDisplay = false;        // Keep physical-board panels active after the board is released
         std::string uiLanguage = "en";
         bool showTutorials = true;
         bool tutorialsPreviouslyEnabled = true;

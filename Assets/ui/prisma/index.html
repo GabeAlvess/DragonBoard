@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrismaUI Panels</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; cursor: none; }
+        body {
+            color: #f5f7ff;
+            font-family: Arial, sans-serif;
+            background: #070914 url("Statistics.jpg") center / cover no-repeat;
+        }
+        main { width: 100%; height: 100%; padding: 18px 95px 42px; }
+        header { position: relative; display: flex; align-items: center; justify-content: flex-end; height: 122px; }
+        h1 {
+            position: absolute;
+            left: 50%;
+            margin: 0;
+            font-size: 74px;
+            letter-spacing: 6px;
+            text-align: center;
+            transform: translateX(-50%);
+        }
+        #panels {
+            height: 770px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            align-content: start;
+            gap: 28px;
+            padding: 28px 8px 40px;
+        }
+        .panel-card {
+            min-height: 210px;
+            padding: 32px;
+            color: #ffffff;
+            text-align: left;
+            background: rgba(20, 27, 61, 0.94);
+            border: 2px solid rgba(126, 145, 238, 0.62);
+            border-radius: 20px;
+        }
+        .panel-card:hover, .panel-card:focus {
+            background: #354596;
+            border-color: #aebaff;
+            outline: 4px solid rgba(180, 192, 255, 0.35);
+        }
+        .panel-card.unavailable { opacity: 0.58; border-color: rgba(126, 145, 238, 0.28); }
+        .panel-card.unavailable:hover { background: rgba(20, 27, 61, 0.94); outline: none; }
+        .panel-name { display: block; font-size: 42px; line-height: 1.12; }
+        .panel-path {
+            display: block;
+            margin-top: 24px;
+            overflow: hidden;
+            color: #b9c4df;
+            font-size: 25px;
+            line-height: 1.2;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .empty {
+            grid-column: 1 / 4;
+            padding: 180px 60px;
+            color: #c8ccec;
+            font-size: 38px;
+            line-height: 1.45;
+            text-align: center;
+            border: 2px dashed rgba(126, 145, 238, 0.38);
+            border-radius: 24px;
+        }
+        footer { display: flex; align-items: center; justify-content: flex-end; height: 92px; }
+        .back {
+            padding: 18px 38px;
+            color: #ffffff;
+            font-size: 30px;
+            background: #5367db;
+            border: 2px solid #9aaaff;
+            border-radius: 14px;
+        }
+        .back:hover, .back:focus { background: #7285ef; outline: 4px solid rgba(180, 192, 255, 0.45); }
+        #dragonboard-pointer {
+            position: fixed;
+            left: -100px;
+            top: -100px;
+            z-index: 9999;
+            width: 38px;
+            height: 38px;
+            border: 4px solid #ffffff;
+            border-radius: 50%;
+            background: rgba(83, 103, 219, 0.28);
+            box-shadow: 0 0 0 3px rgba(17, 22, 51, 0.8), 0 0 18px rgba(154, 170, 255, 0.9);
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, -50%);
+        }
+        #dragonboard-pointer.visible { opacity: 1; }
+        #dragonboard-pointer.pressed {
+            background: rgba(114, 133, 239, 0.8);
+            transform: translate(-50%, -50%) scale(0.82);
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <h1>PRISMA UI</h1>
+        </header>
+        <section id="panels"><div class="empty">Waiting for PrismaUI mods to create their panels...</div></section>
+        <footer>
+            <button class="back" type="button" onclick="window.dragonboardClose && window.dragonboardClose('close')">Back to Mods</button>
+        </footer>
+    </main>
+    <div id="dragonboard-pointer" aria-hidden="true"></div>
+    <script>
+        const panels = document.getElementById("panels");
+        const pointer = document.getElementById("dragonboard-pointer");
+
+        function panelName(path) {
+            const normalized = String(path || "").replace("file:///views/", "");
+            const folder = normalized.split("/")[0] || "PrismaUI Panel";
+            return folder.replace(/[_-]+/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
+        }
+
+        window.dragonboardSetViews = function (views) {
+            panels.innerHTML = "";
+            if (!views || views.length === 0) {
+                panels.innerHTML = '<div class="empty">No PrismaUI panels have been created yet.<br>Some mods create their panel only after their original hotkey is pressed once.</div>';
+                return;
+            }
+            views.forEach(view => {
+                const card = document.createElement("button");
+                card.type = "button";
+                card.className = "panel-card";
+                card.innerHTML = '<span class="panel-name"></span><span class="panel-path"></span>';
+                card.querySelector(".panel-name").textContent = panelName(view.path);
+                card.querySelector(".panel-path").textContent = view.live ? view.path : "Installed · waiting for mod initialization";
+                if (!view.live) card.classList.add("unavailable");
+                card.addEventListener("click", () => {
+                    if (view.live && window.dragonboardOpenPrismaView) {
+                        window.dragonboardOpenPrismaView(String(view.id));
+                    }
+                });
+                panels.appendChild(card);
+            });
+        };
+
+        document.addEventListener("mousemove", event => {
+            pointer.style.left = `${event.clientX}px`;
+            pointer.style.top = `${event.clientY}px`;
+            pointer.classList.add("visible");
+        });
+        document.addEventListener("mousedown", () => pointer.classList.add("pressed"));
+        document.addEventListener("mouseup", () => pointer.classList.remove("pressed"));
+    </script>
+</body>
+</html>

@@ -59,6 +59,7 @@ namespace dragonboard::integrations::higgs
         RE::TESObjectMISC* _configuredBaseForm = nullptr;
         RE::ObjectRefHandle _heldReference;
         bool _heldLeft = false;
+        bool _heldByHiggs = false;
         std::uint32_t _heldPlayerCellFormID = 0;
         std::uint32_t _missingHeldBoardAfterCellChangeFrames = 0;
         MapStoreStage _mapStoreStage = MapStoreStage::None;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DragonBoardVR_API.h"
+#include "integrations/prismaui/PrismaUI_API.h"
 #include "ui/mods/IniCatalog.h"
 #include "ui/mods/IniScannerProcess.h"
 #include "ui/rml/RmlInputBridge.h"
@@ -302,6 +303,7 @@ namespace dragonboard::ui::rml
         struct SettingsDraft
         {
             bool lockPins = false;
+            bool alwaysOnDisplay = false;
             bool showDevButton = false;
             bool showTutorials = true;
             bool statusWidgetVisible = true;
@@ -373,6 +375,21 @@ namespace dragonboard::ui::rml
         bool EnsureRenderTargetSizePresentThread(std::uint32_t width, std::uint32_t height);
         void AdvanceRmlPrewarmPresentThread();
         void RenderPanel(float deltaTime);
+        bool OpenPrismaUiPresentThread();
+        void RefreshPrismaLauncherPresentThread();
+        bool SwitchPrismaViewPresentThread(PrismaView view);
+        void ShowPrismaLauncherPresentThread();
+        void UpdatePrismaUiPresentThread(float deltaTime);
+        void RefreshPrismaSurfacePresentThread();
+        void ClosePrismaUiPresentThread();
+        static void OnPrismaDomReady(PrismaView view);
+        static void OnPrismaClose(const char* argument);
+        static void OnPrismaOpenView(const char* argument);
+        static void OnPrismaKeyboardRequest(const char* argument);
+        static void OnPrismaConsole(
+            PrismaView view,
+            PRISMA_UI_API::ConsoleMessageLevel level,
+            const char* message);
         void SyncRmlSettingsFromDraft();
         void ReloadLocalizationPresentThread();
         void ApplyRmlSliderChange(std::string_view id, float value);
@@ -526,6 +543,31 @@ namespace dragonboard::ui::rml
         ID3D11ShaderResourceView* _panelShaderResource = nullptr;
         std::uint32_t _panelWidth = 1920;
         std::uint32_t _panelHeight = 1080;
+        PRISMA_UI_API::IVPrismaUI3* _prismaUi = nullptr;
+        PrismaView _prismaLauncherView = 0;
+        PrismaView _prismaView = 0;
+        std::unordered_set<std::string> _prismaKnownPaths;
+        bool _prismaCatalogLoaded = false;
+        PRISMA_UI_API::ExternalSurface _prismaSurface;
+        std::uint64_t _prismaSurfaceGeneration = 0;
+        std::atomic<bool> _prismaClosePending{ false };
+        std::atomic<bool> _prismaLauncherRefreshPending{ false };
+        std::atomic<bool> _prismaLauncherDomReadyPending{ false };
+        std::atomic<PrismaView> _prismaOpenViewPending{ 0 };
+        std::atomic<bool> _prismaKeyboardRequestPending{ false };
+        std::mutex _prismaKeyboardRequestMutex;
+        std::string _prismaKeyboardRequestPayload;
+        PrismaView _prismaKeyboardView = 0;
+        std::string _prismaKeyboardElementToken;
+        bool _prismaActive = false;
+        bool _prismaPointerDown = false;
+        bool _prismaScrollActive = false;
+        int _prismaPointerX = 0;
+        int _prismaPointerY = 0;
+        float _prismaSurfaceRefreshSeconds = 0.0f;
+        float _prismaLauncherRefreshSeconds = 0.0f;
+        float _prismaViewSwitchGraceSeconds = 0.0f;
+        std::string _prismaLauncherPayload;
         std::atomic<bool> _rendererReady{ false };
         std::atomic<bool> _rmlWarmupRequested{ false };
         std::atomic<bool> _rmlWarmupAttempted{ false };
@@ -644,7 +686,8 @@ namespace dragonboard::ui::rml
             kIniSearch,
             kInventorySearch,
             kMagicSearch,
-            kGalleryRename
+            kGalleryRename,
+            kPrismaUi
         };
         SharedKeyboardPurpose _sharedKeyboardPurpose = SharedKeyboardPurpose::kNone;
         std::atomic<bool> _galleryRenameKeyboardPending{ false };

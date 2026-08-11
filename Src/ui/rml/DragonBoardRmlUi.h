@@ -204,6 +204,7 @@ namespace dragonboard::ui::rml
         enum class ModsAction : std::uint8_t
         {
             kNone,
+            kOpenPrismaUi,
             kAdd,
             kClose,
             kActivate,
@@ -530,6 +531,7 @@ namespace dragonboard::ui::rml
         [[nodiscard]] bool ConsumeSaveRequested();
         [[nodiscard]] bool ConsumePositionAdjustmentRequested();
         [[nodiscard]] bool ConsumeLockPinsToggleRequested();
+        [[nodiscard]] bool ConsumeAlwaysOnDisplayToggleRequested();
         [[nodiscard]] bool ConsumeDeveloperPanelToggleRequested();
         [[nodiscard]] bool ConsumeShowTutorialsToggleRequested();
         [[nodiscard]] bool ConsumeStatusWidgetToggleRequested();
@@ -582,6 +584,7 @@ namespace dragonboard::ui::rml
         void SetPinTutorial();
         void SetPositionAdjustmentActive(bool active);
         void SetPinsLocked(bool locked);
+        void SetAlwaysOnDisplayEnabled(bool enabled);
         void SetDeveloperButtonEnabled(bool enabled);
         void SetShowTutorialsEnabled(bool enabled);
         void SetStatusWidgetEnabled(bool enabled);
@@ -764,6 +767,7 @@ namespace dragonboard::ui::rml
         bool _saveRequested = false;
         bool _positionAdjustmentRequested = false;
         bool _lockPinsToggleRequested = false;
+        bool _alwaysOnDisplayToggleRequested = false;
         bool _developerPanelToggleRequested = false;
         bool _showTutorialsToggleRequested = false;
         bool _statusWidgetToggleRequested = false;

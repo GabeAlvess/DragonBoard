@@ -53,6 +53,14 @@
                                 <span id="toggle-world-pin-state" class="toggle-state">Off</span>
                             </button>
                         </div>
+                        <div class="setting-row toggle-setting">
+                            <div class="setting-copy"><span class="setting-label">Always on Display</span></div>
+                            <div class="toggle-space"></div>
+                            <button id="toggle-always-on-display" class="toggle-button">
+                                <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                <span id="toggle-always-on-display-state" class="toggle-state">Off</span>
+                            </button>
+                        </div>
                         <div class="setting-row language-setting">
                             <div class="setting-copy"><span class="setting-label">Interface language</span></div>
                             <div class="language-picker">

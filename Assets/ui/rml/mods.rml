@@ -50,6 +50,7 @@
                     <span id="mods-ini-dirty-status">NO UNSAVED CHANGES</span>
                 </div>
                 <div class="footer-spacer"></div>
+                <button id="mods-prismaui" class="mods-prisma-button"><span>PrismaUI</span></button>
                 <div id="mods-add" class="mods-add-button" tabindex="0"><span class="mods-add-label">Record</span></div>
                 <button id="mods-ini-discard" class="mods-discard-button disabled"><span>Discard</span></button>
                 <button id="mods-ini-save" class="mods-save-button disabled"><span>Save Changes</span></button>

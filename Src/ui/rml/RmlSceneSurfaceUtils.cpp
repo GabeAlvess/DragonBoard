@@ -29,7 +29,9 @@ namespace dragonboard::ui::rml
         return RE::NiPointer<RE::NiSourceTexture>(texture);
     }
 
-    RmlSurfaceMaterialBinding IsolateRmlSurfaceMaterial(RE::BSGeometry& geometry)
+    RmlSurfaceMaterialBinding IsolateRmlSurfaceMaterial(
+        RE::BSGeometry& geometry,
+        bool configureFullbright)
     {
         if (auto* property = geometry.lightingShaderProp_cast()) {
             auto* sourceMaterial = static_cast<RE::BSLightingShaderMaterialBase*>(
@@ -57,7 +59,9 @@ namespace dragonboard::ui::rml
             installedMaterial->diffuseTexture = sourceTexture;
             installedMaterial->hashKey =
                 (std::numeric_limits<std::uint32_t>::max)();
-            ConfigureRmlSurfaceFullbright(*property);
+            if (configureFullbright) {
+                ConfigureRmlSurfaceFullbright(*property);
+            }
             return {
                 RE::NiPointer<RE::BSShaderProperty>(property),
                 std::move(sourceTexture)
@@ -90,7 +94,9 @@ namespace dragonboard::ui::rml
         installedMaterial->sourceTexture = sourceTexture;
         installedMaterial->hashKey =
             (std::numeric_limits<std::uint32_t>::max)();
-        ConfigureRmlSurfaceFullbright(*property);
+        if (configureFullbright) {
+            ConfigureRmlSurfaceFullbright(*property);
+        }
         return {
             RE::NiPointer<RE::BSShaderProperty>(property),
             std::move(sourceTexture)
@@ -148,6 +154,34 @@ namespace dragonboard::ui::rml
                 material->baseColor = RE::NiColorA(1.0f, 1.0f, 1.0f, 1.0f);
                 material->baseColorScale = 1.0f;
             }
+        }
+        RefreshRmlSurfaceShader(property);
+    }
+
+    void ConfigureRmlSurfaceShadowReceiver(RE::BSShaderProperty& property)
+    {
+        auto* lighting = netimmerse_cast<RE::BSLightingShaderProperty*>(
+            std::addressof(property));
+        if (!lighting) return;
+
+        using Flag = RE::BSShaderProperty::EShaderPropertyFlag;
+        property.flags.set(Flag::kNoFade);
+        property.flags.set(Flag::kReceiveShadows);
+        property.flags.reset(Flag::kCastShadows);
+        property.flags.reset(Flag::kOwnEmit);
+        property.flags.reset(Flag::kExternalEmittance);
+        property.flags.reset(Flag::kSpecular);
+        lighting->emissiveMult = 0.0f;
+        if (lighting->emissiveColor) {
+            *lighting->emissiveColor = RE::NiColor(0.0f, 0.0f, 0.0f);
+        }
+
+        auto* material = static_cast<RE::BSLightingShaderMaterialBase*>(
+            lighting->GetBaseMaterial());
+        if (material) {
+            material->specularColor = RE::NiColor(0.0f, 0.0f, 0.0f);
+            material->specularColorScale = 0.0f;
+            material->specularPower = 0.0f;
         }
         RefreshRmlSurfaceShader(property);
     }
