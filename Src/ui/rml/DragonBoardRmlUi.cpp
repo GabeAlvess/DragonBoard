@@ -3088,21 +3088,27 @@ namespace dragonboard::ui::rml
                 "display", info.searchQuery.empty() ? "none" : "flex");
         }
 
-        constexpr std::array<std::pair<const char*, const char*>, 8> kInventoryFilters{ {
-            { "inventory-filter-favorites", "favorites" },
-            { "inventory-filter-weapons", "weapons" },
-            { "inventory-filter-armor", "armor" },
-            { "inventory-filter-potions", "potions" },
-            { "inventory-filter-food", "food" },
-            { "inventory-filter-quest", "quest" },
-            { "inventory-filter-books", "books" },
-            { "inventory-filter-misc", "misc" }
+        constexpr std::array<std::tuple<const char*, const char*, const char*>, 8>
+            kInventoryFilters{ {
+            { "inventory-filter-favorites", "favorites", "Favorites" },
+            { "inventory-filter-weapons", "weapons", "Weapons" },
+            { "inventory-filter-armor", "armor", "Armor" },
+            { "inventory-filter-potions", "potions", "Potions" },
+            { "inventory-filter-food", "food", "Food" },
+            { "inventory-filter-quest", "quest", "Quest Items" },
+            { "inventory-filter-books", "books", "Books" },
+            { "inventory-filter-misc", "misc", "Miscellaneous" }
         } };
-        for (const auto& [id, filter] : kInventoryFilters) {
+        const char* inventoryHeading = "All";
+        for (const auto& [id, filter, displayName] : kInventoryFilters) {
             if (auto* element = _inventoryDocument->GetElementById(id)) {
                 element->SetClass("active", info.activeFilter == filter);
             }
+            if (info.activeFilter == filter) {
+                inventoryHeading = displayName;
+            }
         }
+        setText("inventory-filter-heading", Tr(inventoryHeading));
 
         const std::string contextKey = info.activeFilter + "\n" + info.searchQuery;
         const bool resetScroll = !_inventoryVirtualInitialized ||
@@ -3409,21 +3415,27 @@ namespace dragonboard::ui::rml
             clear->SetProperty("display", info.searchQuery.empty() ? "none" : "flex");
         }
 
-        constexpr std::array<std::pair<const char*, const char*>, 8> kMagicFilters{ {
-            { "magic-filter-favorites", "favorites" },
-            { "magic-filter-destruction", "destruction" },
-            { "magic-filter-conjuration", "conjuration" },
-            { "magic-filter-restoration", "restoration" },
-            { "magic-filter-illusion", "illusion" },
-            { "magic-filter-alteration", "alteration" },
-            { "magic-filter-powers", "powers" },
-            { "magic-filter-passive", "passive" }
+        constexpr std::array<std::tuple<const char*, const char*, const char*>, 8>
+            kMagicFilters{ {
+            { "magic-filter-favorites", "favorites", "Favorites" },
+            { "magic-filter-destruction", "destruction", "Destruction" },
+            { "magic-filter-conjuration", "conjuration", "Conjuration" },
+            { "magic-filter-restoration", "restoration", "Restoration" },
+            { "magic-filter-illusion", "illusion", "Illusion" },
+            { "magic-filter-alteration", "alteration", "Alteration" },
+            { "magic-filter-powers", "powers", "Powers" },
+            { "magic-filter-passive", "passive", "Passive Effects" }
         } };
-        for (const auto& [id, filter] : kMagicFilters) {
+        const char* magicHeading = "All";
+        for (const auto& [id, filter, displayName] : kMagicFilters) {
             if (auto* element = _magicDocument->GetElementById(id)) {
                 element->SetClass("active", info.activeFilter == filter);
             }
+            if (info.activeFilter == filter) {
+                magicHeading = displayName;
+            }
         }
+        setText("magic-filter-heading", Tr(magicHeading));
 
         const std::string contextKey = info.activeFilter + "\n" + info.searchQuery;
         const bool resetScroll = !_magicVirtualInitialized ||

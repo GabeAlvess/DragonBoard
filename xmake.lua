@@ -90,6 +90,9 @@ target('DragonBoardVR')
     add_installfiles('Assets/meshes/DragonBoardVR/RmlUIScreen.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
+    add_installfiles('Assets/meshes/DragonBoardVR/WidgetLabelScreen.nif', {
+        prefixdir = 'meshes/DragonBoardVR'
+    })
     add_installfiles('Assets/meshes/DragonBoardVR/GalleryPhotoSurface.nif', {
         prefixdir = 'meshes/DragonBoardVR'
     })
@@ -141,6 +144,8 @@ target('DragonBoardVR')
         local installFile = path.join(outputDir, path.filename(targetFile))
         os.cp(targetFile, installFile)
         local screenNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'RmlUIScreen.nif')
+        local widgetLabelScreenNif = path.join(
+            os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'WidgetLabelScreen.nif')
         local galleryPhotoNif = path.join(
             os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'GalleryPhotoSurface.nif')
         local spellWheelNif = path.join(os.projectdir(), 'Assets', 'meshes', 'DragonBoardVR', 'dragonboard.nif')
@@ -199,15 +204,8 @@ target('DragonBoardVR')
                 installRoot, 'meshes', 'DragonBoardVR', 'TutorialScreen.nif'),
             '-Replacement', 'RmlUI3.dds'
         })
-        os.vrunv('powershell', {
-            '-NoProfile',
-            '-ExecutionPolicy', 'Bypass',
-            '-File', path.join(os.projectdir(), 'Tools', 'GenerateStatusScreen.ps1'),
-            '-Source', screenNif,
-            '-Destination', path.join(
-                installRoot, 'meshes', 'DragonBoardVR', 'WidgetLabelScreen.nif'),
-            '-Replacement', 'RmlUI4.dds'
-        })
+        os.cp(widgetLabelScreenNif, path.join(
+            installRoot, 'meshes', 'DragonBoardVR', 'WidgetLabelScreen.nif'))
         os.cp(spellWheelNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard.nif'))
         os.cp(physicalBoardNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard_physical.nif'))
         os.cp(vrikProxyNif, path.join(installRoot, 'meshes', 'DragonBoardVR', 'dragonboard_vrik_proxy.nif'))

@@ -135,6 +135,21 @@ namespace vrui
     {
     }
 
+    void VRUIItemEditPanel::update(float deltaTime)
+    {
+        VRUIDynamicContainer::update(deltaTime);
+
+        if (_previewRevealFrames <= 0 || !_previewWidget) {
+            return;
+        }
+
+        --_previewRevealFrames;
+        if (_previewRevealFrames == 0) {
+            _previewRootTransformConfigured = false;
+            updatePreview();
+        }
+    }
+
     void VRUIItemEditPanel::setTargetItem(const std::string& category, const std::string& itemName, const std::string& modelPath, uint32_t formID,
                                           float rotX, float rotY, float rotZ, float xOff, float yOff, float zOff, float scaleMult,
                                           const std::string& sourcePanel, const std::string& actionFunc)
@@ -663,7 +678,10 @@ namespace vrui
                     anchorY,
                     anchorZ
                 });
-                _previewWidget->setLocalScale(_normalizedScale * _baseScaleMult * previewScale);
+                const float rootScale = _previewRevealFrames > 0 ?
+                    0.0001f :
+                    _normalizedScale * _baseScaleMult * previewScale;
+                _previewWidget->setLocalScale(rootScale);
                 _previewRootTransformConfigured = true;
             }
             _previewWidget->setPrimaryVisualTransform({ _posX, _posY, _posZ }, rot, _scale);
@@ -744,6 +762,8 @@ namespace vrui
         });
         addChild(_previewWidget);
         updateInventoryPreviewInteraction();
+        _previewRevealFrames = 1;
+        _previewRootTransformConfigured = false;
         updatePreview();
     }
 

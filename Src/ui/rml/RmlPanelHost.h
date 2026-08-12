@@ -306,7 +306,7 @@ namespace dragonboard::ui::rml
             bool alwaysOnDisplay = false;
             bool showDevButton = false;
             bool showTutorials = true;
-            bool statusWidgetVisible = true;
+            bool statusWidgetVisible = false;
             std::string uiLanguage{ "en" };
             bool worldPinned = false;
             float menuScale = 1.0f;

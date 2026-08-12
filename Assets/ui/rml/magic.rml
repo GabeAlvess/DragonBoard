@@ -23,7 +23,7 @@
 
         <section class="magic-list-panel">
             <div class="list-heading">
-                <span class="list-heading-label">SPELLS</span>
+                <span id="magic-filter-heading" class="list-heading-label">ALL</span>
                 <span id="magic-spell-count" class="spell-count">0</span>
             </div>
             <div class="magic-list-shell">

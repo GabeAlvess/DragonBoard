@@ -23,7 +23,7 @@
 
         <section class="inventory-list-panel">
             <div class="list-heading">
-                <span class="list-heading-label">ITEMS</span>
+                <span id="inventory-filter-heading" class="list-heading-label">ALL</span>
                 <span id="inventory-item-count" class="item-count">0</span>
             </div>
             <div class="inventory-list-shell">

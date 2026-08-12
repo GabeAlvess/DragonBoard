@@ -70,7 +70,7 @@ if (-not $header.Contains('bool boardWidget = false;')) {
 if (-not $header.Contains('RE::NiNode* tabletRootNode = nullptr;')) {
     throw 'SurfaceState must cache the tablet root used by its visual rotation'
 }
-if (-not $header.Contains('bool statusWidgetVisible = true;')) {
+if (-not $header.Contains('bool statusWidgetVisible = false;')) {
     throw 'SettingsDraft must carry Status widget visibility'
 }
 if (-not $header.Contains('_statusWidgetResetPending')) {

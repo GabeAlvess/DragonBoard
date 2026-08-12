@@ -9049,6 +9049,7 @@ namespace dragonboard::ui::rml
             backend = _inventoryBackend;
             preview = _inventoryPreviewBackend;
         }
+        const auto previousEntry = _inventoryPresenter.SelectedEntry();
         const auto selectedEntry = action == InventoryAction::kSelect ?
             _inventoryPresenter.Select(index) :
             _inventoryPresenter.SelectedEntry();
@@ -9059,7 +9060,11 @@ namespace dragonboard::ui::rml
 
         switch (action) {
         case InventoryAction::kSelect:
-            UpdateInventoryPreviewGameThread();
+            if (!previousEntry || !selectedEntry ||
+                previousEntry->formID != selectedEntry->formID ||
+                previousEntry->modelPath != selectedEntry->modelPath) {
+                UpdateInventoryPreviewGameThread();
+            }
             _rmlInventorySyncPending.store(true, std::memory_order_release);
             return;
         case InventoryAction::kEquip:
@@ -9280,6 +9285,7 @@ namespace dragonboard::ui::rml
             backend = _magicBackend;
             preview = _magicPreviewBackend;
         }
+        const auto previousSelected = _magicPresenter.SelectedEntry();
         const auto selected = action == MagicAction::kSelect ?
             _magicPresenter.Select(index) :
             _magicPresenter.SelectedEntry();
@@ -9294,7 +9300,11 @@ namespace dragonboard::ui::rml
 
         switch (action) {
         case MagicAction::kSelect:
-            UpdateMagicPreviewGameThread();
+            if (!previousSelected || !selected ||
+                previousSelected->formID != selected->formID ||
+                previousSelected->modelPath != selected->modelPath) {
+                UpdateMagicPreviewGameThread();
+            }
             _rmlMagicSyncPending.store(true, std::memory_order_release);
             return;
         case MagicAction::kEquip:

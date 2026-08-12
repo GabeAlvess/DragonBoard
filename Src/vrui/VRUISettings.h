@@ -358,7 +358,7 @@ namespace vrui
         float bDevPosX = -16.000000f; float bDevPosY = 0.000000f; float bDevPosZ = -2.000000f;
         float bDevRotX = 0.000000f; float bDevRotY = 0.000000f; float bDevRotZ = 0.000000f;
         float bDevScale = 0.800000f;   
-        bool  showDevButton = true;
+        bool  showDevButton = false;
 
         std::string bGalleryLabel = "Gallery";
         std::string bGalleryAction = "Gallery";
@@ -366,7 +366,7 @@ namespace vrui
         float bGalleryRotX = 0.0f; float bGalleryRotY = 0.0f; float bGalleryRotZ = 20.0f;
         float bGalleryScale = 1.0f;
 
-        bool statusWidgetVisible = true;
+        bool statusWidgetVisible = false;
         int galleryCaptureTimerSeconds = 0;
         int galleryGridColumns = 8;
         int galleryThumbnailWidth = 512;

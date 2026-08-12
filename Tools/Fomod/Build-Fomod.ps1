@@ -530,6 +530,10 @@ foreach ($floatingSize in $floatingSizes.GetEnumerator()) {
         $sourcePath = Join-Path $sourceRoot $relativePath
         $content = [IO.File]::ReadAllText($sourcePath, $utf8)
         $content = Set-IniValue -Text $content -Section 'Visual' -Key 'fMenuScale' -Value $scaleValue
+        $content = Set-IniValue -Text $content -Section 'FixedButtons' -Key 'bShowDevButton' -Value 'false'
+        $content = Set-IniValue -Text $content -Section 'FixedButtons' -Key 'fHomePosY' -Value '0.000000'
+        $content = Set-IniValue -Text $content -Section 'FixedButtons' -Key 'fHomeRotX' -Value '0.000000'
+        $content = Set-IniValue -Text $content -Section 'StatusWidget' -Key 'bVisible' -Value 'false'
         foreach ($offset in $floatingOffsets.GetEnumerator()) {
             $offsetValue = ([double]$offset.Value).ToString('0.000000', [Globalization.CultureInfo]::InvariantCulture)
             $content = Set-IniValue -Text $content -Section 'Visual' -Key $offset.Key -Value $offsetValue

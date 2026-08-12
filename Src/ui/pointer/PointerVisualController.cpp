@@ -28,15 +28,6 @@ namespace dragonboard::ui::pointer
         }
         manager._pointerVisual.SetActive(true);
 
-        if (manager._pointerVisual.IsReticleSuppressed()) {
-            reticle->SetAppCulled(true);
-            if (beam->parent) {
-                beam->parent->DetachChild(beam.get());
-            }
-            beam->SetAppCulled(true);
-            return;
-        }
-
         const bool parentChanged = reticle->parent != panelNode;
         if (parentChanged) {
             if (reticle->parent) {
@@ -95,6 +86,16 @@ namespace dragonboard::ui::pointer
             settings.reticleRotY * degreesToRadians,
             settings.reticleRotZ * degreesToRadians);
         reticle->local.rotate = reticleRotation;
+
+        if (manager._pointerVisual.IsReticleSuppressed()) {
+            reticle->SetAppCulled(true);
+            if (beam->parent) {
+                beam->parent->DetachChild(beam.get());
+            }
+            beam->SetAppCulled(true);
+            return;
+        }
+
         reticle->SetAppCulled(false);
 
         if (beam->parent) {

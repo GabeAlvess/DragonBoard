@@ -45,6 +45,7 @@ namespace vrui
 
         explicit VRUIItemEditPanel(const std::string& name);
 
+        void update(float deltaTime) override;
         void setTargetItem(const std::string& category, const std::string& itemName, const std::string& modelPath, uint32_t formID,
                            float rotX, float rotY, float rotZ, float posX, float posY, float posZ, float scale,
                            const std::string& sourcePanel = "InventoryPanel", const std::string& actionFunc = "");
@@ -105,6 +106,7 @@ namespace vrui
         float _normalizedScale = 1.0f;
         bool _rmlPreviewMode = true;
         bool _previewRootTransformConfigured = false;
+        int _previewRevealFrames = 0;
         RmlPreviewLayout _rmlPreviewLayout = RmlPreviewLayout::ItemEditor;
         InventoryPreviewInteractionHandler _inventoryPreviewInteractionHandler;
         WorkingTransformChangedHandler _workingTransformChangedHandler;
